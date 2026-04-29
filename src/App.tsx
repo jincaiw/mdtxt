@@ -17,9 +17,11 @@ import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 import { SplitDivider } from "./components/SplitDivider";
 import {
   addRecentFile,
+  getAutoSave,
   getLastFile,
   getSavedViewMode,
   getSplitRatio,
+  setAutoSave,
   setLastFile,
   setSavedViewMode,
   setSplitRatio,
@@ -50,6 +52,7 @@ function AppContent() {
   // UI state
   const [mode, setMode] = useState<ViewMode>(() => getSavedViewMode());
   const [splitRatio, setSplitRatioState] = useState<number>(() => getSplitRatio());
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(() => getAutoSave());
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -111,6 +114,35 @@ function AppContent() {
   useEffect(() => {
     setSplitRatio(splitRatio);
   }, [splitRatio]);
+
+  useEffect(() => {
+    setAutoSave(autoSaveEnabled);
+  }, [autoSaveEnabled]);
+
+  // Listen for SettingsMenu toggling auto-save (cross-component event keeps both sides in sync)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail?.enabled === "boolean") setAutoSaveEnabled(detail.enabled);
+    };
+    window.addEventListener("marklite:autosave-toggle", handler);
+    return () => window.removeEventListener("marklite:autosave-toggle", handler);
+  }, []);
+
+  // Auto-save: debounced 1.5s after typing stops, only if a file is open and dirty
+  useEffect(() => {
+    if (!autoSaveEnabled) return;
+    if (!filePath) return;
+    if (content === originalContent) return;
+
+    const timer = window.setTimeout(() => {
+      invoke("save_file", { path: filePath, content })
+        .then(() => setOriginalContent(content))
+        .catch((err) => console.error("Auto-save failed:", err));
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, [autoSaveEnabled, content, originalContent, filePath]);
 
   useEffect(() => {
     // Restore last opened file once on app launch
@@ -413,7 +445,7 @@ function AppContent() {
       />
 
       {!hasFile ? (
-        <WelcomeScreen onOpenFile={handleOpenFile} onFileDrop={handleFileDrop} />
+        <WelcomeScreen onOpenFile={handleOpenFile} onFileDrop={handleFileDrop} onOpenRecent={loadFile} />
       ) : (
         <>
           {/* Split-aware layout. Both views always mounted; CSS toggles their display

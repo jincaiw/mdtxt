@@ -61,3 +61,7 @@ export const getSplitRatio = (): number => {
     return Number.isFinite(r) && r > 0.15 && r < 0.85 ? r : 0.5;
 };
 export const setSplitRatio = (r: number): void => safeSet(KEY_SPLIT_RATIO, r);
+
+const KEY_AUTOSAVE = "marklite:autoSave";
+export const getAutoSave = (): boolean => safeGet<boolean>(KEY_AUTOSAVE, false);
+export const setAutoSave = (v: boolean): void => safeSet(KEY_AUTOSAVE, v);

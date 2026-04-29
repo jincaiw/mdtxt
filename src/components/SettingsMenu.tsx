@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTheme, Theme, FontFamily, FontSize } from '../context/ThemeContext';
+import { getAutoSave, setAutoSave } from '../utils/persistence';
 
 const themes: { id: Theme; name: string; colors: [string, string]; textColor: string; icon?: string }[] = [
     { id: 'dark', name: 'Dark', colors: ['#0a0a0a', '#141414'], textColor: '#ffffff' },
@@ -24,8 +25,17 @@ const fontSizes: { id: FontSize; name: string; size: string }[] = [
 
 export function SettingsMenu() {
     const [isOpen, setIsOpen] = useState(false);
+    const [autoSave, setAutoSaveState] = useState(() => getAutoSave());
     const { theme, setTheme, font, setFont, fontSize, setFontSize } = useTheme();
     const menuRef = useRef<HTMLDivElement>(null);
+
+    const toggleAutoSave = () => {
+        const next = !autoSave;
+        setAutoSaveState(next);
+        setAutoSave(next);
+        // Notify the app so the auto-save effect picks up the new setting
+        window.dispatchEvent(new CustomEvent("marklite:autosave-toggle", { detail: { enabled: next } }));
+    };
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -125,7 +135,7 @@ export function SettingsMenu() {
                     </div>
 
                     {/* Font Size Section */}
-                    <div className="p-4">
+                    <div className="p-4 border-b border-[var(--border)]">
                         <div className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
                             Font Size
                         </div>
@@ -143,6 +153,31 @@ export function SettingsMenu() {
                                 </button>
                             ))}
                         </div>
+                    </div>
+
+                    {/* Editor Section */}
+                    <div className="p-4">
+                        <div className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+                            Editor
+                        </div>
+                        <button
+                            onClick={toggleAutoSave}
+                            role="switch"
+                            aria-checked={autoSave}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[var(--bg-hover)] text-sm text-[var(--text-primary)]"
+                        >
+                            <span className="flex flex-col items-start">
+                                <span>Auto-save</span>
+                                <span className="text-[11px] text-[var(--text-muted)]">Save 1.5s after typing stops</span>
+                            </span>
+                            <span
+                                className={`relative inline-block w-9 h-5 rounded-full transition-colors ${autoSave ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
+                            >
+                                <span
+                                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${autoSave ? "translate-x-4" : ""}`}
+                                />
+                            </span>
+                        </button>
                     </div>
                 </div>
             )}
