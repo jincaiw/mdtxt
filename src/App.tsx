@@ -79,6 +79,10 @@ function AppContent() {
   const lineCount = useMemo(() => content.split("\n").length, [content]);
   const hasFile = filePath !== null;
   const wordCount = useMemo(() => getWordCount(content), [content]);
+  const charCount = useMemo(() => content.length, [content]);
+  // Average adult reading speed for prose: ~200 wpm. Markdown markup inflates
+  // word count slightly, but the rough number is what users actually want.
+  const readingTimeMin = useMemo(() => wordCount / 200, [wordCount]);
 
   // Show toast helper
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
@@ -526,6 +530,8 @@ function AppContent() {
             onToggleFileExplorer={handleToggleFileExplorer}
             onToggleTOC={handleToggleTOC}
             wordCount={wordCount}
+            charCount={charCount}
+            readingTimeMin={readingTimeMin}
           />
         </>
       )}

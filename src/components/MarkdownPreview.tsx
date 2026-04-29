@@ -3,6 +3,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { readFile } from "@tauri-apps/plugin-fs";
+import { parseFrontmatter } from "../utils/frontmatter";
 
 interface MarkdownPreviewProps {
     content: string;
@@ -162,6 +163,62 @@ function CodeBlock({ children, ...rest }: React.HTMLAttributes<HTMLPreElement>) 
     );
 }
 
+/** Render YAML frontmatter as a collapsible metadata card. */
+function FrontmatterCard({ data }: { data: Record<string, string | number | boolean | string[]> }) {
+    const [collapsed, setCollapsed] = useState(false);
+    const entries = Object.entries(data);
+    if (entries.length === 0) return null;
+
+    const renderValue = (v: string | number | boolean | string[]) => {
+        if (Array.isArray(v)) {
+            return (
+                <div className="flex flex-wrap gap-1">
+                    {v.map((item, i) => (
+                        <span key={i} className="px-2 py-0.5 text-xs bg-[var(--bg-hover)] rounded border border-[var(--border-subtle)] text-[var(--text-primary)]">
+                            {item}
+                        </span>
+                    ))}
+                </div>
+            );
+        }
+        if (typeof v === "boolean") {
+            return <span className="text-xs font-mono">{v ? "true" : "false"}</span>;
+        }
+        return <span className="text-sm">{String(v)}</span>;
+    };
+
+    return (
+        <div className="mb-6 border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--bg-secondary)]">
+            <button
+                type="button"
+                onClick={() => setCollapsed((c) => !c)}
+                className="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider hover:bg-[var(--bg-hover)] transition-colors"
+                aria-expanded={!collapsed}
+            >
+                <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px]">tune</span>
+                    Frontmatter
+                </span>
+                <span className="material-symbols-outlined text-[18px]">
+                    {collapsed ? "expand_more" : "expand_less"}
+                </span>
+            </button>
+            {!collapsed && (
+                <div className="px-4 py-3 border-t border-[var(--border-subtle)]">
+                    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
+                        {entries.map(([k, v]) => (
+                            <div key={k} className="contents">
+                                <dt className="font-mono text-xs text-[var(--text-muted)] pt-0.5">{k}</dt>
+                                <dd className="text-[var(--text-primary)]">{renderValue(v)}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
+            )}
+        </div>
+    );
+}
+
 /** Interactive task checkbox — local optimistic state, parent writes to source. */
 function InteractiveTaskCheckbox({ initialChecked, onToggle }: { initialChecked: boolean; onToggle: (checked: boolean) => void }) {
     const [checked, setChecked] = useState(initialChecked);
@@ -306,6 +363,14 @@ export function MarkdownPreview({
     const taskCheckboxCounter = useRef(0);
     taskCheckboxCounter.current = 0;
 
+    // Parse YAML frontmatter once per content change. We render it as a
+    // metadata card and pass the *body* (without the --- block) to react-markdown
+    // so the raw YAML doesn't appear as a thematic break + heading.
+    const { body: renderBody, data: frontmatter, hasFrontmatter } = useMemo(
+        () => parseFrontmatter(content),
+        [content]
+    );
+
     // Calculate current line based on scroll position
     const handleScroll = useCallback(() => {
         if (!mainRef.current || !onLineChange) return;
@@ -347,13 +412,14 @@ export function MarkdownPreview({
                 className="flex-1 overflow-y-auto bg-[var(--bg-primary)] transition-colors"
             >
                 <div className="max-w-[800px] mx-auto px-8 py-12">
+                    {hasFrontmatter && <FrontmatterCard data={frontmatter} />}
                     <div className="markdown-body" ref={markdownBodyRef}>
                         <Markdown
                             remarkPlugins={[remarkGfm]}
                             rehypePlugins={[rehypeHighlight]}
                             components={components}
                         >
-                            {content}
+                            {renderBody}
                         </Markdown>
                     </div>
                 </div>

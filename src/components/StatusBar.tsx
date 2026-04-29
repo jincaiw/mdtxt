@@ -8,7 +8,17 @@ interface StatusBarProps {
     onToggleFileExplorer?: () => void;
     onToggleTOC?: () => void;
     wordCount?: number;
+    charCount?: number;
+    readingTimeMin?: number;
 }
+
+const formatReadingTime = (min: number): string => {
+    if (min < 1) return "< 1 min read";
+    if (min < 60) return `${Math.round(min)} min read`;
+    const hours = Math.floor(min / 60);
+    const rem = Math.round(min % 60);
+    return rem === 0 ? `${hours}h read` : `${hours}h ${rem}m read`;
+};
 
 export function StatusBar({
     isSaved,
@@ -20,6 +30,8 @@ export function StatusBar({
     onToggleFileExplorer,
     onToggleTOC,
     wordCount,
+    charCount,
+    readingTimeMin,
 }: StatusBarProps) {
     return (
         <footer
@@ -75,8 +87,13 @@ export function StatusBar({
                     </div>
                 )}
                 {wordCount !== undefined && (
-                    <div className="hover:text-[var(--text-primary)] cursor-default transition-colors">
+                    <div className="hover:text-[var(--text-primary)] cursor-default transition-colors" title={charCount !== undefined ? `${charCount.toLocaleString()} characters` : undefined}>
                         {wordCount.toLocaleString()} words
+                    </div>
+                )}
+                {readingTimeMin !== undefined && readingTimeMin > 0 && (
+                    <div className="hover:text-[var(--text-primary)] cursor-default transition-colors" title="Estimated reading time at 200 wpm">
+                        {formatReadingTime(readingTimeMin)}
                     </div>
                 )}
                 <div className="hover:text-[var(--text-primary)] cursor-default transition-colors">
