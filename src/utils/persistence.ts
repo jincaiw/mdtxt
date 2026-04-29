@@ -65,3 +65,27 @@ export const setSplitRatio = (r: number): void => safeSet(KEY_SPLIT_RATIO, r);
 const KEY_AUTOSAVE = "marklite:autoSave";
 export const getAutoSave = (): boolean => safeGet<boolean>(KEY_AUTOSAVE, false);
 export const setAutoSave = (v: boolean): void => safeSet(KEY_AUTOSAVE, v);
+
+const KEY_FOCUS_MODE = "marklite:focusMode";
+const KEY_TYPEWRITER_MODE = "marklite:typewriterMode";
+const KEY_TOOLBAR = "marklite:toolbar";
+export const getFocusMode = (): boolean => safeGet<boolean>(KEY_FOCUS_MODE, false);
+export const setFocusMode = (v: boolean): void => safeSet(KEY_FOCUS_MODE, v);
+export const getTypewriterMode = (): boolean => safeGet<boolean>(KEY_TYPEWRITER_MODE, false);
+export const setTypewriterMode = (v: boolean): void => safeSet(KEY_TYPEWRITER_MODE, v);
+export const getToolbarEnabled = (): boolean => safeGet<boolean>(KEY_TOOLBAR, false);
+export const setToolbarEnabled = (v: boolean): void => safeSet(KEY_TOOLBAR, v);
+
+const KEY_AI_ENDPOINT = "marklite:aiEndpoint";
+const KEY_AI_MODEL = "marklite:aiModel";
+const KEY_AI_API_KEY = "marklite:aiApiKey";
+export const getAIConfig = (): { endpoint: string; model: string; apiKey: string } => ({
+    endpoint: safeGet<string>(KEY_AI_ENDPOINT, ""),
+    model: safeGet<string>(KEY_AI_MODEL, ""),
+    apiKey: safeGet<string>(KEY_AI_API_KEY, ""),
+});
+export const setAIConfig = (cfg: { endpoint: string; model: string; apiKey: string }): void => {
+    safeSet(KEY_AI_ENDPOINT, cfg.endpoint);
+    safeSet(KEY_AI_MODEL, cfg.model);
+    safeSet(KEY_AI_API_KEY, cfg.apiKey);
+};

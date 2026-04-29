@@ -11,6 +11,7 @@ import {
     type EditorResult,
 } from "../utils/editorActions";
 import { FindReplaceBar } from "./FindReplaceBar";
+import { FormatToolbar } from "./FormatToolbar";
 import type { Scroller } from "../utils/scrollSync";
 
 interface CodeEditorProps {
@@ -22,6 +23,11 @@ interface CodeEditorProps {
     filePath?: string | null; // Current file path for saving images
     onScrollFraction?: (fraction: number) => void;
     registerScroller?: (scroller: Scroller | null) => void;
+    focusMode?: boolean;
+    typewriterMode?: boolean;
+    showToolbar?: boolean;
+    onSlashTrigger?: (textareaEl: HTMLTextAreaElement, caretCoords: { x: number; y: number }) => void;
+    aiConfig?: { endpoint: string; model: string; apiKey: string };
 }
 
 // Locked metrics for perfect alignment between textarea and highlight layer.
@@ -49,7 +55,7 @@ const sharedTextStyle: React.CSSProperties = {
     boxSizing: "border-box",
 };
 
-export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, onError, filePath, onScrollFraction, registerScroller }: CodeEditorProps) {
+export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, onError, filePath, onScrollFraction, registerScroller, focusMode, typewriterMode, showToolbar, onSlashTrigger }: CodeEditorProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const gutterRef = useRef<HTMLDivElement>(null);
     const highlightRef = useRef<HTMLDivElement>(null);
@@ -333,6 +339,58 @@ export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, on
     // Memoize highlighted lines to avoid recalculating on non-content re-renders
     const highlightedLines = useMemo(() => lines.map((line) => highlightLine(line)), [lines]);
 
+    // Typewriter mode: keep the active line vertically centered as the caret moves.
+    useEffect(() => {
+        if (!typewriterMode) return;
+        const t = textareaRef.current;
+        if (!t) return;
+        const targetTop = (activeLine - 1) * EDITOR_LINE_HEIGHT - t.clientHeight / 2 + EDITOR_LINE_HEIGHT / 2;
+        // Smooth via rAF for a calmer scroll than scrollTo({behavior:'smooth'}) which
+        // can fight the user's own input on some browsers.
+        const start = t.scrollTop;
+        const distance = Math.max(0, targetTop) - start;
+        if (Math.abs(distance) < 1) return;
+        let raf = 0;
+        const t0 = performance.now();
+        const dur = 120;
+        const step = (now: number) => {
+            const p = Math.min(1, (now - t0) / dur);
+            const eased = 1 - Math.pow(1 - p, 3);
+            t.scrollTop = start + distance * eased;
+            if (p < 1) raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(raf);
+    }, [activeLine, typewriterMode]);
+
+    // Slash-command trigger: when user types "/" at start of line (or after whitespace),
+    // notify parent so it can open the slash menu near the caret.
+    useEffect(() => {
+        const t = textareaRef.current;
+        if (!t || !onSlashTrigger) return;
+        const handler = (e: KeyboardEvent) => {
+            if (e.key !== "/") return;
+            // Only trigger when we're about to type "/" at the start of a line
+            // or after whitespace. Defer to rAF so the textarea has the new value.
+            requestAnimationFrame(() => {
+                const pos = t.selectionStart;
+                const before = t.value.slice(0, pos);
+                const lastNl = before.lastIndexOf("\n");
+                const lineHead = before.slice(lastNl + 1);
+                if (lineHead === "/") {
+                    // Caret coords: roughly cursor line × line-height + padding offset
+                    const lineIdx = before.split("\n").length - 1;
+                    const rect = t.getBoundingClientRect();
+                    const x = rect.left + EDITOR_PADDING;
+                    const y = rect.top + EDITOR_PADDING + (lineIdx * EDITOR_LINE_HEIGHT) - t.scrollTop + EDITOR_LINE_HEIGHT;
+                    onSlashTrigger(t, { x, y });
+                }
+            });
+        };
+        t.addEventListener("keydown", handler);
+        return () => t.removeEventListener("keydown", handler);
+    }, [onSlashTrigger]);
+
     // Syntax highlighting for markdown
     function highlightLine(line: string): React.ReactNode {
         if (line.startsWith("# ")) {
@@ -500,8 +558,26 @@ export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, on
         });
     }, [onChange]);
 
+    const insertAtCaret = useCallback((text: string) => {
+        const t = textareaRef.current;
+        if (!t) return;
+        applyResult({
+            text: t.value.slice(0, t.selectionStart) + text + t.value.slice(t.selectionEnd),
+            selStart: t.selectionStart + text.length,
+            selEnd: t.selectionStart + text.length,
+        });
+    }, [applyResult]);
+
     return (
-        <main className="flex-1 flex overflow-hidden relative">
+        <main className="flex-1 flex flex-col overflow-hidden relative">
+            {showToolbar && (
+                <FormatToolbar
+                    getTextarea={() => textareaRef.current}
+                    apply={applyResult}
+                    insert={insertAtCaret}
+                />
+            )}
+            <div className="flex flex-1 overflow-hidden relative">
             {/* Line Numbers Gutter */}
             <div
                 ref={gutterRef}
@@ -551,11 +627,23 @@ export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, on
                             opacity: 0.45,
                         }}
                     />
-                    {highlightedLines.map((highlighted, i) => (
-                        <div key={i} style={{ height: `${EDITOR_LINE_HEIGHT}px`, lineHeight: `${EDITOR_LINE_HEIGHT}px`, position: "relative" }}>
-                            {highlighted}
-                        </div>
-                    ))}
+                    {highlightedLines.map((highlighted, i) => {
+                        const isActive = i + 1 === activeLine;
+                        return (
+                            <div
+                                key={i}
+                                style={{
+                                    height: `${EDITOR_LINE_HEIGHT}px`,
+                                    lineHeight: `${EDITOR_LINE_HEIGHT}px`,
+                                    position: "relative",
+                                    opacity: focusMode && !isActive ? 0.35 : 1,
+                                    transition: focusMode ? "opacity 150ms ease-out" : undefined,
+                                }}
+                            >
+                                {highlighted}
+                            </div>
+                        );
+                    })}
                 </div>
 
                 <FindReplaceBar
@@ -571,7 +659,7 @@ export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, on
                     onReplace={handleFindReplace}
                 />
 
-                {/* Actual Editable Textarea — transparent text, real caret */}
+                {/* Actual Editable Textarea — transparent text, real caret. */}
                 <textarea
                     ref={textareaRef}
                     value={content}
@@ -588,6 +676,7 @@ export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, on
                         caretColor: "var(--accent)",
                     }}
                 />
+            </div>
             </div>
         </main>
     );

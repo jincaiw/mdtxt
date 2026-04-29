@@ -20,13 +20,19 @@ import { ShortcutCheatsheet } from "./components/ShortcutCheatsheet";
 import {
   addRecentFile,
   getAutoSave,
+  getFocusMode,
   getLastFile,
   getSavedViewMode,
   getSplitRatio,
+  getToolbarEnabled,
+  getTypewriterMode,
   setAutoSave,
+  setFocusMode,
   setLastFile,
   setSavedViewMode,
   setSplitRatio,
+  setToolbarEnabled,
+  setTypewriterMode,
 } from "./utils/persistence";
 
 interface FileData {
@@ -56,6 +62,9 @@ function AppContent() {
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [splitRatio, setSplitRatioState] = useState<number>(() => getSplitRatio());
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(() => getAutoSave());
+  const [focusModeEnabled, setFocusModeEnabled] = useState<boolean>(() => getFocusMode());
+  const [typewriterModeEnabled, setTypewriterModeEnabled] = useState<boolean>(() => getTypewriterMode());
+  const [toolbarVisible, setToolbarVisible] = useState<boolean>(() => getToolbarEnabled());
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -151,6 +160,21 @@ function AppContent() {
   useEffect(() => {
     setAutoSave(autoSaveEnabled);
   }, [autoSaveEnabled]);
+
+  useEffect(() => { setFocusMode(focusModeEnabled); }, [focusModeEnabled]);
+  useEffect(() => { setTypewriterMode(typewriterModeEnabled); }, [typewriterModeEnabled]);
+  useEffect(() => { setToolbarEnabled(toolbarVisible); }, [toolbarVisible]);
+
+  // Cross-component event listeners — settings menu and command palette toggle these
+  useEffect(() => {
+    const handlers: Array<[string, (e: Event) => void]> = [
+      ["marklite:focus-toggle", (e) => setFocusModeEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["marklite:typewriter-toggle", (e) => setTypewriterModeEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["marklite:toolbar-toggle", (e) => setToolbarVisible(!!(e as CustomEvent).detail?.enabled)],
+    ];
+    handlers.forEach(([k, h]) => window.addEventListener(k, h));
+    return () => handlers.forEach(([k, h]) => window.removeEventListener(k, h));
+  }, []);
 
   // Listen for SettingsMenu toggling auto-save (cross-component event keeps both sides in sync)
   useEffect(() => {
@@ -514,6 +538,9 @@ function AppContent() {
                 filePath={filePath}
                 onScrollFraction={onCodeScrollFraction}
                 registerScroller={registerCodeScroller}
+                focusMode={focusModeEnabled}
+                typewriterMode={typewriterModeEnabled}
+                showToolbar={toolbarVisible}
               />
             </div>
 
