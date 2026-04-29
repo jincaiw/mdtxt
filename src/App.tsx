@@ -16,6 +16,7 @@ import { Toast, ToastType } from "./components/Toast";
 import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 import { SplitDivider } from "./components/SplitDivider";
 import { createScrollSync } from "./utils/scrollSync";
+import { ShortcutCheatsheet } from "./components/ShortcutCheatsheet";
 import {
   addRecentFile,
   getAutoSave,
@@ -52,6 +53,7 @@ function AppContent() {
 
   // UI state
   const [mode, setMode] = useState<ViewMode>(() => getSavedViewMode());
+  const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [splitRatio, setSplitRatioState] = useState<number>(() => getSplitRatio());
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(() => getAutoSave());
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
@@ -450,6 +452,15 @@ function AppContent() {
           handleToggleSplit();
         }
       }
+      // ? — Show cheatsheet (only when no input is focused)
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement | null;
+        const isTyping = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+        if (!isTyping) {
+          e.preventDefault();
+          setShowCheatsheet(true);
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -584,6 +595,8 @@ function AppContent() {
           </div>
         </div>
       )}
+
+      <ShortcutCheatsheet isOpen={showCheatsheet} onClose={() => setShowCheatsheet(false)} />
 
       {/* Toast notifications */}
       <Toast
