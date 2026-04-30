@@ -5,6 +5,26 @@ All notable changes to MarkLite will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-04-30
+
+### Fixed
+
+- "This file was deleted or moved" banner appearing on every opened file (false positive in mtime polling) — feature removed
+- Outline panel: scrolling broken and last item bleeding into status bar (missing `flex flex-col` + `min-h-0` chain on the panel)
+- TOC links inside markdown body (e.g. `[Q1](#q1)`) not navigating to their headings — explicit click handler added with fuzzy heading-text fallback for non-matching slugs
+- New File button doing nothing visible — `hasFile` now considers a blank `Untitled.md` buffer as "open"
+- Command palette on the welcome screen exposing Save / Save As / view toggles that wouldn't work without a buffer
+
+### Removed
+
+- Auto-save toggle (UI removed from Settings dropdown, Settings modal, command palette, status bar)
+- Focus-mode dimming of non-active editor lines — all lines now render at full opacity (typewriter mode kept)
+- External-change polling that was watching the open file's mtime
+
+### Changed
+
+- Wikilink resolution and recent-file existence checks use the existing `get_file_info` Rust command instead of the fs plugin's `stat`
+
 ## [0.6.0] - 2026-04-29
 
 ### Added — Editor
