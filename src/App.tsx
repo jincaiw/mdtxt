@@ -25,14 +25,18 @@ import {
   getAIConfig,
   getLastFile,
   getSavedViewMode,
+  getSpellCheck,
   getSplitRatio,
   getToolbarEnabled,
   getTypewriterMode,
+  getWordWrap,
   setLastFile,
   setSavedViewMode,
+  setSpellCheck,
   setSplitRatio,
   setToolbarEnabled,
   setTypewriterMode,
+  setWordWrap,
 } from "./utils/persistence";
 
 interface FileData {
@@ -66,6 +70,8 @@ function AppContent() {
   const [aiConfig, setAiConfigState] = useState(() => getAIConfig());
   const [typewriterModeEnabled, setTypewriterModeEnabled] = useState<boolean>(() => getTypewriterMode());
   const [toolbarVisible, setToolbarVisible] = useState<boolean>(() => getToolbarEnabled());
+  const [wordWrapEnabled, setWordWrapEnabled] = useState<boolean>(() => getWordWrap());
+  const [spellCheckEnabled, setSpellCheckEnabled] = useState<boolean>(() => getSpellCheck());
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -161,12 +167,16 @@ function AppContent() {
 
   useEffect(() => { setTypewriterMode(typewriterModeEnabled); }, [typewriterModeEnabled]);
   useEffect(() => { setToolbarEnabled(toolbarVisible); }, [toolbarVisible]);
+  useEffect(() => { setWordWrap(wordWrapEnabled); }, [wordWrapEnabled]);
+  useEffect(() => { setSpellCheck(spellCheckEnabled); }, [spellCheckEnabled]);
 
   // Cross-component event listeners — settings menu and command palette toggle these
   useEffect(() => {
     const handlers: Array<[string, (e: Event) => void]> = [
       ["marklite:typewriter-toggle", (e) => setTypewriterModeEnabled(!!(e as CustomEvent).detail?.enabled)],
       ["marklite:toolbar-toggle", (e) => setToolbarVisible(!!(e as CustomEvent).detail?.enabled)],
+      ["marklite:wordwrap-toggle", (e) => setWordWrapEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["marklite:spellcheck-toggle", (e) => setSpellCheckEnabled(!!(e as CustomEvent).detail?.enabled)],
     ];
     handlers.forEach(([k, h]) => window.addEventListener(k, h));
 
@@ -781,6 +791,8 @@ function AppContent() {
                 registerScroller={registerCodeScroller}
                 typewriterMode={typewriterModeEnabled}
                 showToolbar={toolbarVisible}
+                wordWrap={wordWrapEnabled}
+                spellCheck={spellCheckEnabled}
                 aiConfig={aiConfig}
               />
             </div>

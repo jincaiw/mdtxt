@@ -3,6 +3,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { readFile } from "@tauri-apps/plugin-fs";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { parseFrontmatter, serializeFrontmatter, type FrontmatterValue } from "../utils/frontmatter";
 import type { Scroller } from "../utils/scrollSync";
 import { MermaidBlock, isMermaidLanguage } from "./MermaidBlock";
@@ -509,7 +510,27 @@ export function MarkdownPreview({
                     </a>
                 );
             }
-            return <a href={href} {...rest}>{children}</a>;
+            // External http(s) and mailto links — route through the OS default
+            // handler so the webview itself doesn't navigate away from the app.
+            const isExternal = !!href && /^(https?:|mailto:)/i.test(href);
+            return (
+                <a
+                    href={href}
+                    {...rest}
+                    {...(isExternal
+                        ? { rel: "noopener noreferrer", target: "_blank" }
+                        : {})}
+                    onClick={(e) => {
+                        if (!isExternal || !href) return;
+                        e.preventDefault();
+                        openUrl(href).catch((err) =>
+                            console.error("Failed to open external URL:", err)
+                        );
+                    }}
+                >
+                    {children}
+                </a>
+            );
         },
         pre: (props: React.HTMLAttributes<HTMLPreElement>) => <CodeBlock {...props} />,
         h1: (props: React.HTMLAttributes<HTMLHeadingElement>) => <HeadingWithAnchor level={1} {...props} />,

@@ -69,12 +69,18 @@ export const setAutoSave = (v: boolean): void => safeSet(KEY_AUTOSAVE, v);
 const KEY_FOCUS_MODE = "marklite:focusMode";
 const KEY_TYPEWRITER_MODE = "marklite:typewriterMode";
 const KEY_TOOLBAR = "marklite:toolbar";
+const KEY_WORD_WRAP = "marklite:wordWrap";
+const KEY_SPELL_CHECK = "marklite:spellCheck";
 export const getFocusMode = (): boolean => safeGet<boolean>(KEY_FOCUS_MODE, false);
 export const setFocusMode = (v: boolean): void => safeSet(KEY_FOCUS_MODE, v);
 export const getTypewriterMode = (): boolean => safeGet<boolean>(KEY_TYPEWRITER_MODE, false);
 export const setTypewriterMode = (v: boolean): void => safeSet(KEY_TYPEWRITER_MODE, v);
 export const getToolbarEnabled = (): boolean => safeGet<boolean>(KEY_TOOLBAR, false);
 export const setToolbarEnabled = (v: boolean): void => safeSet(KEY_TOOLBAR, v);
+export const getWordWrap = (): boolean => safeGet<boolean>(KEY_WORD_WRAP, true);
+export const setWordWrap = (v: boolean): void => safeSet(KEY_WORD_WRAP, v);
+export const getSpellCheck = (): boolean => safeGet<boolean>(KEY_SPELL_CHECK, false);
+export const setSpellCheck = (v: boolean): void => safeSet(KEY_SPELL_CHECK, v);
 
 const KEY_AI_ENDPOINT = "marklite:aiEndpoint";
 const KEY_AI_MODEL = "marklite:aiModel";
