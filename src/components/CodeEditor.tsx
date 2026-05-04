@@ -28,6 +28,8 @@ interface CodeEditorProps {
     registerScroller?: (scroller: Scroller | null) => void;
     typewriterMode?: boolean;
     showToolbar?: boolean;
+    wordWrap?: boolean;
+    spellCheck?: boolean;
     aiConfig?: { endpoint: string; model: string; apiKey: string };
 }
 
@@ -56,7 +58,13 @@ const sharedTextStyle: React.CSSProperties = {
     boxSizing: "border-box",
 };
 
-export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, onError, filePath, onScrollFraction, registerScroller, typewriterMode, showToolbar, aiConfig }: CodeEditorProps) {
+export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, onError, filePath, onScrollFraction, registerScroller, typewriterMode, showToolbar, wordWrap = true, spellCheck = false, aiConfig }: CodeEditorProps) {
+    // When word wrap is on, long lines wrap inside the editor and the highlight
+    // overlay; when off, lines scroll horizontally. Both layers must agree on
+    // these styles or the caret will visually drift away from the rendered text.
+    const wrapStyle: React.CSSProperties = wordWrap
+        ? { whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere" }
+        : { whiteSpace: "pre", wordBreak: "normal", overflowWrap: "normal" };
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const gutterRef = useRef<HTMLDivElement>(null);
     const highlightRef = useRef<HTMLDivElement>(null);
@@ -703,7 +711,10 @@ export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, on
                 />
             )}
             <div className="flex flex-1 overflow-hidden relative">
-            {/* Line Numbers Gutter */}
+            {/* Line Numbers Gutter — hidden in word-wrap mode because wrapped
+                lines occupy multiple visual rows, so per-source-line numbers
+                would no longer align with the editor content. */}
+            {!wordWrap && (
             <div
                 ref={gutterRef}
                 className="w-14 shrink-0 bg-[var(--bg-gutter)] border-r border-[var(--border-subtle)] no-select text-xs text-[var(--text-muted)] overflow-hidden transition-colors"
@@ -731,39 +742,49 @@ export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, on
                     })}
                 </div>
             </div>
+            )}
 
             {/* Editor Container */}
             <div className="flex-1 relative bg-[var(--bg-editor)] transition-colors">
                 {/* Syntax Highlighted Layer (visual only).
                     Active-line band lives inside this scroll container so it tracks
-                    scroll naturally — no JS scrollTop math required. */}
+                    scroll naturally — no JS scrollTop math required.
+                    When wordWrap is on, per-line divs use minHeight (so wrapped
+                    content can grow) and the active-line band is suppressed,
+                    since its fixed Y assumes uniform line heights. */}
                 <div
                     ref={highlightRef}
                     className="absolute inset-0 text-[var(--text-primary)] pointer-events-none overflow-hidden"
                     aria-hidden="true"
-                    style={sharedTextStyle}
+                    style={{ ...sharedTextStyle, ...wrapStyle }}
                 >
-                    <div
-                        className="absolute left-0 right-0 pointer-events-none"
-                        style={{
-                            top: `${EDITOR_PADDING + (activeLine - 1) * EDITOR_LINE_HEIGHT}px`,
-                            height: `${EDITOR_LINE_HEIGHT}px`,
-                            background: "var(--bg-hover)",
-                            opacity: 0.45,
-                        }}
-                    />
-                    {highlightedLines.map((highlighted, i) => (
+                    {!wordWrap && (
                         <div
-                            key={i}
+                            className="absolute left-0 right-0 pointer-events-none"
                             style={{
+                                top: `${EDITOR_PADDING + (activeLine - 1) * EDITOR_LINE_HEIGHT}px`,
                                 height: `${EDITOR_LINE_HEIGHT}px`,
-                                lineHeight: `${EDITOR_LINE_HEIGHT}px`,
-                                position: "relative",
+                                background: "var(--bg-hover)",
+                                opacity: 0.45,
                             }}
-                        >
-                            {highlighted}
-                        </div>
-                    ))}
+                        />
+                    )}
+                    {highlightedLines.map((highlighted, i) => {
+                        const lineSizing: React.CSSProperties = wordWrap
+                            ? { minHeight: `${EDITOR_LINE_HEIGHT}px`, lineHeight: `${EDITOR_LINE_HEIGHT}px` }
+                            : { height: `${EDITOR_LINE_HEIGHT}px`, lineHeight: `${EDITOR_LINE_HEIGHT}px` };
+                        return (
+                            <div
+                                key={i}
+                                style={{
+                                    ...lineSizing,
+                                    position: "relative",
+                                }}
+                            >
+                                {highlighted}
+                            </div>
+                        );
+                    })}
                 </div>
 
                 <FindReplaceBar
@@ -813,20 +834,23 @@ export function CodeEditor({ content, onChange, onCursorChange, onImagePaste, on
                     />
                 )}
 
-                {/* Actual Editable Textarea — transparent text, real caret. */}
+                {/* Actual Editable Textarea — transparent text, real caret.
+                    Caret color stays opaque so users see *where* they're typing,
+                    even though the glyphs themselves are rendered by the overlay. */}
                 <textarea
                     ref={textareaRef}
                     value={content}
                     onChange={handleChange}
                     onPaste={handlePaste}
                     onKeyDown={onKeyDown}
-                    spellCheck={false}
+                    spellCheck={spellCheck}
                     autoComplete="off"
-                    autoCorrect="off"
+                    autoCorrect={spellCheck ? "on" : "off"}
                     autoCapitalize="off"
                     className="absolute inset-0 w-full h-full bg-transparent text-transparent caret-[var(--accent)] resize-none outline-none overflow-auto border-0"
                     style={{
                         ...sharedTextStyle,
+                        ...wrapStyle,
                         caretColor: "var(--accent)",
                     }}
                 />

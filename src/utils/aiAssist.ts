@@ -27,6 +27,16 @@ export interface AIConfig {
     apiKey: string;
 }
 
+/** True when the URL is well-formed and uses http(s). */
+export function isValidEndpoint(raw: string): boolean {
+    try {
+        const u = new URL(raw);
+        return u.protocol === "http:" || u.protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
 export async function runAIAction(
     action: AIAction,
     text: string,
@@ -34,6 +44,9 @@ export async function runAIAction(
     signal?: AbortSignal
 ): Promise<string> {
     if (!cfg.endpoint) throw new Error("AI endpoint not configured. Open Settings → AI to set one up.");
+    if (!isValidEndpoint(cfg.endpoint)) {
+        throw new Error("AI endpoint must be a valid http:// or https:// URL.");
+    }
     if (!cfg.model) throw new Error("AI model not configured.");
 
     const res = await fetch(cfg.endpoint, {

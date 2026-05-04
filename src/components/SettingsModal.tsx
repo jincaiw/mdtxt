@@ -4,8 +4,11 @@ import {
     getTypewriterMode, setTypewriterMode,
     getToolbarEnabled, setToolbarEnabled,
     getAIConfig, setAIConfig,
+    getWordWrap, setWordWrap,
+    getSpellCheck, setSpellCheck,
 } from "../utils/persistence";
 import { attachFocusTrap } from "../utils/focusTrap";
+import { isValidEndpoint } from "../utils/aiAssist";
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -77,8 +80,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
     const [typewriter, setTypewriterLocal] = useState(getTypewriterMode);
     const [toolbar, setToolbarLocal] = useState(getToolbarEnabled);
+    const [wordWrap, setWordWrapLocal] = useState(getWordWrap);
+    const [spellCheck, setSpellCheckLocal] = useState(getSpellCheck);
 
     const [ai, setAi] = useState(getAIConfig);
+    const aiEndpointInvalid = ai.endpoint.length > 0 && !isValidEndpoint(ai.endpoint);
 
     const fire = (event: string, enabled: boolean) =>
         window.dispatchEvent(new CustomEvent(event, { detail: { enabled } }));
@@ -231,6 +237,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     <ToggleRow label="Show formatting toolbar" description="Toolbar above the editor" checked={toolbar}
                                         onChange={(v) => { setToolbarLocal(v); setToolbarEnabled(v); fire("marklite:toolbar-toggle", v); }} />
                                 )}
+                                {matches("word wrap") && (
+                                    <ToggleRow label="Word wrap" description="Wrap long lines instead of horizontal scroll" checked={wordWrap}
+                                        onChange={(v) => { setWordWrapLocal(v); setWordWrap(v); fire("marklite:wordwrap-toggle", v); }} />
+                                )}
+                                {matches("spell check") && (
+                                    <ToggleRow label="Spell check" description="Underline misspelled words while you type" checked={spellCheck}
+                                        onChange={(v) => { setSpellCheckLocal(v); setSpellCheck(v); fire("marklite:spellcheck-toggle", v); }} />
+                                )}
                             </>
                         )}
 
@@ -246,10 +260,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                             type="url"
                                             value={ai.endpoint}
                                             onChange={(e) => setAi({ ...ai, endpoint: e.target.value })}
-                                            onBlur={() => setAIConfig(ai)}
+                                            onBlur={() => { if (!aiEndpointInvalid) setAIConfig(ai); }}
                                             placeholder="https://api.openai.com/v1/chat/completions"
-                                            className="mt-1 w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border)] rounded-[var(--radius-md)] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] font-mono"
+                                            aria-invalid={aiEndpointInvalid}
+                                            className={`mt-1 w-full px-3 py-2 text-sm bg-[var(--bg-input)] border rounded-[var(--radius-md)] text-[var(--text-primary)] outline-none font-mono ${aiEndpointInvalid ? "border-[var(--danger)] focus:border-[var(--danger)]" : "border-[var(--border)] focus:border-[var(--accent)]"}`}
                                         />
+                                        {aiEndpointInvalid && (
+                                            <span className="block mt-1 text-[11px] text-[var(--danger)]">Must be a valid http:// or https:// URL.</span>
+                                        )}
                                     </label>
                                     <label className="block">
                                         <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Model</span>
@@ -274,7 +292,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                         />
                                     </label>
                                     <p className="text-[11px] text-[var(--text-muted)]">
-                                        Stored in localStorage on this machine only. Use a local provider (e.g. Ollama at <code>http://localhost:11434/v1</code>) for full privacy.
+                                        Stored in localStorage on this machine only — <strong>not encrypted</strong>. Anyone with access to your user profile can read it. Use a local provider (e.g. Ollama at <code>http://localhost:11434/v1/chat/completions</code>) for full privacy.
                                     </p>
                                 </div>
                             </>

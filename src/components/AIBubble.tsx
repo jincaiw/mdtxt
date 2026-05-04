@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { runAIAction, type AIAction, type AIConfig } from "../utils/aiAssist";
 
 interface AIBubbleProps {
@@ -27,6 +27,8 @@ export function AIBubble({ anchor, selectedText, config, onReplace, onInsert, on
     const [result, setResult] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const abortRef = useRef<AbortController | null>(null);
+    const bubbleRef = useRef<HTMLDivElement>(null);
+    const [adjusted, setAdjusted] = useState<{ left: number; top: number } | null>(null);
 
     useEffect(() => {
         if (!anchor) {
@@ -36,6 +38,27 @@ export function AIBubble({ anchor, selectedText, config, onReplace, onInsert, on
             abortRef.current?.abort();
         }
     }, [anchor]);
+
+    // Reposition the bubble so it stays inside the viewport. Recomputed when
+    // the anchor moves or after a result/error appears (which changes height).
+    useLayoutEffect(() => {
+        if (!anchor || !bubbleRef.current) return;
+        const margin = 8;
+        const rect = bubbleRef.current.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        let left = anchor.x;
+        let top = anchor.y;
+        if (left + rect.width + margin > vw) left = Math.max(margin, vw - rect.width - margin);
+        if (left < margin) left = margin;
+        if (top + rect.height + margin > vh) {
+            // Flip above the anchor when there's no room below.
+            const flipped = anchor.y - rect.height - 24;
+            top = flipped > margin ? flipped : Math.max(margin, vh - rect.height - margin);
+        }
+        if (top < margin) top = margin;
+        setAdjusted({ left, top });
+    }, [anchor, result, error, busy]);
 
     if (!anchor) return null;
 
@@ -58,10 +81,18 @@ export function AIBubble({ anchor, selectedText, config, onReplace, onInsert, on
 
     return (
         <div
+            ref={bubbleRef}
             role="dialog"
             aria-label="AI assist"
             className="fixed z-[90] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-2xl animate-fade-in"
-            style={{ left: anchor.x, top: anchor.y, maxWidth: 380 }}
+            style={{
+                left: adjusted?.left ?? anchor.x,
+                top: adjusted?.top ?? anchor.y,
+                maxWidth: 380,
+                // Hide flicker on first measure: if we haven't adjusted yet,
+                // render off-screen-but-painted so the layout pass can size us.
+                visibility: adjusted ? "visible" : "hidden",
+            }}
         >
             <div className="flex items-center gap-1 px-1 py-1 border-b border-[var(--border-subtle)]">
                 {ACTIONS.filter((a) => !a.needsSelection || selectedText).map((a) => (

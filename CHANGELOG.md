@@ -5,6 +5,44 @@ All notable changes to MarkLite will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Word wrap toggle for the editor (Settings → Editor; default on). Wrapped
+  mode hides the line-number gutter so per-source-line numbers don't drift
+  out of alignment with wrapped visual rows.
+- Spell check toggle for the editor (Settings → Editor; default off).
+- Document statistics dialog (command palette → "Show document statistics"):
+  words, characters, sentences, paragraphs, headings, links, images, code
+  blocks, and reading time. Frontmatter and code blocks are excluded from
+  prose counts.
+- Command palette: "Reveal in folder" and "Copy file path" actions for the
+  current file.
+
+### Fixed — Security
+
+- Wikilink resolver now rejects targets containing `..`, path separators,
+  drive letters, or NUL bytes. A crafted document can no longer load files
+  outside the current folder.
+- Rust `save_image` command sanitizes the supplied filename to a bare
+  basename, preventing escape from the `images/` subdirectory. Backed by
+  unit tests covering common traversal payloads.
+- External markdown links (`http(s)://`, `mailto:`) now open in the system
+  default handler via `tauri-plugin-opener` instead of navigating the
+  webview itself; `rel="noopener noreferrer"` is also set as a fallback.
+- AI assist refuses non-`http(s)` endpoints; the Settings modal flags an
+  invalid endpoint inline so users get fast feedback before triggering a
+  request.
+- Settings modal makes it explicit that the AI API key is stored
+  unencrypted in localStorage.
+
+### Fixed — UX
+
+- AI assist bubble repositions when it would overflow the right or bottom
+  edge of the viewport, flipping above the anchor when there is no room
+  below.
+
 ## [0.6.1] - 2026-04-30
 
 ### Fixed

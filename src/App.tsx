@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+
 import { ThemeProvider } from "./context/ThemeContext";
 import { TitleBar } from "./components/TitleBar";
 import { WelcomeScreen } from "./components/WelcomeScreen";
@@ -19,20 +21,25 @@ import { createScrollSync } from "./utils/scrollSync";
 import { ShortcutCheatsheet } from "./components/ShortcutCheatsheet";
 import { CommandPalette, type PaletteCommand } from "./components/CommandPalette";
 import { SettingsModal } from "./components/SettingsModal";
+import { StatsDialog } from "./components/StatsDialog";
 import { getRecentFiles } from "./utils/persistence";
 import {
   addRecentFile,
   getAIConfig,
   getLastFile,
   getSavedViewMode,
+  getSpellCheck,
   getSplitRatio,
   getToolbarEnabled,
   getTypewriterMode,
+  getWordWrap,
   setLastFile,
   setSavedViewMode,
+  setSpellCheck,
   setSplitRatio,
   setToolbarEnabled,
   setTypewriterMode,
+  setWordWrap,
 } from "./utils/persistence";
 
 interface FileData {
@@ -62,10 +69,13 @@ function AppContent() {
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [splitRatio, setSplitRatioState] = useState<number>(() => getSplitRatio());
   const [aiConfig, setAiConfigState] = useState(() => getAIConfig());
   const [typewriterModeEnabled, setTypewriterModeEnabled] = useState<boolean>(() => getTypewriterMode());
   const [toolbarVisible, setToolbarVisible] = useState<boolean>(() => getToolbarEnabled());
+  const [wordWrapEnabled, setWordWrapEnabled] = useState<boolean>(() => getWordWrap());
+  const [spellCheckEnabled, setSpellCheckEnabled] = useState<boolean>(() => getSpellCheck());
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -161,12 +171,16 @@ function AppContent() {
 
   useEffect(() => { setTypewriterMode(typewriterModeEnabled); }, [typewriterModeEnabled]);
   useEffect(() => { setToolbarEnabled(toolbarVisible); }, [toolbarVisible]);
+  useEffect(() => { setWordWrap(wordWrapEnabled); }, [wordWrapEnabled]);
+  useEffect(() => { setSpellCheck(spellCheckEnabled); }, [spellCheckEnabled]);
 
   // Cross-component event listeners — settings menu and command palette toggle these
   useEffect(() => {
     const handlers: Array<[string, (e: Event) => void]> = [
       ["marklite:typewriter-toggle", (e) => setTypewriterModeEnabled(!!(e as CustomEvent).detail?.enabled)],
       ["marklite:toolbar-toggle", (e) => setToolbarVisible(!!(e as CustomEvent).detail?.enabled)],
+      ["marklite:wordwrap-toggle", (e) => setWordWrapEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["marklite:spellcheck-toggle", (e) => setSpellCheckEnabled(!!(e as CustomEvent).detail?.enabled)],
     ];
     handlers.forEach(([k, h]) => window.addEventListener(k, h));
 
@@ -290,15 +304,31 @@ function AppContent() {
 
   // Wikilink click: resolve target relative to the current file's folder.
   // Tries `<target>.md` first, then `<target>` literal. Silently fails if neither exists.
+  // SECURITY: rejects path-traversal and absolute paths so a crafted document
+  // can't load arbitrary files outside the current folder.
   const handleWikilinkClick = useCallback(async (target: string) => {
     if (!filePath) return;
+    const cleaned = target.trim();
+    // Block traversal (`..`), path separators, drive letters, and absolute paths.
+    // Wikilinks should only reference siblings in the same folder.
+    if (
+      !cleaned ||
+      cleaned.includes("..") ||
+      cleaned.includes("/") ||
+      cleaned.includes("\\") ||
+      cleaned.includes("\0") ||
+      /^[a-zA-Z]:/.test(cleaned)
+    ) {
+      showToast(`Invalid wikilink target: [[${target}]]`, "error");
+      return;
+    }
     const lastSep = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
     const dir = lastSep > 0 ? filePath.slice(0, lastSep) : "";
     const sep = filePath.includes("\\") ? "\\" : "/";
     const candidates = [
-      `${dir}${sep}${target}.md`,
-      `${dir}${sep}${target}.markdown`,
-      `${dir}${sep}${target}`,
+      `${dir}${sep}${cleaned}.md`,
+      `${dir}${sep}${cleaned}.markdown`,
+      `${dir}${sep}${cleaned}`,
     ];
     for (const c of candidates) {
       try {
@@ -589,6 +619,44 @@ function AppContent() {
         run: handleSaveAs,
       });
     }
+    if (filePath) {
+      items.push({
+        id: "file.reveal",
+        label: "Reveal in folder",
+        section: "File",
+        icon: "folder_open",
+        keywords: "show finder explorer locate",
+        run: () => {
+          revealItemInDir(filePath).catch((err) => {
+            console.error("Reveal failed:", err);
+            showToast("Could not reveal file", "error");
+          });
+        },
+      });
+      items.push({
+        id: "file.copypath",
+        label: "Copy file path",
+        section: "File",
+        icon: "content_copy",
+        keywords: "clipboard absolute",
+        run: () => {
+          navigator.clipboard.writeText(filePath).then(
+            () => showToast("File path copied", "success"),
+            () => showToast("Could not copy path", "error"),
+          );
+        },
+      });
+    }
+    if (hasFile) {
+      items.push({
+        id: "doc.stats",
+        label: "Show document statistics",
+        section: "File",
+        icon: "analytics",
+        keywords: "words count reading time",
+        run: () => setShowStats(true),
+      });
+    }
 
     // === View === only when a buffer exists
     if (hasFile) {
@@ -717,7 +785,7 @@ function AppContent() {
   }, [
     handleNewFile, handleOpenFile, handleSaveFile, handleSaveAs,
     handleToggleSplit, handleToggleFileExplorer, handleToggleTOC,
-    loadFile, filePath, content, hasFile,
+    loadFile, filePath, content, hasFile, showToast,
     typewriterModeEnabled, toolbarVisible,
   ]);
 
@@ -765,6 +833,8 @@ function AppContent() {
                 registerScroller={registerCodeScroller}
                 typewriterMode={typewriterModeEnabled}
                 showToolbar={toolbarVisible}
+                wordWrap={wordWrapEnabled}
+                spellCheck={spellCheckEnabled}
                 aiConfig={aiConfig}
               />
             </div>
@@ -851,6 +921,7 @@ function AppContent() {
       )}
 
       <ShortcutCheatsheet isOpen={showCheatsheet} onClose={() => setShowCheatsheet(false)} />
+      <StatsDialog isOpen={showStats} content={content} onClose={() => setShowStats(false)} />
       <CommandPalette isOpen={showPalette} items={paletteItems} onClose={() => setShowPalette(false)} />
       <SettingsModal
         isOpen={showSettings}
