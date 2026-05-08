@@ -62,17 +62,21 @@ const getWordCount = (text: string): number => {
  * and only commits to the latest input once the user pauses. Used to keep the
  * heavy markdown preview off the typing critical path without leaving the
  * preview "stuck" the way useDeferredValue can under starvation.
+ *
+ * Implementation notes:
+ *  - All deps the effect reads are listed (`value`, `delay`). No stale-closure
+ *    surprises and no eslint-disable, so React's strict-mode dev checks don't
+ *    flag this as a "Maximum update depth exceeded" candidate.
+ *  - When `value` is already equal to `debounced`, scheduling a setTimeout
+ *    that calls setDebounced with the same value is harmless: React bails out
+ *    of the re-render via Object.is on the new state. So we skip the explicit
+ *    early-return; it isn't worth the extra dep.
  */
 function useDebouncedValue<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
-    if (Object.is(debounced, value)) return;
     const id = window.setTimeout(() => setDebounced(value), delay);
     return () => window.clearTimeout(id);
-    // We intentionally exclude `debounced` from deps — including it would
-    // re-arm the timer every time the timer commits, racing with the next
-    // input. We just want: input changes → wait `delay` → commit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, delay]);
   return debounced;
 }
@@ -512,6 +516,21 @@ function AppContent() {
     setContent(newContent);
   }, []);
 
+  // Stable cursor + preview-line setters. Critical that these are useCallback
+  // (not inline arrows): CodeEditor wires `onCursorChange` into a useEffect via
+  // `updateCursorPosition`, and an unstable callback ref would re-run that
+  // effect on every parent render, calling `updateCursorPosition()` again,
+  // which itself calls `setCursorPosition({ line, col })` with a fresh object
+  // — fresh object refs bypass React's bail-out and feed the cycle.
+  // The functional-update form bails out (returns the previous state) when the
+  // values haven't actually changed, breaking the loop on idle re-renders.
+  const handleCursorChange = useCallback((line: number, col: number) => {
+    setCursorPosition((prev) => (prev.line === line && prev.col === col ? prev : { line, col }));
+  }, []);
+  const handlePreviewLineChange = useCallback((line: number) => {
+    setPreviewLine((prev) => (prev === line ? prev : line));
+  }, []);
+
   // Handle image paste success
   const handleImagePaste = useCallback(() => {
     showToast('Image pasted successfully!', 'success');
@@ -866,7 +885,7 @@ function AppContent() {
               <CodeEditor
                 content={content}
                 onChange={handleContentChange}
-                onCursorChange={(line, col) => setCursorPosition({ line, col })}
+                onCursorChange={handleCursorChange}
                 onImagePaste={handleImagePaste}
                 onError={handleError}
                 filePath={filePath}
@@ -900,7 +919,7 @@ function AppContent() {
                 lineCount={lineCount}
                 fileSize={fileSize}
                 onEditClick={handleToggleMode}
-                onLineChange={(line) => setPreviewLine(line)}
+                onLineChange={handlePreviewLineChange}
                 filePath={filePath}
                 markdownBodyRef={previewRef}
                 onContentChange={handleContentChange}
