@@ -93,9 +93,14 @@ function generateExportCSS(theme: Theme, font: FontFamily, fontSize: FontSize): 
     const fontFamily = fontFamilies[font];
     const sizes = fontSizes[fontSize];
 
+    // No Google Fonts @import here — exporting must succeed offline, and the
+    // resulting HTML must render reasonably on machines that can't reach the
+    // CDN. The font-family declarations below use the same display names as
+    // the editor (Inter, Merriweather, Lora, Source Serif 4, Fira Sans,
+    // JetBrains Mono); the recipient sees those if installed locally,
+    // otherwise the cascade falls back to a safe system font in the same
+    // genre (sans-serif, serif, or monospace).
     return `
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Merriweather:wght@400;700&family=Lora:wght@400;600;700&family=Source+Serif+4:wght@400;600;700&family=Fira+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
         * {
             margin: 0;
             padding: 0;

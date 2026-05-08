@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Offline support
+
+- All UI fonts (Inter, JetBrains Mono, Merriweather, Lora, Source Serif 4,
+  Fira Sans) and the Material Symbols Outlined icon font are now bundled
+  with the app via `@fontsource/*` and `material-symbols`. The
+  `<link rel="stylesheet" href="https://fonts.googleapis.com/...">`
+  tags have been removed from `index.html`, so the editor renders identically
+  online and offline — no more "icon shows as text" while waiting for the CDN
+  on a slow connection.
+- Tauri CSP tightened: `style-src` no longer whitelists
+  `https://fonts.googleapis.com` and `font-src` no longer whitelists
+  `https://fonts.gstatic.com`. Fonts may now load only from `self` (the
+  bundled woff2 files) plus `data:` URLs (used by some embedded SVG icons).
+- HTML export drops the Google Fonts `@import`. The export now relies on
+  font-family fallbacks (system sans/serif/mono) so exporting succeeds
+  offline and the resulting file renders predictably anywhere.
+
 ### Added
 
 - Word wrap toggle for the editor (Settings → Editor; default on). Wrapped
