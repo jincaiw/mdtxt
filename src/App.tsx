@@ -209,7 +209,11 @@ function AppContent() {
       setLastFile(fileData.path);
     } catch (err) {
       console.error("Failed to load file:", err);
-      showToast("Failed to open file", "error");
+      // Surface the actual error from Rust so "File too large" / "File not
+      // found" reaches the user instead of a generic message — without this,
+      // hitting the new 50 MB cap looked exactly like a permission error.
+      const msg = typeof err === "string" ? err : (err as { message?: string })?.message;
+      showToast(msg || "Failed to open file", "error");
     } finally {
       setIsLoading(false);
     }
@@ -254,7 +258,9 @@ function AppContent() {
     // Restore last opened file once on app launch
     const last = getLastFile();
     if (last) {
-      // Fire-and-forget; failures are silent (file may have been moved/deleted)
+      // Fire-and-forget; failures are mostly silent (file may have been moved
+      // / deleted), but we DO surface a toast for the new TooLarge case so a
+      // user who suddenly can't reopen yesterday's file isn't left guessing.
       invoke<FileData>("read_file", { path: last })
         .then((fileData) => {
           setFilePath(fileData.path);
@@ -268,8 +274,12 @@ function AppContent() {
           // screen show "3d ago" for the file you'd just been editing.
           addRecentFile(fileData.path, fileData.name);
         })
-        .catch(() => {
+        .catch((err) => {
           setLastFile(null);
+          const msg = typeof err === "string" ? err : (err as { message?: string })?.message || "";
+          if (/too large/i.test(msg)) {
+            showToast(`Could not restore last file: ${msg}`, "error");
+          }
         });
     }
     // Run only once on mount
@@ -320,7 +330,8 @@ function AppContent() {
         setOriginalContent(content);
       } catch (err) {
         console.error("Failed to save file:", err);
-        showToast("Failed to save file", "error");
+        const msg = typeof err === "string" ? err : (err as { message?: string })?.message;
+        showToast(msg || "Failed to save file", "error");
         return;
       }
     }
@@ -462,7 +473,8 @@ function AppContent() {
       showToast("File saved", "success");
     } catch (err) {
       console.error("Failed to save file:", err);
-      showToast("Failed to save file", "error");
+      const msg = typeof err === "string" ? err : (err as { message?: string })?.message;
+      showToast(msg || "Failed to save file", "error");
     }
   }, [content, fileName, showToast]);
 
@@ -478,7 +490,8 @@ function AppContent() {
       showToast("File saved", "success");
     } catch (err) {
       console.error("Failed to save file:", err);
-      showToast("Failed to save file", "error");
+      const msg = typeof err === "string" ? err : (err as { message?: string })?.message;
+      showToast(msg || "Failed to save file", "error");
     }
   }, [filePath, content, showToast, handleSaveAs]);
 

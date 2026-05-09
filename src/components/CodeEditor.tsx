@@ -311,7 +311,13 @@ export function CodeEditor({ content, onChange, onCursorChange, onSelectionChang
                 return;
             } catch (error) {
                 console.error('Failed to paste image:', error);
-                onError?.('Failed to save image. Please try again.');
+                // Surface the actual error so "Image is 30 MB; maximum is
+                // 25 MB" reaches the user rather than a generic retry hint.
+                const msg =
+                    typeof error === "string"
+                        ? error
+                        : (error as { message?: string })?.message;
+                onError?.(msg || 'Failed to save image. Please try again.');
                 return;
             }
         }
