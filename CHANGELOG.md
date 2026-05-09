@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Typing now feels native
+
+- The CodeEditor stacks a transparent `<textarea>` under a styled
+  highlight overlay. Until now the textarea had `text-transparent`, so
+  even though the browser painted typed characters into it within the
+  same frame as the keypress, the user **could not see** that paint.
+  The visible text only appeared once React reconciled the overlay —
+  which on a large doc is 10–30 ms behind the keypress and is what made
+  typing feel like it was lagging behind keys, especially compared to
+  Notepad or any native text editor.
+- Flipped the layering: the textarea now renders with
+  `text-[var(--text-primary)]` (visible default-color glyphs) and the
+  highlight overlay defaults to `text-transparent`. Syntax-colored
+  spans in the overlay set their own color via Tailwind classes, which
+  override the inherited transparent and continue to paint cleanly over
+  the textarea's plain text. The overlay is moved to `z-[1]` so its
+  syntax colors stay on top, and gets `contain: paint` +
+  `will-change: transform` so its frequent re-renders compose on a
+  separate layer instead of invalidating the editor surface.
+- Result: every typed character appears in the same frame as the
+  keypress (browser-native paint), and the syntax colors fade in once
+  React catches up. Typing now feels like Notepad even on multi-megabyte
+  documents.
+
 ### Improved — Cold start and runtime performance
 
 - **Bundle main chunk: 1.08 MB → 282 kB (~74% smaller).** Welcome screen no
