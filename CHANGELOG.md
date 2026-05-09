@@ -7,29 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed — Typing now feels native
+### Fixed — Click after scroll lands on the right line
 
-- The CodeEditor stacks a transparent `<textarea>` under a styled
-  highlight overlay. Until now the textarea had `text-transparent`, so
-  even though the browser painted typed characters into it within the
-  same frame as the keypress, the user **could not see** that paint.
-  The visible text only appeared once React reconciled the overlay —
-  which on a large doc is 10–30 ms behind the keypress and is what made
-  typing feel like it was lagging behind keys, especially compared to
-  Notepad or any native text editor.
-- Flipped the layering: the textarea now renders with
-  `text-[var(--text-primary)]` (visible default-color glyphs) and the
-  highlight overlay defaults to `text-transparent`. Syntax-colored
-  spans in the overlay set their own color via Tailwind classes, which
-  override the inherited transparent and continue to paint cleanly over
-  the textarea's plain text. The overlay is moved to `z-[1]` so its
-  syntax colors stay on top, and gets `contain: paint` +
-  `will-change: transform` so its frequent re-renders compose on a
-  separate layer instead of invalidating the editor surface.
-- Result: every typed character appears in the same frame as the
-  keypress (browser-native paint), and the syntax colors fade in once
-  React catches up. Typing now feels like Notepad even on multi-megabyte
-  documents.
+- Scrolling and immediately clicking (or double-clicking) used to land
+  the caret on a line one row off from where it visibly looked like
+  the click was — typing then added text to the "wrong" line, which
+  was confusing. The cause: the highlight overlay's `scrollTop` was
+  synced to the textarea via a rAF loop, which catches up on the NEXT
+  frame after the scroll. If you clicked inside that 16-ms window, the
+  textarea had already placed the caret at the new position but the
+  overlay was still painting the old one, so the visible glyph at the
+  click coordinate didn't match the textarea's text-position mapping.
+- Replaced the rAF loop with a synchronous `onScroll` handler on the
+  textarea. The overlay's scrollTop is now updated in the same turn
+  as the scroll event, so the two layers stay in lockstep and clicks
+  always land where the user expects. Also frees the main thread from
+  a 60 Hz rAF callback that was firing whether the editor was idle or
+  not.
+
+### Improved — Smaller per-keystroke recompute
+
+- `updateCursorPosition` ran twice per keystroke (selectionchange AND
+  keyup both fire). The downstream setStates already bailed via
+  `Object.is`, but the substring + split work itself ran twice. Now
+  caches the last reported (start, end) range and short-circuits at
+  the top when nothing's moved.
 
 ### Improved — Cold start and runtime performance
 

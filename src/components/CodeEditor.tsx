@@ -533,58 +533,42 @@ function CodeEditorImpl({ content, onChange, onCursorChange, onSelectionChange, 
         };
     }, [updateCursorPosition]);
 
-    // Indirection ref so the rAF sync below can call the latest
-    // recomputeVisible without re-installing the rAF loop on every render.
+    // Indirection ref so handleTextareaScroll below can call the latest
+    // recomputeVisible without re-creating the callback on every render.
     // Assigned just below where recomputeVisible is declared.
     const recomputeVisibleRef = useRef<() => void>(() => { });
 
-    // Use rAF-based scroll sync for sub-frame accuracy. The native scroll event
-    // can lag the caret by 1 frame; rAF lets us catch up before paint.
-    useEffect(() => {
-        const textarea = textareaRef.current;
-        if (!textarea) return;
-
-        let rafId: number | null = null;
-        let lastTop = -1;
-        let lastLeft = -1;
-
-        const sync = () => {
-            const t = textareaRef.current;
-            if (!t) {
-                rafId = null;
-                return;
-            }
-            const top = t.scrollTop;
-            const left = t.scrollLeft;
-            if (top !== lastTop || left !== lastLeft) {
-                if (highlightRef.current) {
-                    highlightRef.current.scrollTop = top;
-                    highlightRef.current.scrollLeft = left;
-                }
-                if (gutterRef.current) {
-                    gutterRef.current.scrollTop = top;
-                }
-                if (top !== lastTop) {
-                    if (onScrollFraction) {
-                        const max = t.scrollHeight - t.clientHeight;
-                        onScrollFraction(max > 0 ? top / max : 0);
-                    }
-                    // Re-evaluate the virtualization window on real vertical
-                    // motion. The hysteresis inside guarantees we only call
-                    // setState when the window has actually moved.
-                    recomputeVisibleRef.current();
-                }
-                lastTop = top;
-                lastLeft = left;
-            }
-            rafId = requestAnimationFrame(sync);
-        };
-
-        rafId = requestAnimationFrame(sync);
-
-        return () => {
-            if (rafId !== null) cancelAnimationFrame(rafId);
-        };
+    // Synchronous scroll sync via the textarea's native onScroll. Wired into
+    // the JSX as `onScroll={handleTextareaScroll}`.
+    //
+    // Why this matters for click-after-scroll alignment: with the previous
+    // rAF-based sync the overlay's scrollTop only caught up on the NEXT
+    // animation frame after the textarea scrolled. If the user clicked
+    // (or double-clicked) inside that 16-ms window, the textarea placed
+    // the caret at the new scroll position but the overlay still painted
+    // the OLD position — giving the impression that the visible word was
+    // one line off from the click. Setting overlay.scrollTop in the same
+    // synchronous turn as the scroll event keeps the two layers in
+    // lockstep, so clicks always land where the user expects.
+    const handleTextareaScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
+        const t = e.currentTarget;
+        const top = t.scrollTop;
+        const left = t.scrollLeft;
+        if (highlightRef.current) {
+            highlightRef.current.scrollTop = top;
+            highlightRef.current.scrollLeft = left;
+        }
+        if (gutterRef.current) {
+            gutterRef.current.scrollTop = top;
+        }
+        if (onScrollFraction) {
+            const max = t.scrollHeight - t.clientHeight;
+            onScrollFraction(max > 0 ? top / max : 0);
+        }
+        // Virtualization window is recomputed on every scroll event; the
+        // hysteresis inside guarantees we only call setState when the
+        // visible window has genuinely moved.
+        recomputeVisibleRef.current();
     }, [onScrollFraction]);
 
     // Register an imperative scroller so external code (split-view sync) can
@@ -1044,36 +1028,11 @@ function CodeEditorImpl({ content, onChange, onCursorChange, onSelectionChange, 
                     // (see .editor-overlay-scrollbar-hidden in index.css), and
                     // pointer-events:none means the user never interacts with
                     // it directly anyway. Vertical scroll position is driven
-                    // imperatively by the rAF sync below.
-                    //
-                    // `text-transparent` on the wrapper — the textarea below
-                    // owns the visible default-color glyphs (see the textarea
-                    // styling for the full story). Syntax-colored spans here
-                    // set their own color via Tailwind classes
-                    // (text-[var(--syntax-h1)] etc.), which override the
-                    // inherited transparent and paint cleanly over the
-                    // textarea's plain rendering. Plain `<span>{text}</span>`
-                    // wrappers inherit transparent → invisible from this
-                    // layer → revealed by the textarea behind.
-                    //
-                    // z-index:1 keeps this overlay above the textarea so its
-                    // syntax-colored spans paint over the textarea's plain
-                    // rendering. The transparent regions (default-color text,
-                    // background) let the textarea show through.
-                    className="absolute inset-0 z-[1] text-transparent pointer-events-none overflow-auto editor-overlay-scrollbar-hidden"
+                    // imperatively from the textarea's onScroll handler so the
+                    // two layers stay in lockstep — see the textarea below.
+                    className="absolute inset-0 text-[var(--text-primary)] pointer-events-none overflow-auto editor-overlay-scrollbar-hidden"
                     aria-hidden="true"
-                    style={{
-                        ...sharedTextStyle,
-                        ...wrapStyle,
-                        // Promote the overlay to its own compositor layer so
-                        // syntax updates from React don't trigger a paint of
-                        // the underlying editor surface. Cheap on memory
-                        // (one bitmap per layer) and a meaningful win on
-                        // large docs where the overlay has thousands of
-                        // children to paint.
-                        willChange: "transform",
-                        contain: "paint",
-                    }}
+                    style={{ ...sharedTextStyle, ...wrapStyle }}
                 >
                     {!wordWrap && (
                         <div
@@ -1144,33 +1103,22 @@ function CodeEditorImpl({ content, onChange, onCursorChange, onSelectionChange, 
                     />
                 )}
 
-                {/* Editable textarea — the user-visible default-color text.
-                    The overlay above paints SYNTAX-COLORED spans on top of
-                    this textarea; non-styled text is rendered transparent up
-                    there so the textarea's plain rendering shows through.
-
-                    Why this stacking order matters for typing feel: when the
-                    user types, the browser updates this textarea's value and
-                    paints the new glyph in the same frame, before React even
-                    sees the input event. Previously the textarea was
-                    `text-transparent` so the user couldn't see that instant
-                    paint — they had to wait for React to reconcile the
-                    overlay (10-30 ms+ on a big doc). With visible textarea
-                    text, the typed character appears in the same frame as
-                    the keypress and the overlay's syntax colors fade in
-                    once React catches up. End result: typing feels native,
-                    the way Notepad does. */}
+                {/* Editable textarea — transparent text, real caret.
+                    The visible glyphs come from the highlight overlay above;
+                    this layer just owns input, selection, and the caret.
+                    Caret color stays opaque so the cursor is always visible. */}
                 <textarea
                     ref={textareaRef}
                     value={content}
                     onChange={handleChange}
                     onPaste={handlePaste}
                     onKeyDown={onKeyDown}
+                    onScroll={handleTextareaScroll}
                     spellCheck={spellCheck}
                     autoComplete="off"
                     autoCorrect={spellCheck ? "on" : "off"}
                     autoCapitalize="off"
-                    className="absolute inset-0 w-full h-full bg-transparent text-[var(--text-primary)] caret-[var(--accent)] resize-none outline-none overflow-auto border-0"
+                    className="absolute inset-0 w-full h-full bg-transparent text-transparent caret-[var(--accent)] resize-none outline-none overflow-auto border-0"
                     style={{
                         ...sharedTextStyle,
                         ...wrapStyle,
