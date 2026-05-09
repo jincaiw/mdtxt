@@ -65,7 +65,8 @@ I wanted a simple, lightweight solution that renders markdown beautifully while 
 - **GitHub Flavored Markdown** with task lists, tables, strikethrough
 - **Code blocks** with syntax highlighting and one-click copy
 - **Math** via KaTeX (`$inline$`, `$$block$$`) — loaded only when needed
-- **Mermaid diagrams** (` ```mermaid `) — loaded only when needed
+- **Chemistry** via mhchem — `$\ce{2 H2 + O2 -> 2 H2O}$`, ions, isotopes, Kröger-Vink defects
+- **Mermaid diagrams** (` ```mermaid `) — flowcharts, sequence, class, state, gantt, ER, mindmaps
 - **Image lightbox** — click to zoom; lazy loading
 - **Interactive task checkboxes** — toggling writes back to source
 - **Heading anchors** with click-to-jump

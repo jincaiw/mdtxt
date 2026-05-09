@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Chemistry notation in math
+
+- KaTeX now loads the **mhchem** contrib alongside the rest of the math
+  bundle, so `\ce{...}` and `\pu{...}` render in the preview.
+  This unlocks textbook-grade chemistry: balanced equations, ions,
+  isotopes, oxidation states, arrows, and Kröger-Vink defect notation
+  (e.g. `$\ce{2 Fe^x_{Fe} + O^x_{O} -> 2 Fe'_{Fe} + V_{O}^{**} + 1/2 O2 ^}$`).
+  The math-detection regex now also picks up bare `\ce{` / `\pu{`,
+  so chemistry-only documents trigger the lazy load even without
+  `$` delimiters. New `/chem` slash command inserts a starter snippet.
+
+### Improved — Book-style math typography
+
+- Display equations are centered with proper vertical breathing room and
+  scroll horizontally on narrow viewports instead of overflowing the
+  reading column. KaTeX glyphs no longer inherit the global `code` border
+  /background, and equation tags pick up the muted-text colour for a
+  printed-textbook feel.
+
+### Fixed — Caret drifts off the rendered glyph after scrolling
+
+- The CodeEditor stacks a transparent `<textarea>` on top of a styled
+  highlight overlay; alignment relies on both layers wrapping at the
+  same column. Once the document grew past the viewport the textarea
+  sprouted a vertical scrollbar that quietly ate ~10 px of its content
+  area, while the overlay kept its full width. With word-wrap on, the
+  two layers wrapped at different columns and the caret started landing
+  a character or two off the rendered text after every scroll. Both
+  layers now reserve a fixed scrollbar gutter (`scrollbar-gutter: stable`),
+  and the overlay's own scrollbar is hidden visually so only the
+  textarea's remains user-facing.
+
+### Improved — Editor performance on large documents
+
+- Typing into a 5 k+ line markdown file used to feel "sticky" because
+  the highlight overlay mounted every line as a `<div>` and React's
+  reconciler walked the lot on every keystroke. The overlay now
+  virtualizes: only the lines visible in the viewport (plus a 40-line
+  buffer) render, with fixed-height spacers above and below preserving
+  scroll-height parity with the textarea so caret alignment is intact.
+  Re-renders only fire when the visible window shifts by more than half
+  the buffer, so smooth scrolling no longer thrashes setState.
+  Word-wrap mode and small docs (under 400 lines) keep the previous
+  full-render path. Per-line wrapper styles are also hoisted to module
+  scope and the non-virtualized list is wrapped in `React.memo` so
+  unchanged lines short-circuit prop diffing.
+
 ### Fixed — Webview accelerator collision
 
 - AI assist shortcut now also responds to **Alt+J**. On Windows, WebView2
