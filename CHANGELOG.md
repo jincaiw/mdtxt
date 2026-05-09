@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Webview accelerator collision
+
+- AI assist shortcut now also responds to **Alt+J**. On Windows, WebView2
+  treats `Ctrl+J` as a "browser accelerator" for the built-in Downloads
+  UI — the page never sees the keydown, so `e.preventDefault()` can't
+  rescue it. Alt+J skips that path entirely. macOS (WKWebView) and Linux
+  (WebKitGTK) keep `Ctrl+J` working; the cheatsheet detects the platform
+  and shows the right one. A capture-phase `keydown` listener also
+  preventDefaults Ctrl+J app-wide, so on platforms where the page does
+  see the event the host webview's default action is suppressed
+  regardless of which element is focused.
+
 ### Fixed — Security
 
 - `read_file` / `save_file` refuse documents above 50 MB. Stat happens before

@@ -683,7 +683,25 @@ function AppContent() {
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+
+    // Defense-in-depth for Ctrl+J: Edge/Chrome/WebView2 treat Ctrl+J as a
+    // "browser accelerator" for Downloads. On WebView2 (Windows) the page
+    // never sees this keydown, so JS can't help — users have Alt+J as the
+    // working alias there. On WebKitGTK (Linux) and WKWebView (macOS) the
+    // event DOES reach the page; we capture-phase preventDefault here so the
+    // host webview's default action is suppressed regardless of which
+    // element is focused (textarea, palette input, settings, etc.).
+    const blockCtrlJ = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === "j" || e.key === "J")) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", blockCtrlJ, { capture: true });
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", blockCtrlJ, { capture: true } as EventListenerOptions);
+    };
   }, []);
 
   // Get export HTML from the visible preview on demand (avoids duplicate rendering)

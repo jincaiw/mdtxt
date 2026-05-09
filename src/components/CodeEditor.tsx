@@ -175,19 +175,26 @@ export function CodeEditor({ content, onChange, onCursorChange, onSelectionChang
                 setFindOpen(true);
                 return;
             }
-            // Ctrl+J — open AI bubble on selection or current line
-            if (e.key === "j" || e.key === "J") {
-                e.preventDefault();
-                const t = textareaRef.current;
-                if (!t) return;
-                const lineIdx = t.value.slice(0, state.selStart).split("\n").length - 1;
-                const rect = t.getBoundingClientRect();
-                const y = rect.top + EDITOR_PADDING + lineIdx * EDITOR_LINE_HEIGHT - t.scrollTop + EDITOR_LINE_HEIGHT + 4;
-                const x = rect.left + EDITOR_PADDING + 12;
-                const text = state.text.slice(state.selStart, state.selEnd);
-                setAIBubble({ x, y, selStart: state.selStart, selEnd: state.selEnd, text });
-                return;
-            }
+        }
+        // AI bubble: Ctrl+J on Linux/macOS (WebKitGTK / WKWebView), Alt+J
+        // everywhere — including Windows, where WebView2 grabs Ctrl+J for
+        // the built-in Downloads UI before the page can preventDefault. The
+        // Alt+J alias keeps the J mnemonic without colliding with that
+        // accelerator.
+        const isAiCombo =
+            ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === "j" || e.key === "J")) ||
+            (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === "j" || e.key === "J" || e.code === "KeyJ"));
+        if (isAiCombo) {
+            e.preventDefault();
+            const t = textareaRef.current;
+            if (!t) return;
+            const lineIdx = t.value.slice(0, state.selStart).split("\n").length - 1;
+            const rect = t.getBoundingClientRect();
+            const y = rect.top + EDITOR_PADDING + lineIdx * EDITOR_LINE_HEIGHT - t.scrollTop + EDITOR_LINE_HEIGHT + 4;
+            const x = rect.left + EDITOR_PADDING + 12;
+            const text = state.text.slice(state.selStart, state.selEnd);
+            setAIBubble({ x, y, selStart: state.selStart, selEnd: state.selEnd, text });
+            return;
         }
 
         // Ctrl/Cmd shortcuts (Bold, Italic, Link). Other Ctrl combos handled at app level.

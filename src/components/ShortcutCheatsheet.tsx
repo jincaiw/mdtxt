@@ -17,7 +17,12 @@ interface ShortcutGroup {
 }
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+const isWindows = typeof navigator !== "undefined" && /Win/.test(navigator.platform);
 const cmd = isMac ? "⌘" : "Ctrl";
+// On Windows, WebView2 grabs Ctrl+J for the built-in Downloads UI before
+// the page can preventDefault, so we surface Alt+J as the primary AI
+// shortcut there. macOS / Linux see Ctrl+J fine.
+const aiShortcut = isWindows ? "Alt+J" : `${cmd}+J`;
 
 const groups: ShortcutGroup[] = [
     {
@@ -38,7 +43,7 @@ const groups: ShortcutGroup[] = [
             { keys: `${cmd}+Shift+O`, description: "Toggle outline" },
             { keys: `${cmd}+P`, description: "Command palette" },
             { keys: `${cmd}+,`, description: "Open settings" },
-            { keys: `${cmd}+J`, description: "AI assist on selection" },
+            { keys: aiShortcut, description: "AI assist on selection" },
             { keys: "?", description: "Show this cheatsheet" },
         ],
     },

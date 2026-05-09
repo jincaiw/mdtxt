@@ -151,7 +151,7 @@ A few essentials — press `?` inside the app for the full searchable list.
 | Find / Replace | Ctrl+F / Ctrl+H |
 | Bold / Italic / Link | Ctrl+B / Ctrl+I / Ctrl+K |
 | Toggle blockquote | Ctrl+/ |
-| AI assist | Ctrl+J |
+| AI assist | Ctrl+J (macOS/Linux) · Alt+J (Windows) |
 
 ## Tech Stack
 
