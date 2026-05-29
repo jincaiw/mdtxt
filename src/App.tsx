@@ -93,6 +93,10 @@ const getWordCount = (text: string): number => {
 const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platform || navigator.userAgent || "");
 const AI_SHORTCUT = IS_MAC ? "⌘J" : "Alt+J";
 
+// Width of the right-side AI panel; the editor/preview area reserves this much
+// padding-right when it's open so content reflows beside it (not under it).
+const AI_PANEL_WIDTH = 400;
+
 /**
  * Returns a value that lags behind `value` by `delay` ms. Each new `value`
  * resets the timer, so during continuous typing the returned value is stable
@@ -152,6 +156,8 @@ function AppContent() {
   const [showFileExplorer, setShowFileExplorer] = useState(false);
   const [showTOC, setShowTOC] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
+  // Proposed document from Agent mode, shown as an inline diff for accept/reject.
+  const [proposedDoc, setProposedDoc] = useState<string | null>(null);
 
   // Preview scroll position
   const [previewLine, setPreviewLine] = useState(1);
@@ -615,6 +621,19 @@ function AppContent() {
 
   // Toggle the right-side AI assistant panel.
   const handleToggleAI = useCallback(() => setShowAIPanel((v) => !v), []);
+
+  // Agent proposed an edited document → show it as a diff to accept/reject.
+  // Ensure the editor (where the diff renders) is visible.
+  const handleProposeEdit = useCallback((doc: string) => {
+    setProposedDoc(doc);
+    setMode((m) => (m === "preview" ? "split" : m));
+  }, []);
+
+  // Review finished: commit the accepted document (or keep the original on reject).
+  const handleReviewResolve = useCallback((finalDoc: string | null) => {
+    if (finalDoc != null) setContent(finalDoc);
+    setProposedDoc(null);
+  }, []);
 
   // Close all panels
   const closeAllPanels = useCallback(() => {
@@ -1092,7 +1111,14 @@ function AppContent() {
           {/* Split-aware layout. Both views always mounted; CSS toggles their display
               and width so editor/preview state (scroll, selection) is preserved across
               mode switches. */}
-          <div ref={splitContainerRef} className="flex-1 overflow-hidden flex flex-row">
+          <div
+            ref={splitContainerRef}
+            className="flex-1 overflow-hidden flex flex-row"
+            // Reserve space on the right for the AI panel so editor/preview reflow
+            // beside it instead of being covered. The panel itself is fixed at
+            // right-0 (above the status bar), which keeps window controls at the edge.
+            style={{ paddingRight: showAIPanel ? AI_PANEL_WIDTH : 0, transition: "padding-right 0.15s ease" }}
+          >
             <div
               data-split-left
               className="overflow-hidden flex flex-col"
@@ -1120,6 +1146,8 @@ function AppContent() {
                 wordWrap={wordWrapEnabled}
                 spellCheck={spellCheckEnabled}
                 aiConfig={aiConfig}
+                reviewDoc={proposedDoc}
+                onReviewResolve={handleReviewResolve}
               />
             </div>
 
@@ -1161,7 +1189,7 @@ function AppContent() {
             </div>
           </div>
 
-          <ModeToggle mode={mode} onSetMode={setMode} />
+          <ModeToggle mode={mode} onSetMode={setMode} aiPanelOpen={showAIPanel} />
 
           {/* Sidebar Panels — only mount when actually open so they don't
               load their module until first use. */}
@@ -1197,6 +1225,7 @@ function AppContent() {
                 fileName={fileName || ""}
                 selectionText={content.slice(selectionRange.start, selectionRange.end)}
                 aiConfig={aiConfig}
+                onProposeEdit={handleProposeEdit}
               />
             </Suspense>
           )}
