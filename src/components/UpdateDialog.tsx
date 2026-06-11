@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getSkippedUpdateVersion, setSkippedUpdateVersion } from "../utils/persistence";
+import { attachFocusTrap } from "../utils/focusTrap";
 
 type Phase = "available" | "downloading" | "installed" | "error";
 
@@ -18,6 +19,29 @@ export function UpdateDialog() {
     // 0..1 once the content length is known; -1 = indeterminate.
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState("");
+    const dialogRef = useRef<HTMLDivElement>(null);
+
+    const busy = phase === "downloading" || phase === "installed";
+
+    // Escape dismisses like "Later", and Tab stays inside the dialog — the
+    // same keyboard contract as the Settings modal. Disabled while busy: a
+    // download/install in flight can't be cancelled, so dismissal would only
+    // hide a process the user still has to wait out.
+    useEffect(() => {
+        if (!update || busy) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                setUpdate(null);
+            }
+        };
+        document.addEventListener("keydown", onKey);
+        const detach = attachFocusTrap(dialogRef.current);
+        return () => {
+            document.removeEventListener("keydown", onKey);
+            detach();
+        };
+    }, [update, busy]);
 
     useEffect(() => {
         let cancelled = false;
@@ -67,13 +91,11 @@ export function UpdateDialog() {
         }
     };
 
-    const busy = phase === "downloading" || phase === "installed";
-
     return (
         <div className="fixed inset-0 z-[120] flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Update available">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={busy ? undefined : dismiss} aria-hidden="true" />
 
-            <div className="relative z-10 w-[440px] max-w-[92vw] max-h-[90vh] overflow-y-auto bg-[var(--bg-primary)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-2xl animate-fade-in">
+            <div ref={dialogRef} className="relative z-10 w-[440px] max-w-[92vw] max-h-[90vh] overflow-y-auto bg-[var(--bg-primary)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-2xl animate-fade-in">
                 <div className="px-5 pt-5 pb-4">
                     <div className="flex items-start gap-3">
                         <div className="w-10 h-10 shrink-0 rounded-[var(--radius-md)] bg-[var(--bg-hover)] flex items-center justify-center">
@@ -140,6 +162,11 @@ export function UpdateDialog() {
                             <button
                                 type="button"
                                 onClick={install}
+                                // Landing focus here engages the focus trap and lets
+                                // Enter accept / Tab reach Skip & Later — the dialog
+                                // appears unprompted at launch, so without this the
+                                // keyboard is still in the editor behind it.
+                                autoFocus
                                 className="px-3.5 py-1.5 text-sm font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90 transition-opacity"
                             >
                                 Update now

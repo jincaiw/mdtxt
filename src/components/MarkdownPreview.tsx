@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useMemo, useState, useTransition, memo } from "react";
+import { useRef, useEffect, useCallback, useMemo, useState, useTransition, memo, createContext, useContext } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -430,18 +430,30 @@ function FrontmatterCard({
     );
 }
 
+/** Source line (body-relative, 1-based) of the enclosing list item. Set by the
+ *  custom `li` renderer; lets a task checkbox identify which source line it
+ *  represents without render-order counters, which mis-address tasks when
+ *  StrictMode/concurrent React re-runs renderers out of lockstep with the
+ *  component body (PREVIEW-07). */
+const TaskLineContext = createContext<number | null>(null);
+
 /** Interactive task checkbox — local optimistic state, parent writes to source. */
-function InteractiveTaskCheckbox({ initialChecked, onToggle }: { initialChecked: boolean; onToggle: (checked: boolean) => void }) {
+function InteractiveTaskCheckbox({ initialChecked, onToggle }: { initialChecked: boolean; onToggle: (line: number, checked: boolean) => void }) {
+    const line = useContext(TaskLineContext);
     const [checked, setChecked] = useState(initialChecked);
     useEffect(() => setChecked(initialChecked), [initialChecked]);
     return (
         <input
             type="checkbox"
             checked={checked}
+            // Without a source line we can't write back; stay inert rather than
+            // flipping a checkbox the document won't remember.
+            disabled={line == null}
             onChange={(e) => {
+                if (line == null) return;
                 const next = e.target.checked;
                 setChecked(next);
-                onToggle(next);
+                onToggle(line, next);
             }}
             className="mr-2 cursor-pointer accent-[var(--accent)]"
         />
@@ -566,33 +578,23 @@ function MarkdownPreviewImpl({
         return lastSep > 0 ? filePath.slice(0, lastSep) : null;
     }, [filePath]);
 
-    // Toggle a task list checkbox by index — write back to the source markdown.
-    // Counts task items in document order; toggles the Nth one.
-    // SKIPS lines inside fenced code blocks so a literal `- [ ] foo` written
-    // in a documentation example doesn't shift the index of the real tasks.
-    const handleTaskToggle = useCallback((index: number, checked: boolean) => {
+    // Toggle the task checkbox that starts on the given body-relative source
+    // line — write back to the source markdown. Line-addressed via the AST
+    // node position rather than a render-order counter: StrictMode/concurrent
+    // React re-runs the components map an unpredictable number of times, so a
+    // counter shared across render passes mis-addresses tasks (clicking task N
+    // toggled task N+1). A line number identifies the task regardless of how
+    // many times anything rendered.
+    const handleTaskToggle = useCallback((bodyLine: number, checked: boolean) => {
         if (!onContentChange) return;
         const lines = contentRef.current.split("\n");
-        let count = 0;
-        let inFence = false;
-        const fenceRe = /^(\s*)(```|~~~)/;
+        // node positions are body-relative (frontmatter is stripped before
+        // react-markdown sees the text) and 1-based.
+        const i = bodyLine - 1 + fmOffsetRef.current;
         const taskRe = /^(\s*[-*+]\s+\[)([ xX])(\]\s+)/;
-        for (let i = 0; i < lines.length; i++) {
-            if (fenceRe.test(lines[i])) {
-                inFence = !inFence;
-                continue;
-            }
-            if (inFence) continue;
-            const m = lines[i].match(taskRe);
-            if (m) {
-                if (count === index) {
-                    lines[i] = lines[i].replace(taskRe, `$1${checked ? "x" : " "}$3`);
-                    onContentChange(lines.join("\n"));
-                    return;
-                }
-                count++;
-            }
-        }
+        if (i < 0 || i >= lines.length || !taskRe.test(lines[i])) return;
+        lines[i] = lines[i].replace(taskRe, `$1${checked ? "x" : " "}$3`);
+        onContentChange(lines.join("\n"));
     }, [onContentChange]);
 
     const components = useMemo(() => ({
@@ -682,33 +684,28 @@ function MarkdownPreviewImpl({
         h4: H4Renderer,
         h5: H5Renderer,
         h6: H6Renderer,
+        // Every list item publishes its source line for task checkboxes below it.
+        // The li node is a real source node and always carries a position; the
+        // checkbox <input> is SYNTHESIZED by remark-gfm and carries none, so the
+        // line must come from here (PREVIEW-07).
+        li: ({ node, children, ...rest }: React.LiHTMLAttributes<HTMLLIElement> & { node?: { position?: { start?: { line?: number } } } }) => (
+            <li {...rest}>
+                <TaskLineContext.Provider value={node?.position?.start?.line ?? null}>
+                    {children}
+                </TaskLineContext.Provider>
+            </li>
+        ),
         // Interactive task checkbox: react-markdown + remarkGfm renders <input type="checkbox" disabled />.
-        // We capture the task's positional index AT RENDER TIME (so each <input>'s
-        // closure remembers its own index) — not on click. The previous form
-        // `onToggle={(c) => handleTaskToggle(counter.current++, c)}` incremented
-        // the counter on click, which meant clicking any checkbox toggled the
-        // (click-count)-th task in source order, not the task that was actually
-        // clicked. The capture-on-render form always toggles the right task.
+        // The task is identified by its SOURCE LINE (via TaskLineContext from the
+        // enclosing li), which is stable no matter how many render passes run.
+        // Earlier designs used render-order counters; both the count-on-click and
+        // the capture-on-render variants mis-addressed tasks once React re-ran the
+        // renderers out of lockstep with the component body (PREVIEW-07).
         input: ({ type, checked, ...rest }: React.InputHTMLAttributes<HTMLInputElement>) => {
             if (type !== "checkbox") return <input type={type} checked={checked} {...rest} />;
-            const idx = taskCheckboxCounter.current++;
-            return (
-                <InteractiveTaskCheckbox
-                    initialChecked={!!checked}
-                    onToggle={(c) => handleTaskToggle(idx, c)}
-                />
-            );
+            return <InteractiveTaskCheckbox initialChecked={!!checked} onToggle={handleTaskToggle} />;
         },
     }), [baseDir, handleTaskToggle, onWikilinkClick]);
-
-    // Reset the task index counter on every render so the next render starts at 0.
-    // react-markdown traverses the AST top-to-bottom inside the same render
-    // pass, so by the time react-markdown finishes the counter equals the
-    // total task count. StrictMode dev double-invokes the render body but
-    // resets the counter at the top of each pass, so each <input>'s captured
-    // idx is consistent regardless of which pass committed.
-    const taskCheckboxCounter = useRef(0);
-    taskCheckboxCounter.current = 0;
 
     // Parse YAML frontmatter once per content change. We render it as a
     // metadata card and pass the *body* (without the --- block) to react-markdown
