@@ -33,7 +33,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA5RDRBQjJENTc0MUI3QzAKUldUQXQwRlhMYXZVQ1FsZUtpWlFNWEFRQ0hKSDdsY0UxSllFTGJhcVZLTkFWbm9WU0lpUWdiSXgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM5MkNBMjY0NDQ0MkFEMEQKUldRTnJVSkVaS0lzeWNZUHRrL1AxNEpicXFpUkJmS1FGSFAxdlU1c2Z3YnR5SkRWc2xWdWt3R2MK",
       "endpoints": [
         "https://github.com/Razee4315/Paperling/releases/latest/download/latest.json"
       ]

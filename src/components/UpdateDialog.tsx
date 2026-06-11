@@ -119,6 +119,7 @@ export function UpdateDialog() {
                     )}
                 </div>
 
+                {!busy && (
                 <div className="flex items-center justify-end gap-2 px-5 py-3 bg-[var(--bg-secondary)] border-t border-[var(--border)]">
                     {phase === "available" && (
                         <>
@@ -155,6 +156,7 @@ export function UpdateDialog() {
                         </button>
                     )}
                 </div>
+                )}
             </div>
         </div>
     );

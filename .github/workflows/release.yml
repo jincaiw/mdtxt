@@ -127,8 +127,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Updater artifact signing — the matching pubkey lives in
-          # tauri.conf.json. Without these the build still succeeds but
-          # latest.json gets no signatures and in-app updates won't install.
+          # tauri.conf.json. With createUpdaterArtifacts enabled the build
+          # FAILS if this secret is missing, so it must stay set on the repo.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           # The signing key was generated without a password; GitHub refuses
           # empty-valued secrets, so the empty password is set inline here.
