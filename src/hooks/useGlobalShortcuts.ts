@@ -9,6 +9,8 @@ export interface ShortcutHandlers {
     handleNewFile: () => void;
     handleToggleMode: () => void;
     handleToggleSplit: () => void;
+    /** Toggle OS fullscreen (F11). Cross-platform via the Tauri window API. */
+    toggleFullscreen: () => void;
     handleToggleFileExplorer: () => void;
     handleToggleTOC: () => void;
     openCheatsheet: () => void;
@@ -35,6 +37,16 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const s = ref.current;
+            // F11 - Toggle fullscreen. The universal fullscreen key on Windows
+            // and Linux. macOS reserves F11 for Show Desktop, where users
+            // fullscreen via the green title-bar button; the underlying Tauri
+            // setFullscreen drives the same window state either way. No file
+            // needed — works on the welcome screen too. FULLSCREEN-01.
+            if (e.key === "F11") {
+                e.preventDefault();
+                s.toggleFullscreen();
+                return;
+            }
             // Ctrl+Shift+E - Toggle file explorer (check before Ctrl+E)
             if (e.ctrlKey && e.shiftKey && e.key === "E") {
                 e.preventDefault();

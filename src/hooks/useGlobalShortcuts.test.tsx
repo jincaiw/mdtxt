@@ -14,6 +14,7 @@ function makeHandlers(over: Partial<ShortcutHandlers> = {}): ShortcutHandlers {
         handleNewFile: vi.fn(),
         handleToggleMode: vi.fn(),
         handleToggleSplit: vi.fn(),
+        toggleFullscreen: vi.fn(),
         handleToggleFileExplorer: vi.fn(),
         handleToggleTOC: vi.fn(),
         openCheatsheet: vi.fn(),
@@ -77,6 +78,11 @@ describe("useGlobalShortcuts", () => {
         press({ key: ",", ctrlKey: true });
         expect(h.openPalette).toHaveBeenCalledTimes(1);
         expect(h.openSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it("F11 toggles fullscreen", () => {
+        press({ key: "F11" });
+        expect(h.toggleFullscreen).toHaveBeenCalledTimes(1);
     });
 
     it("Alt+J dispatches the AI-assist event", () => {

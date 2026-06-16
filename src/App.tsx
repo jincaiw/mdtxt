@@ -853,6 +853,21 @@ function AppContent() {
   // Toggle the right-side AI assistant panel.
   const handleToggleAI = useCallback(() => setShowAIPanel((v) => !v), []);
 
+  // Toggle OS fullscreen (F11). The custom title bar deliberately stays
+  // visible so there's always an obvious way back (the same controls, plus
+  // F11 again); a one-time hint reinforces it for non-technical users. One
+  // Tauri call covers Windows, Linux, and macOS. FULLSCREEN-01.
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      const w = Window.getCurrent();
+      const isFs = await w.isFullscreen();
+      await w.setFullscreen(!isFs);
+      if (!isFs) showToast("Fullscreen on — press F11 to exit", "info");
+    } catch {
+      /* browser dev mode — no Tauri window */
+    }
+  }, [showToast]);
+
   // Agent proposed an edited document → show it as a diff to accept/reject.
   // Ensure the editor (where the diff renders) is visible.
   const handleProposeEdit = useCallback((doc: string) => {
@@ -939,6 +954,7 @@ function AppContent() {
   useGlobalShortcuts({
     handleOpenFile, handleSaveFile, handleSaveAs, handleNewFile,
     handleToggleMode, handleToggleSplit, handleToggleFileExplorer, handleToggleTOC,
+    toggleFullscreen,
     openCheatsheet: () => setShowCheatsheet(true),
     openPalette: () => setShowPalette(true),
     openSettings: () => setShowSettings(true),
@@ -1079,6 +1095,18 @@ function AppContent() {
       });
     }
 
+    // Fullscreen works anywhere (including the welcome screen), so unlike the
+    // other View entries it isn't gated on a file being open.
+    items.push({
+      id: "view.fullscreen",
+      label: "Toggle fullscreen",
+      hint: "F11",
+      section: "View",
+      icon: "fullscreen",
+      keywords: "full screen distraction free f11 immersive",
+      run: toggleFullscreen,
+    });
+
     // === AI === only when a buffer exists and AI is enabled in Settings.
     // The command palette is the always-reachable entry point for AI assist
     // (the toolbar AI button is hidden when the toolbar is off). Dispatches a
@@ -1167,7 +1195,7 @@ function AppContent() {
     // (post-debounce) for no reason. Headings are computed below in a
     // separate hook that's gated on the palette actually being open.
     handleNewFile, handleOpenFile, handleSaveFile, handleSaveAs,
-    handleToggleSplit, handleToggleFileExplorer, handleToggleTOC,
+    handleToggleSplit, handleToggleFileExplorer, handleToggleTOC, toggleFullscreen,
     loadFile, filePath, hasFile, showToast,
     typewriterModeEnabled, toolbarVisible, aiEnabled,
   ]);
