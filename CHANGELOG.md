@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Fullscreen mode (F11).** Press F11 to toggle distraction-free fullscreen on
+  Windows, Linux, and macOS. The title bar stays visible so there's always an
+  obvious way back, and a one-time hint reminds you to press F11 to exit. Also
+  available from the command palette.
 - **Auto-updater.** Paperling now checks GitHub Releases on launch and shows a
   popup when a newer version is available, with "Update now" (download with
   progress, install, restart), "Skip this version" (remembered per version),
@@ -27,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Cleaner "What's new" in the update popup.** The updater now shows the
+  release's actual changes as a tidy, scrollable list instead of a block of raw
+  text. Release notes are sourced automatically from this changelog at build
+  time, and links open in your browser rather than inside the app.
 - **Relicensed to Apache 2.0.** MarkLite moved from the previous custom
   non-commercial terms to the Apache License 2.0: free for both personal and
   commercial use, with an explicit patent grant. See `LICENSE` and `NOTICE`.

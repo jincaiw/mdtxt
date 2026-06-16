@@ -16,6 +16,7 @@ jobs:
     outputs:
       should_release: ${{ steps.bump.outputs.should_release }}
       version: ${{ steps.bump.outputs.version }}
+      notes: ${{ steps.notes.outputs.notes }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -73,6 +74,35 @@ jobs:
             echo "should_release=true" >> $GITHUB_OUTPUT
             echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           fi
+
+      # Build the release body from the top CHANGELOG section so the updater's
+      # "What's new" popup shows the actual changes (the in-app dialog strips
+      # the Installation block; the GitHub release page keeps it). Falls back to
+      # the generic blurb if the section comes out empty.
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          # Print the lines of the first "## [...]" section, excluding the two
+          # heading lines that bound it.
+          CHANGES=$(awk '/^## \[/{c++; next} c==1' CHANGELOG.md)
+          if [ -z "$(echo "$CHANGES" | tr -d '[:space:]')" ]; then
+            CHANGES="A new version of Paperling is available."
+          fi
+          {
+            echo "notes<<__PAPERLING_NOTES__"
+            echo "## What's new in v$VERSION"
+            echo ""
+            printf '%s\n' "$CHANGES"
+            echo ""
+            echo "### Installation"
+            echo "- **Windows:** \`.msi\` (recommended) or \`.exe\` (NSIS installer)"
+            echo "- **Linux:** \`.deb\` or \`.AppImage\`"
+            echo "- **macOS:** \`.dmg\`"
+            echo ""
+            echo "See the [CHANGELOG](https://github.com/Razee4315/Paperling/blob/main/CHANGELOG.md) for the full history."
+            echo "__PAPERLING_NOTES__"
+          } >> "$GITHUB_OUTPUT"
 
   # ─── Job 2: Build + Release ────────────────────────────────
   release:
@@ -137,17 +167,7 @@ jobs:
           tauriScript: bun run tauri
           tagName: v__VERSION__
           releaseName: 'Paperling v__VERSION__'
-          releaseBody: |
-            ## Paperling v__VERSION__
-
-            A minimal, distraction-free markdown editor.
-
-            ### Installation
-            - **Windows:** `.msi` (recommended) or `.exe` (NSIS installer)
-            - **Linux:** `.deb` or `.AppImage`
-            - **macOS:** `.dmg`
-
-            See the [CHANGELOG](https://github.com/Razee4315/Paperling/blob/main/CHANGELOG.md) for details.
+          releaseBody: ${{ needs.check-and-bump.outputs.notes }}
           args: ${{ matrix.args }}
           releaseDraft: false
           prerelease: false
