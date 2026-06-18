@@ -236,8 +236,8 @@ pub async fn list_directory_files(directory: String) -> Result<Vec<FileEntry>, C
         }
     }
     
-    // Sort alphabetically
-    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    // Sort alphabetically, case-insensitively.
+    entries.sort_by_key(|a| a.name.to_lowercase());
     
     Ok(entries)
 }
