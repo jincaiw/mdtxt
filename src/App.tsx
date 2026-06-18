@@ -106,6 +106,13 @@ interface FileData {
 const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platform || navigator.userAgent || "");
 const AI_SHORTCUT = IS_MAC ? "⌘J" : "Alt+J";
 
+// Fullscreen-transition timing. The cover fades IN over FS_FADE_IN_MS (kept in
+// sync with the cover's Tailwind duration class) and we wait that long before
+// resizing the window, so the resize is fully masked. After the resize calls
+// resolve we hold FS_SETTLE_MS for the OS to finish painting, then fade out.
+const FS_FADE_IN_MS = 150;
+const FS_SETTLE_MS = 200;
+
 // Width of the right-side AI panel; the editor/preview area reserves this much
 // padding-right when it's open so content reflows beside it (not under it).
 const AI_PANEL_WIDTH = 400;
@@ -869,17 +876,21 @@ function AppContent() {
   // Drops an opaque cover over the webview while the window resizes. The
   // unmaximize→fullscreen step (and its reverse) physically resizes the window
   // twice, so the content visibly reflows mid-transition — a jarring "snap".
-  // We snap the cover on instantly, let the OS settle behind it, then fade it
-  // out, so the change reads as a smooth dip instead of a jump.
+  // We fade the cover IN to full opacity, hold while the OS settles behind it,
+  // then fade it OUT, so the change reads as a smooth dip rather than a hard
+  // cut. Crucially we wait for the fade-in to finish before touching the
+  // window, so the resize is masked from its very first frame (a single rAF
+  // wasn't reliably enough — early reflow frames leaked through). FULLSCREEN-01.
   const [fsTransition, setFsTransition] = useState(false);
   const toggleFullscreen = useCallback(async () => {
     try {
       const w = Window.getCurrent();
       const next = !isFullscreenRef.current;
+      // Fade the cover in, then wait for it to reach full opacity before the
+      // window starts resizing underneath it. FS_FADE_IN_MS must stay in sync
+      // with the cover's fade-in duration class below.
       setFsTransition(true);
-      // Yield one frame so the cover actually paints before the window starts
-      // resizing underneath it — otherwise the first reflow frame leaks through.
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      await new Promise((r) => window.setTimeout(r, FS_FADE_IN_MS));
       if (next) {
         wasMaximizedRef.current = await w.isMaximized();
         if (wasMaximizedRef.current) await w.unmaximize();
@@ -894,8 +905,8 @@ function AppContent() {
     } catch {
       /* browser dev mode — no Tauri window */
     } finally {
-      // Reveal once the resize has settled; the cover fades out via CSS.
-      window.setTimeout(() => setFsTransition(false), 200);
+      // Let the resize settle behind the fully-opaque cover, then fade out.
+      window.setTimeout(() => setFsTransition(false), FS_SETTLE_MS);
     }
   }, [showToast]);
 
@@ -1492,13 +1503,14 @@ function AppContent() {
         </Suspense>
       )}
 
-      {/* Fullscreen transition cover. Snaps opaque instantly (no fade-in) to
-          hide the mid-resize reflow, then fades out over 300ms to reveal the
-          settled layout. Sits above everything; pointer-events-none so it never
-          eats a click once it's transparent. */}
+      {/* Fullscreen transition cover. Fades in over 150ms (we wait for that
+          before resizing, so the mid-resize reflow is fully masked), then fades
+          out over 300ms to reveal the settled layout — a smooth dip in and out.
+          The 150ms fade-in duration is mirrored by FS_FADE_IN_MS. Sits above
+          everything; pointer-events-none so it never eats a click. */}
       <div
         aria-hidden="true"
-        className={`fixed inset-0 z-[200] bg-[var(--bg-primary)] pointer-events-none ${fsTransition ? "opacity-100" : "opacity-0 invisible transition-[opacity,visibility] duration-300"}`}
+        className={`fixed inset-0 z-[200] bg-[var(--bg-primary)] pointer-events-none transition-[opacity,visibility] ease-out ${fsTransition ? "opacity-100 duration-150" : "opacity-0 invisible duration-300"}`}
       />
 
       {/* Loading overlay */}
