@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { findAll, matchLength, replaceOne, replaceAllMatches } from "../utils/findReplace";
 
 interface FindReplaceBarProps {
     isOpen: boolean;
@@ -14,57 +15,6 @@ interface MatchResult {
     matches: number[];
     activeIdx: number;
 }
-
-const findAll = (haystack: string, needle: string, caseSensitive: boolean, regex: boolean): number[] => {
-    if (!needle) return [];
-    const result: number[] = [];
-    if (regex) {
-        try {
-            const re = new RegExp(needle, caseSensitive ? "g" : "gi");
-            let m;
-            while ((m = re.exec(haystack)) !== null) {
-                result.push(m.index);
-                if (m.index === re.lastIndex) re.lastIndex++; // avoid zero-width loops
-            }
-        } catch {
-            return [];
-        }
-        return result;
-    }
-    const h = caseSensitive ? haystack : haystack.toLowerCase();
-    const n = caseSensitive ? needle : needle.toLowerCase();
-    let i = h.indexOf(n);
-    while (i !== -1) {
-        result.push(i);
-        i = h.indexOf(n, i + Math.max(1, n.length));
-    }
-    return result;
-};
-
-const matchLength = (haystack: string, idx: number, needle: string, caseSensitive: boolean, regex: boolean): number => {
-    if (regex) {
-        try {
-            const re = new RegExp(needle, caseSensitive ? "g" : "gi");
-            re.lastIndex = idx;
-            const m = re.exec(haystack);
-            return m && m.index === idx ? m[0].length : 0;
-        } catch {
-            return 0;
-        }
-    }
-    return needle.length;
-};
-
-/** Expand $1…$9, $& (whole match) and $$ (literal $) in a regex replacement,
- *  mirroring String.prototype.replace semantics. Without this, "$1" used to be
- *  inserted literally — breaking the main reason to turn regex mode on. */
-const expandReplacement = (m: RegExpExecArray, template: string): string =>
-    template.replace(/\$(\$|&|[1-9])/g, (whole, g: string) => {
-        if (g === "$") return "$";
-        if (g === "&") return m[0];
-        const idx = Number(g);
-        return idx < m.length ? (m[idx] ?? "") : whole;
-    });
 
 export function FindReplaceBar({
     isOpen,
@@ -152,50 +102,13 @@ export function FindReplaceBar({
 
     const replaceCurrent = useCallback(() => {
         if (match.activeIdx === -1) return;
-        const start = match.matches[match.activeIdx];
-        let len: number;
-        let actualReplacement = replacement;
-        if (regex) {
-            try {
-                const re = new RegExp(query, caseSensitive ? "g" : "gi");
-                re.lastIndex = start;
-                const m = re.exec(content);
-                if (!m || m.index !== start) return;
-                len = m[0].length;
-                actualReplacement = expandReplacement(m, replacement);
-            } catch {
-                return;
-            }
-        } else {
-            len = query.length;
-        }
-        if (len === 0) return;
-        const newContent = content.slice(0, start) + actualReplacement + content.slice(start + len);
-        onReplace(newContent, start + actualReplacement.length);
+        const res = replaceOne(content, match.matches[match.activeIdx], query, replacement, caseSensitive, regex);
+        if (res) onReplace(res.content, res.cursor);
     }, [match, content, query, replacement, caseSensitive, regex, onReplace]);
 
     const replaceAll = useCallback(() => {
-        if (match.matches.length === 0) return;
-        let updated: string;
-        if (regex) {
-            // Native String.replace handles $1/$&/$$ expansion and zero-width
-            // matches correctly in one pass.
-            try {
-                updated = content.replace(new RegExp(query, caseSensitive ? "g" : "gi"), replacement);
-            } catch {
-                return;
-            }
-        } else {
-            // Walk in reverse so indices stay valid as we splice
-            updated = content;
-            for (let i = match.matches.length - 1; i >= 0; i--) {
-                const start = match.matches[i];
-                updated = updated.slice(0, start) + replacement + updated.slice(start + query.length);
-            }
-        }
-        // Keep the caret near the first replacement instead of yanking the
-        // viewport to the end of the document.
-        onReplace(updated, Math.min(match.matches[0] + replacement.length, updated.length));
+        const res = replaceAllMatches(content, match.matches, query, replacement, caseSensitive, regex);
+        if (res) onReplace(res.content, res.cursor);
     }, [match, content, query, replacement, caseSensitive, regex, onReplace]);
 
     const handleKey = (e: React.KeyboardEvent) => {
