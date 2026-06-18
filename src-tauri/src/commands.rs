@@ -256,6 +256,13 @@ fn sanitize_image_name(name: &str) -> Result<String, CommandError> {
     if trimmed.contains('\0') {
         return Err(CommandError::WriteError("Invalid image filename".to_string()));
     }
+    // Reject both path separators explicitly, on every platform. On Unix a
+    // backslash is a legal filename character, so the Path::file_name() check
+    // below would let a Windows-style "..\foo.png" traversal payload through;
+    // rejecting separators up front keeps the behavior identical cross-platform.
+    if trimmed.contains('/') || trimmed.contains('\\') {
+        return Err(CommandError::WriteError("Invalid image filename".to_string()));
+    }
     // Reject any path-like input — only a bare basename is allowed.
     let basename = std::path::Path::new(trimmed)
         .file_name()
