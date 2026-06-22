@@ -9,6 +9,22 @@ export interface FindOptions {
     regex: boolean;
 }
 
+/**
+ * Whether `needle` is a usable search pattern. Plain text is always valid; in
+ * regex mode a pattern the engine can't compile (a half-typed `[`, a stray
+ * `\d++`) is not. Lets the UI tell "invalid pattern" apart from "no matches",
+ * which `findAll` collapses into the same empty result.
+ */
+export function isValidPattern(needle: string, regex: boolean): boolean {
+    if (!regex || !needle) return true;
+    try {
+        new RegExp(needle);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export interface ReplaceResult {
     /** The full document text after the replacement. */
     content: string;

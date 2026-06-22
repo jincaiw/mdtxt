@@ -66,12 +66,11 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: Expo
 
         try {
             const mod = await loadExportModule();
-            if (format === 'html') {
-                await mod.exportToHTML(htmlContent, fileName, theme, font, fontSize);
-            } else {
-                await mod.exportToPDF(htmlContent, fileName, theme, font, fontSize);
-            }
-            onSuccess?.(format.toUpperCase());
+            const exported = format === 'html'
+                ? await mod.exportToHTML(htmlContent, fileName, theme, font, fontSize)
+                : await mod.exportToPDF(htmlContent, fileName, theme, font, fontSize);
+            // Skip the confirmation toast when the user cancelled the save dialog.
+            if (exported) onSuccess?.(format.toUpperCase());
         } catch (error) {
             console.error(`Failed to export ${format}:`, error);
             onError?.(format.toUpperCase());

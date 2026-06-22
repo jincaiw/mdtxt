@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findAll, matchLength, expandReplacement, replaceOne, replaceAllMatches } from "./findReplace";
+import { findAll, matchLength, expandReplacement, replaceOne, replaceAllMatches, isValidPattern } from "./findReplace";
 
 describe("findAll", () => {
     it("returns no matches for an empty needle", () => {
@@ -145,5 +145,25 @@ describe("replaceAllMatches", () => {
 
     it("returns null for an invalid regex", () => {
         expect(replaceAllMatches("abc", [0], "(", "y", false, true)).toBeNull();
+    });
+});
+
+describe("isValidPattern", () => {
+    it("treats plain text as always valid", () => {
+        expect(isValidPattern("(", false)).toBe(true);
+        expect(isValidPattern("", false)).toBe(true);
+    });
+
+    it("treats an empty regex query as valid (nothing to compile yet)", () => {
+        expect(isValidPattern("", true)).toBe(true);
+    });
+
+    it("accepts a well-formed regex", () => {
+        expect(isValidPattern("\\d+", true)).toBe(true);
+    });
+
+    it("rejects an uncompilable regex", () => {
+        expect(isValidPattern("(", true)).toBe(false);
+        expect(isValidPattern("[", true)).toBe(false);
     });
 });

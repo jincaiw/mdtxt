@@ -431,14 +431,16 @@ export function generateHTML(
 </html>`;
 }
 
-// Export to HTML file
+// Export to HTML file. Resolves `true` when a file was actually written, and
+// `false` when the user cancelled the save dialog — so the caller can skip the
+// "Exported" confirmation toast on cancel.
 export async function exportToHTML(
     htmlContent: string,
     fileName: string,
     theme: Theme,
     font: FontFamily,
     fontSize: FontSize
-): Promise<void> {
+): Promise<boolean> {
     const title = fileName.replace(/\.(md|markdown)$/i, '');
     const cleaned = await prepareExportHtml(htmlContent);
     const fullHTML = generateHTML(cleaned, title, theme, font, fontSize);
@@ -449,9 +451,9 @@ export async function exportToHTML(
         filters: [{ name: 'HTML', extensions: ['html'] }],
     });
 
-    if (filePath) {
-        await writeTextFile(filePath, fullHTML);
-    }
+    if (!filePath) return false;
+    await writeTextFile(filePath, fullHTML);
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -569,16 +571,20 @@ function printHtmlDocument(html: string): Promise<void> {
 // writes a real PDF via the native PrintToPdf engine — no print dialog. Other
 // platforms fall back to the webview's print pipeline (`window.print()`), the
 // only cross-platform route to a vector PDF without bundling a headless browser.
+// Resolves `true` once the PDF has been written (Windows) or the print flow was
+// handed off (other platforms), and `false` when the user cancels the Windows
+// save dialog. The print-pipeline fallback can't tell save from cancel, so it
+// optimistically reports success.
 export async function exportToPDF(
     htmlContent: string,
     fileName: string,
     _theme: Theme,
     font: FontFamily,
     fontSize: FontSize
-): Promise<void> {
+): Promise<boolean> {
     if (!htmlContent || htmlContent.trim() === '') {
         console.error('No HTML content to export!');
-        return;
+        return false;
     }
 
     const title = fileName.replace(/\.(md|markdown)$/i, '');
@@ -597,10 +603,11 @@ export async function exportToPDF(
             filters: [{ name: 'PDF', extensions: ['pdf'] }],
         });
         // Dialog cancelled — nothing to do.
-        if (!filePath) return;
+        if (!filePath) return false;
         await invoke('export_pdf', { html: fullHTML, path: filePath });
-        return;
+        return true;
     }
 
     await printHtmlDocument(fullHTML);
+    return true;
 }

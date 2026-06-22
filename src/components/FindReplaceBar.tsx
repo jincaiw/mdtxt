@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { findAll, matchLength, replaceOne, replaceAllMatches } from "../utils/findReplace";
+import { findAll, matchLength, replaceOne, replaceAllMatches, isValidPattern } from "../utils/findReplace";
 
 interface FindReplaceBarProps {
     isOpen: boolean;
@@ -124,9 +124,15 @@ export function FindReplaceBar({
 
     if (!isOpen) return null;
 
-    const totalLabel = match.matches.length === 0
-        ? "No results"
-        : `${match.activeIdx + 1} of ${match.matches.length}`;
+    // A broken regex and a regex that simply matches nothing both yield an empty
+    // result set; tell them apart so a half-typed pattern reads as "Invalid
+    // pattern" (in the danger color) instead of a misleading "No results".
+    const patternInvalid = !isValidPattern(query, regex);
+    const totalLabel = patternInvalid
+        ? "Invalid pattern"
+        : match.matches.length === 0
+            ? "No results"
+            : `${match.activeIdx + 1} of ${match.matches.length}`;
 
     return (
         <div
@@ -156,7 +162,7 @@ export function FindReplaceBar({
                     className="flex-1 px-2 py-1 text-sm bg-[var(--bg-input)] border border-[var(--border)] rounded text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                     aria-label="Find text"
                 />
-                <span className="text-[11px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap min-w-[80px] text-right">
+                <span className={`text-[11px] tabular-nums whitespace-nowrap min-w-[80px] text-right ${patternInvalid ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
                     {totalLabel}
                 </span>
                 <button onClick={prev} title="Previous (Shift+Enter)" aria-label="Previous match" className="w-6 h-6 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] flex items-center justify-center">
