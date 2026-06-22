@@ -7,13 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.34] - 2026-06-22
+### Added
+
+- The Export and Settings dropdown menus are now fully keyboard-operable: focus
+  moves into the menu on open, Arrow/Home/End move between items, and Escape
+  closes and returns focus to the button.
+- The file explorer refreshes when the window regains focus and gained a manual
+  refresh button, so its list no longer goes stale after files change on disk.
 
 ### Changed
 
 - **PDF export now saves directly.** On Windows, "Export → PDF" asks where to
   save and writes the file straight away, instead of opening the system print
   dialog. The PDF keeps selectable text and working links.
+- The theme now matches your operating system's light/dark setting on first
+  launch, and follows it until you pick a theme yourself.
+- Notifications stack instead of replacing one another, and error messages stay
+  on screen longer than confirmations.
+- The Light theme has a softer, warmer tone for a bit more character.
+
+### Removed
+
+- The GitHub theme. (Light covers the same clean, bright look.)
+
+### Fixed
+
+- Find & Replace now shows "Invalid pattern" for an unparseable regex instead of
+  a misleading "No results".
+- Cancelling the export save dialog no longer shows a false "Exported" message.
+- A persistent autosave failure keeps reminding you (throttled) instead of
+  going quiet after the first warning.
+
+## [1.0.34] - 2026-06-22
 
 ## [1.0.33] - 2026-06-18
 

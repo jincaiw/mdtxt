@@ -579,20 +579,23 @@ function AppContent() {
     return () => window.removeEventListener("focus", checkExternalChange);
   }, [loadFileDirect, showToast]);
 
-  // Autosave: once enabled, persist 1.5s after the last edit. Silent (the
-  // status dot already flips to Saved); only failures surface a toast, and
-  // only once per failure streak so a broken disk doesn't spam.
-  const autosaveFailedRef = useRef(false);
+  // Autosave: once enabled, persist 1.5s after the last edit. Silent on success
+  // (the status dot already flips to Saved). Failures surface a toast, throttled
+  // to at most once per 30s so a broken disk keeps reminding the user without
+  // spamming on every 1.5s tick. The unsaved dot stays lit the whole time as
+  // the always-on signal. A successful save clears the throttle.
+  const lastAutosaveErrorRef = useRef(0);
   useEffect(() => {
     if (!autoSaveEnabled || !filePath || content === originalContent) return;
     const id = window.setTimeout(async () => {
       try {
         knownMtimeRef.current = await invoke<number>("save_file", { path: filePath, content });
         setOriginalContent(content);
-        autosaveFailedRef.current = false;
+        lastAutosaveErrorRef.current = 0;
       } catch (err) {
-        if (!autosaveFailedRef.current) {
-          autosaveFailedRef.current = true;
+        const now = Date.now();
+        if (now - lastAutosaveErrorRef.current > 30000) {
+          lastAutosaveErrorRef.current = now;
           const msg = typeof err === "string" ? err : (err as { message?: string })?.message;
           showToast(msg || "Autosave failed", "error");
         }

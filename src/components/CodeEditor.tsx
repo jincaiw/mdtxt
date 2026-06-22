@@ -63,7 +63,7 @@ const EDITOR_FONT_FAMILY =
     "'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace";
 
 // Markdown syntax colours, driven by the same CSS variables the rest of the app
-// themes with — so light/dark/paper/github all "just work" in the editor too.
+// themes with — so light/dark/paper/dracula all "just work" in the editor too.
 const markdownHighlight = HighlightStyle.define([
     { tag: t.heading1, color: "var(--syntax-h1)", fontWeight: "bold" },
     { tag: t.heading2, color: "var(--syntax-h2)", fontWeight: "bold" },

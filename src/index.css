@@ -50,15 +50,17 @@
   --selection-text: #ffffff;
 }
 
-/* Light Theme */
+/* Light Theme — a soft, warm-neutral light. The faint warmth gives it a gentle
+   character without drifting toward the cream Paper theme. Only surface/border
+   tokens are warmed; text colors are unchanged so contrast ratios hold. */
 [data-theme="light"] {
   --bg-primary: #ffffff;
-  --bg-secondary: #fafafa;
-  --bg-titlebar: #f5f5f5;
+  --bg-secondary: #faf9f7;
+  --bg-titlebar: #f4f2ee;
   --bg-editor: #ffffff;
-  --bg-gutter: #fafafa;
-  --bg-hover: #f0f0f0;
-  --bg-input: #fafafa;
+  --bg-gutter: #faf9f7;
+  --bg-hover: #efece8;
+  --bg-input: #faf9f7;
 
   --text-primary: #171717;
   --text-secondary: #525252;
@@ -68,12 +70,12 @@
   --accent-hover: rgba(23, 23, 23, 0.9);
   --accent-text: #ffffff;
 
-  --border: #e5e5e5;
-  --border-subtle: #f0f0f0;
+  --border: #e8e4de;
+  --border-subtle: #efece8;
 
-  --code-bg: #f5f5f5;
+  --code-bg: #f4f2ee;
   --code-text: #dc2626;
-  --blockquote-bg: rgba(250, 250, 250, 0.8);
+  --blockquote-bg: rgba(244, 242, 238, 0.8);
 
   --syntax-h1: #171717;
   --syntax-h2: #262626;
@@ -142,53 +144,6 @@
 
   --selection-bg: #5c4033;
   --selection-text: #faf8f3;
-}
-
-/* GitHub Theme - Matches GitHub's README rendering */
-[data-theme="github"] {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f6f8fa;
-  --bg-titlebar: #f6f8fa;
-  --bg-editor: #ffffff;
-  --bg-gutter: #f6f8fa;
-  --bg-hover: #eaeef2;
-  --bg-input: #f6f8fa;
-
-  --text-primary: #1f2328;
-  --text-secondary: #656d76;
-  --text-muted: #8b949e;
-
-  --accent: #0969da;
-  --accent-hover: rgba(9, 105, 218, 0.9);
-  --accent-text: #ffffff;
-
-  --border: #d0d7de;
-  --border-subtle: #eaeef2;
-
-  --code-bg: rgba(175, 184, 193, 0.2);
-  --code-text: #1f2328;
-  --blockquote-bg: transparent;
-
-  --syntax-h1: #1f2328;
-  --syntax-h2: #1f2328;
-  --syntax-h3: #1f2328;
-  --syntax-link: #0969da;
-  --syntax-bold: #1f2328;
-  --syntax-list: #1f2328;
-  --syntax-number: #1f2328;
-  --syntax-quote: #656d76;
-  --syntax-code: #656d76;
-
-  --status-saved: #1a7f37;
-  --status-unsaved: #9a6700;
-  --danger: #cf222e;
-
-  --scrollbar-track: #f6f8fa;
-  --scrollbar-thumb: #d0d7de;
-  --scrollbar-hover: #afb8c1;
-
-  --selection-bg: #0969da;
-  --selection-text: #ffffff;
 }
 
 /* Dracula Theme */
@@ -966,7 +921,6 @@ select:focus-visible,
 }
 
 [data-theme="light"],
-[data-theme="github"],
 [data-theme="paper"] {
   --diff-add-bg: rgba(46, 160, 67, 0.16);
   --diff-add-border: #2da44e;

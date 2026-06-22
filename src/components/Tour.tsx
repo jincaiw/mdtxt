@@ -75,7 +75,7 @@ const STEPS: Step[] = [
         imageAlt: "Paperling mascot thinking about themes",
         imageClass: "h-24",
         title: "Make it yours",
-        body: "Five themes live under this gear: Dark, Light, Paper, GitHub and Dracula.",
+        body: "Four themes live under this gear: Dark, Light, Paper and Dracula.",
     },
     {
         id: "done",

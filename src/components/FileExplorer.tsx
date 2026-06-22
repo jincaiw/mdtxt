@@ -44,6 +44,18 @@ export function FileExplorer({
         }
     }, [isOpen, currentFilePath]);
 
+    // Refresh when the window regains focus — files may have been created or
+    // deleted in another app while the explorer sat open. Mirrors App's
+    // external-change-on-focus detection so the list never goes stale.
+    useEffect(() => {
+        if (!isOpen) return;
+        const directory = getDirectory(currentFilePath);
+        if (!directory) return;
+        const onFocus = () => loadFiles(directory);
+        window.addEventListener("focus", onFocus);
+        return () => window.removeEventListener("focus", onFocus);
+    }, [isOpen, currentFilePath]);
+
     // Escape key to close and focus management + focus trap
     useEffect(() => {
         if (!isOpen) return;
@@ -108,15 +120,27 @@ export function FileExplorer({
                     </span>
                     <span className="truncate max-w-[180px]">{directoryName}</span>
                 </div>
-                <button
-                    onClick={onClose}
-                    aria-label="Close file explorer"
-                    className="btn-press flex items-center justify-center w-7 h-7 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                >
-                    <span className="material-symbols-outlined text-[18px]">
-                        close
-                    </span>
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => { const d = getDirectory(currentFilePath); if (d) loadFiles(d); }}
+                        aria-label="Refresh file list"
+                        title="Refresh"
+                        className="btn-press flex items-center justify-center w-7 h-7 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">
+                            refresh
+                        </span>
+                    </button>
+                    <button
+                        onClick={onClose}
+                        aria-label="Close file explorer"
+                        className="btn-press flex items-center justify-center w-7 h-7 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">
+                            close
+                        </span>
+                    </button>
+                </div>
             </div>
 
             {/* Content */}

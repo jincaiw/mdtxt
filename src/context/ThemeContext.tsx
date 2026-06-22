@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ensureFontLoaded } from '../fonts';
 
-export type Theme = 'dark' | 'light' | 'paper' | 'github'| "dracula" 
+export type Theme = 'dark' | 'light' | 'paper' | 'dracula';
 export type FontFamily = 'inter' | 'merriweather' | 'lora' | 'source-serif' | 'fira-sans';
 export type FontSize = 'small' | 'medium' | 'large';
 
@@ -21,7 +21,7 @@ const FONT_STORAGE_KEY = 'paperling-font';
 const FONT_SIZE_STORAGE_KEY = 'paperling-font-size';
 
 // Valid values for validation against corrupted localStorage
-const VALID_THEMES: Theme[] = ['dark', 'light', 'paper', 'github','dracula'];
+const VALID_THEMES: Theme[] = ['dark', 'light', 'paper', 'dracula'];
 const VALID_FONTS: FontFamily[] = ['inter', 'merriweather', 'lora', 'source-serif', 'fira-sans'];
 const VALID_FONT_SIZES: FontSize[] = ['small', 'medium', 'large'];
 
