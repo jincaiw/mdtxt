@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Tab "unsaved" indicator.** The mark showing a tab has unsaved edits rendered
+  as a hollow ring next to the close button, which looked broken and unclear. It
+  is now a small filled dot in the same amber as the status bar's "Unsaved"
+  indicator, and it cleanly becomes the close (×) button on hover.
+
 ## [1.0.47] - 2026-07-04
 
 ### Added

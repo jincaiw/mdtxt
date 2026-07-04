@@ -133,23 +133,33 @@ function TabBarImpl({ tabs, activeId, onSelect, onClose, onNewTab, onReorder, on
                         {isActive && <span className="absolute left-0 top-0 h-[2px] w-full bg-[var(--accent)]" aria-hidden="true" />}
                         <span className="material-symbols-outlined text-[14px] shrink-0 opacity-70">description</span>
                         <span className="truncate text-xs">{tab.label}</span>
-                        {/* Dirty dot doubles as the close target on hover. */}
+                        {/* Trailing control. On hover it's always a close (×)
+                            button. When the tab has unsaved edits and isn't
+                            hovered, it shows a small "unsaved" dot instead —
+                            same colour as the status bar's unsaved indicator, so
+                            the meaning is consistent across the app. The dot is a
+                            plain filled circle (not the Material `circle` glyph,
+                            which renders as a hollow ring under FILL 0). */}
                         <button
                             onMouseDown={(e) => { e.stopPropagation(); }}
                             onClick={(e) => { e.stopPropagation(); onClose(tab.id); }}
                             tabIndex={-1}
                             aria-label={`Close ${tab.name}`}
-                            title="Close"
+                            title={tab.dirty ? "Unsaved changes — click to close" : "Close"}
                             className="shrink-0 w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                         >
-                            {tab.dirty ? (
-                                <>
-                                    <span className="material-symbols-outlined text-[14px] group-hover/tab:hidden" aria-hidden="true">circle</span>
-                                    <span className="material-symbols-outlined text-[14px] hidden group-hover/tab:inline" aria-hidden="true">close</span>
-                                </>
-                            ) : (
-                                <span className="material-symbols-outlined text-[14px] opacity-0 group-hover/tab:opacity-100" aria-hidden="true">close</span>
+                            {tab.dirty && (
+                                <span
+                                    className="w-1.5 h-1.5 rounded-full bg-[var(--status-unsaved)] group-hover/tab:hidden"
+                                    aria-hidden="true"
+                                />
                             )}
+                            <span
+                                className={`material-symbols-outlined text-[16px] leading-none ${
+                                    tab.dirty ? "hidden group-hover/tab:inline" : "opacity-0 group-hover/tab:opacity-100"
+                                }`}
+                                aria-hidden="true"
+                            >close</span>
                         </button>
                     </div>
                 );
