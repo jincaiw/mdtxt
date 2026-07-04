@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.47] - 2026-07-04
 
+### Added
+
+- **Interactive feature guide.** The welcome tour now ends with "Open the
+  guide", which opens a real, editable document that shows off live math,
+  Mermaid diagrams, tables, task lists, code blocks and frontmatter, so you can
+  try every feature hands-on. Open it anytime from the command palette with
+  "Open the interactive guide".
+- **The tour covers more of the app.** Added steps that point out the file
+  explorer and the document outline so new users find them right away.
+
+### Fixed
+
+- **Export button icon.** The Export button used a download arrow that read like
+  an import action; it now uses a clearer export icon.
+
 ## [1.0.46] - 2026-07-02
 
 ## [1.0.45] - 2026-06-28
