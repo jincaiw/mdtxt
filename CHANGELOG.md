@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Paperling failing to launch on some GNOME/Wayland systems (WebKitGTK
+  DMABUF "Error 71 Protocol error").
+
 ## [1.0.48] - 2026-07-04
 
 ### Fixed
