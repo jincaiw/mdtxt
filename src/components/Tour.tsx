@@ -34,7 +34,7 @@ const STEPS: Step[] = [
         imageAlt: "Paperling mascot waving hello",
         imageClass: "h-32",
         title: "Hey, welcome to Paperling!",
-        body: "I'm the paperling this app is named after. Want a quick look around? It takes about 30 seconds.",
+        body: "I'm the paperling this app is named after. Want a quick look around? It takes about 15 seconds.",
     },
     {
         id: "explorer",
@@ -260,7 +260,7 @@ export function Tour({ onClose, onOpenTutorial }: TourProps) {
                             onClick={onClose}
                             className="btn-press text-sm font-medium px-4 py-2 rounded-[var(--radius-md)] bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] border border-[var(--border)] transition-all duration-200"
                         >
-                            {isLast ? "Just start writing" : "Skip tour"}
+                            {isFirst || isLast ? "Just start writing" : "Skip tour"}
                         </button>
                         <div className="flex items-center gap-2">
                             {!isFirst && (
