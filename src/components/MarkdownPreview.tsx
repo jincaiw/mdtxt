@@ -39,6 +39,16 @@ const HIGHLIGHT_OPTIONS = { detect: false } as const;
 //  - the `wikilink:` href protocol, so our internal links aren't stripped.
 const SANITIZE_SCHEMA = {
     ...defaultSchema,
+    // remark-rehype already prefixes every footnote id AND its matching href
+    // with `user-content-`; sanitize's default clobber pass would prefix the
+    // id a SECOND time (ids are on its clobber list, fragment hrefs are not),
+    // so footnote refs and back-arrows pointed at ids that don't exist — in
+    // the app and in every export. Markdown-generated ids stay clobber-safe
+    // via the remark prefix. The cost: ids on raw HTML are no longer
+    // rewritten; acceptable since the schema allows none of the elements
+    // DOM-clobbering needs (form/iframe/object/embed) and the bundled app
+    // never reads bare window globals an id could shadow.
+    clobberPrefix: "",
     attributes: {
         ...defaultSchema.attributes,
         span: [...(defaultSchema.attributes?.span ?? []), ["className", "math", "math-inline", "math-display"]],
