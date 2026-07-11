@@ -39,12 +39,12 @@ export function FileExplorer({
 
     // Initialize the view directory when opening the panel
     useEffect(() => {
-        if (isOpen && currentFilePath && !currentViewDir) {
-            const directory = getDirectory(currentFilePath);
-            setCurrentViewDir(directory);
+        if (isOpen && currentFilePath) {
+            // Keep the current view if the user already navigated somewhere
+            setCurrentViewDir((prev) => prev ?? getDirectory(currentFilePath));
         } else if (!isOpen) {
             // Reset view when closed so it snaps back to the active file next time
-            setCurrentViewDir(null); 
+            setCurrentViewDir(null);
         }
     }, [isOpen, currentFilePath]);
 
@@ -113,11 +113,10 @@ export function FileExplorer({
         }
     };
     
+    const parentDir = currentViewDir ? getDirectory(currentViewDir) : null;
+
     const handleGoUp = () => {
-        if (currentViewDir) {
-            const parentDir = getDirectory(currentViewDir);
-            if (parentDir) setCurrentViewDir(parentDir);
-        }
+        if (parentDir) setCurrentViewDir(parentDir);
     };
 
     const directoryName = currentViewDir
@@ -139,9 +138,10 @@ export function FileExplorer({
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)] no-select">
                     <button
                         onClick={handleGoUp}
+                        disabled={!parentDir}
                         aria-label="Go up one folder"
                         title="Go up"
-                        className="btn-press flex items-center justify-center w-6 h-6 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-colors mr-1"
+                        className="btn-press flex items-center justify-center w-6 h-6 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-colors mr-1 disabled:opacity-40 disabled:pointer-events-none"
                     >
                         <span className="material-symbols-outlined text-[18px]">
                             arrow_upward
@@ -219,5 +219,5 @@ export function FileExplorer({
                 )}
             </div>
         </aside>
-);
+    );
 }
