@@ -7,8 +7,20 @@ import react from "@vitejs/plugin-react";
 // vite.config.ts when present. QUALITY-01.
 export default defineConfig({
     plugins: [react()],
+    resolve: {
+        // Some @codemirror/lang-* packages carry their own nested copy of
+        // @codemirror/state|view; without dedupe, vitest resolves two instances
+        // and EditorState.create rejects extensions built by the other copy
+        // ("Unrecognized extension value"). Vite's dep pre-bundling hides this
+        // in dev/build, so it only bites in tests.
+        dedupe: ["@codemirror/state", "@codemirror/view", "@codemirror/language", "@codemirror/autocomplete", "@codemirror/lint"],
+    },
     test: {
         environment: "jsdom",
+        // Vitest normally hands node_modules to Node's resolver, which happily
+        // loads the nested copies and ignores `resolve.dedupe` above — inline
+        // the CodeMirror family so the deduped Vite resolution is used.
+        server: { deps: { inline: [/@codemirror[\\/]/] } },
         setupFiles: ["./src/test/setup.ts"],
         include: ["src/**/*.{test,spec}.{ts,tsx}"],
         css: false,

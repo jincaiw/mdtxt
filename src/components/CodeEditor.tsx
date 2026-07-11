@@ -745,8 +745,12 @@ function CodeEditorImpl({
     const handleFindJump = useCallback((start: number, end: number) => {
         const v = viewRef.current;
         if (!v) return;
+        // No v.focus() here: the find bar owns focus while open. Focusing the
+        // editor on every auto-jump meant the keystroke after the 100ms match
+        // debounce landed IN THE DOCUMENT, overwriting the matched text.
+        // drawSelection keeps the match visible while the editor is unfocused;
+        // onClose below hands focus back.
         v.dispatch({ selection: { anchor: start, head: end }, scrollIntoView: true });
-        v.focus();
     }, []);
     const handleFindReplace = useCallback((newContent: string, newCursor: number) => {
         const v = viewRef.current;
