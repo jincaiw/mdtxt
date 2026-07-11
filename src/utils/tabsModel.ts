@@ -25,6 +25,53 @@ export function isTabDirty(tab: Pick<TabState, "content" | "originalContent">): 
   return tab.content !== tab.originalContent;
 }
 
+/** The live editor buffer for the ACTIVE tab. Its stored snapshot in the tabs
+ *  array lags until the next switch, so dirty checks for the active tab must
+ *  read these live values instead. `fileName` may be null for an Untitled buffer. */
+export interface LiveActiveTab {
+  filePath: string | null;
+  fileName: string | null;
+  content: string;
+  originalContent: string;
+}
+
+/** A tab that has unsaved changes, in the shape the window-close save loop needs. */
+export interface DirtyTab {
+  id: string;
+  filePath: string | null;
+  fileName: string;
+  content: string;
+}
+
+/**
+ * Every open tab with unsaved changes. The ACTIVE tab is read from `live` (the
+ * editor's current buffer) rather than its stored snapshot, which lags until the
+ * next tab switch; every other tab is compared against its own saved
+ * originalContent. This is what the window-close guard uses so a dirty
+ * BACKGROUND tab can't be discarded silently when the active tab is clean.
+ * TABS-04 / issue #88.
+ */
+export function collectDirtyTabs(
+  tabs: TabState[],
+  activeId: string | null,
+  live: LiveActiveTab
+): DirtyTab[] {
+  const dirty: DirtyTab[] = [];
+  for (const t of tabs) {
+    const isActive = t.id === activeId;
+    const content = isActive ? live.content : t.content;
+    const originalContent = isActive ? live.originalContent : t.originalContent;
+    if (!isTabDirty({ content, originalContent })) continue;
+    dirty.push({
+      id: t.id,
+      filePath: isActive ? live.filePath : t.filePath,
+      fileName: isActive ? (live.fileName ?? "Untitled.md") : t.fileName,
+      content,
+    });
+  }
+  return dirty;
+}
+
 /** Find an open tab by file path (null paths never match). */
 export function findTabByPath(tabs: TabState[], path: string | null): TabState | undefined {
   if (path == null) return undefined;

@@ -107,6 +107,7 @@ import {
   findReusableUntitledTab,
   computeTabLabels,
   moveTab,
+  collectDirtyTabs as computeDirtyTabs,
   type TabState,
 } from "./utils/tabsModel";
 import { countSourceWords, countWords } from "./utils/documentStats";
@@ -337,25 +338,12 @@ function AppContent() {
   // Every open tab that has unsaved changes, reading the ACTIVE tab from live
   // state (its stored snapshot lags until the next switch) and the rest from
   // their snapshots. Used by the window-close guard so background tabs can't be
-  // discarded silently. TABS-04.
-  const collectDirtyTabs = useCallback(() => {
-    const live = liveRef.current;
-    const activeId = activeTabIdRef.current;
-    return tabsRef.current
-      .map((t) => {
-        const isActive = t.id === activeId;
-        return {
-          id: t.id,
-          filePath: isActive ? live.filePath : t.filePath,
-          fileName: isActive ? (live.fileName ?? "Untitled.md") : t.fileName,
-          content: isActive ? live.content : t.content,
-          dirty: isActive
-            ? live.content !== live.originalContent
-            : t.content !== t.originalContent,
-        };
-      })
-      .filter((t) => t.dirty);
-  }, []);
+  // discarded silently. The dirty-collection logic itself is a pure helper so it
+  // stays unit-testable; this wrapper just feeds it the current refs. TABS-04.
+  const collectDirtyTabs = useCallback(
+    () => computeDirtyTabs(tabsRef.current, activeTabIdRef.current, liveRef.current),
+    []
+  );
 
   // Write the live editor state back into the active tab's entry.
   const snapshotActiveTab = useCallback(() => {
