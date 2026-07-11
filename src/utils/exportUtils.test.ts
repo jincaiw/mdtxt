@@ -65,6 +65,14 @@ describe("prepareExportHtml", () => {
         expect(out).toContain('href="https://example.com"');
         expect(out).toContain('src="data:image/png;base64,AAAA"');
     });
+
+    // Relative .md links keep their real href in exports (sibling-file
+    // convention); they used to be captured as dead href="#" anchors. EXPORT-04.
+    it("preserves relative markdown link hrefs", async () => {
+        const out = await prepareExportHtml('<a href="notes/other.md" data-relative-md="true">other</a>');
+        expect(out).toContain('href="notes/other.md"');
+        expect(out).not.toContain('href="#"');
+    });
 });
 
 describe("exportToDocx", () => {

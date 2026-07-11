@@ -751,12 +751,21 @@ function MarkdownPreviewImpl({
                 const targetHref = href;
                 return (
                     <a
-                        href="#"
                         {...rest}
+                        // Keep the real relative href (not "#"): exports capture
+                        // this DOM verbatim, so the link stays alive in exported
+                        // HTML while in-app clicks still route through the
+                        // callback below. EXPORT-04.
+                        href={targetHref}
+                        data-relative-md="true"
                         onClick={(e) => {
                             e.preventDefault();
                             onNavigateRelative(targetHref);
                         }}
+                        // onClick never sees middle-click; with a real href the
+                        // webview would otherwise get a new-window request for
+                        // tauri.localhost/<file>.md.
+                        onAuxClick={(e) => e.preventDefault()}
                     >
                         {children}
                     </a>

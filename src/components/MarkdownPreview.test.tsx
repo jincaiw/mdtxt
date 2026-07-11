@@ -17,13 +17,14 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(async () => {}) }))
 
 afterEach(cleanup);
 
-function renderPreview(content: string) {
+function renderPreview(content: string, extraProps: Record<string, unknown> = {}) {
     return render(
         <MarkdownPreview
             content={content}
             fileName="test.md"
             fileSize={content.length}
             onEditClick={() => {}}
+            {...extraProps}
         />,
     );
 }
@@ -46,5 +47,27 @@ describe("footnote links", () => {
                 `no element with id "${id}" for href "${link.getAttribute("href")}"`,
             ).toBeTruthy();
         }
+    });
+});
+
+// Relative .md links used to render as href="#" with the target held only in
+// the onClick closure — exports captured dead anchors. The real href must be
+// in the DOM, with in-app navigation still going through the callback.
+describe("relative markdown links", () => {
+    it("renders the real href and navigates in-app on click", async () => {
+        const onNavigateRelative = vi.fn();
+        const { container } = renderPreview("[other](notes/other.md)", { onNavigateRelative });
+        const link = await waitFor(() => {
+            const a = container.querySelector<HTMLAnchorElement>("a[data-relative-md]");
+            expect(a).toBeTruthy();
+            return a!;
+        });
+        expect(link.getAttribute("href")).toBe("notes/other.md");
+
+        const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+        link.dispatchEvent(click);
+        expect(onNavigateRelative).toHaveBeenCalledWith("notes/other.md");
+        // preventDefault must fire or the webview would navigate to the .md URL.
+        expect(click.defaultPrevented).toBe(true);
     });
 });
