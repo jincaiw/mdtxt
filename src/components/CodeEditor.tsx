@@ -114,6 +114,14 @@ const editorTheme = EditorView.theme({
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
         backgroundColor: "var(--selection-bg)",
     },
+    // CodeMirror's base theme paints the FOCUSED selection through a
+    // higher-specificity selector (&light.cm-focused > .cm-scroller > ...), so
+    // without this mirror rule every theme showed the CM default lavender —
+    // near-invisible against light-theme text. Selected-text color comes from
+    // the global ::selection rule in index.css.
+    "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
+        backgroundColor: "var(--selection-bg)",
+    },
     ".cm-foldPlaceholder": { backgroundColor: "var(--bg-hover)", color: "var(--text-secondary)", border: "none" },
 });
 

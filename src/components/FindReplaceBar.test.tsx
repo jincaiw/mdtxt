@@ -7,20 +7,9 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
 import { render, fireEvent, waitFor, screen, cleanup } from "@testing-library/react";
 import { CodeEditor } from "./CodeEditor";
+import { installCodeMirrorDomPolyfills } from "../test/codemirrorDom";
 
-// CodeMirror measures text with Range.getClientRects, which jsdom doesn't
-// implement. Empty rects are enough for CM to mount and route events.
-beforeAll(() => {
-    const rect = {
-        x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0,
-        toJSON() { return this; },
-    };
-    Range.prototype.getClientRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList;
-    Range.prototype.getBoundingClientRect = () => rect as DOMRect;
-    if (!("getClientRects" in HTMLElement.prototype) || typeof document.body.getClientRects !== "function") {
-        HTMLElement.prototype.getClientRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList;
-    }
-});
+beforeAll(installCodeMirrorDomPolyfills);
 
 // RTL's automatic cleanup needs vitest `globals: true`, which this repo doesn't
 // enable — without this the second test finds two mounted editors.
