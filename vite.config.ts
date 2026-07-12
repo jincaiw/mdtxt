@@ -9,6 +9,28 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
 
+  // CodeMirror ships as a family of packages that each `instanceof`-check
+  // objects from @codemirror/state; some @codemirror/lang-* packages carry
+  // their own NESTED copies in node_modules, and without dedupe Rollup
+  // bundles every copy (6 were counted in one build). Two state instances in
+  // one editor throw "Unrecognized extension value in extension set" at
+  // runtime — the app booted to the error boundary. Force the whole family
+  // to resolve to the root copy. Mirrors vitest.config.ts. EDITOR-01.
+  resolve: {
+    dedupe: [
+      "@codemirror/state",
+      "@codemirror/view",
+      "@codemirror/language",
+      "@codemirror/autocomplete",
+      "@codemirror/commands",
+      "@codemirror/lint",
+      "@codemirror/search",
+      "@lezer/common",
+      "@lezer/highlight",
+      "@lezer/lr",
+    ],
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
