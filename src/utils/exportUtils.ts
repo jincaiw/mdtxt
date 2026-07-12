@@ -20,6 +20,7 @@ const themeColors: Record<Theme, Record<string, string>> = {
         syntaxH3: '#d4d4d4',
         syntaxLink: '#a3a3a3',
         syntaxBold: '#ffffff',
+        markBg: 'rgba(255, 196, 0, 0.35)',
     },
     light: {
         bgPrimary: '#ffffff',
@@ -36,6 +37,7 @@ const themeColors: Record<Theme, Record<string, string>> = {
         syntaxH3: '#404040',
         syntaxLink: '#2563eb',
         syntaxBold: '#171717',
+        markBg: '#ffe28a',
     },
     paper: {
         bgPrimary: '#f5f0e6',
@@ -52,6 +54,7 @@ const themeColors: Record<Theme, Record<string, string>> = {
         syntaxH3: '#6b5344',
         syntaxLink: '#2d5a7b',
         syntaxBold: '#5c4033',
+        markBg: '#efd489',
     },
     dracula: {
         bgPrimary: '#282a36',
@@ -68,6 +71,7 @@ const themeColors: Record<Theme, Record<string, string>> = {
         syntaxH3: '#bd93f9',
         syntaxLink: '#8be9fd',
         syntaxBold: '#f8f8f2',
+        markBg: 'rgba(255, 184, 108, 0.35)',
     },
 };
 
@@ -135,7 +139,7 @@ function generateExportCSS(theme: Theme, font: FontFamily, fontSize: FontSize): 
             }
             /* Browsers drop background fills when printing unless asked; keep
                code blocks, table headers and blockquote tints visible. */
-            pre, code, th, blockquote, .hljs {
+            pre, code, th, blockquote, .hljs, mark {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
@@ -201,6 +205,31 @@ function generateExportCSS(theme: Theme, font: FontFamily, fontSize: FontSize): 
         strong {
             font-weight: 600;
             color: ${colors.syntaxBold};
+        }
+
+        /* ==highlight== (remark-flexible-markers) — mirrors the preview's
+           .markdown-body mark rule; amber-ish per theme, text stays the
+           theme's primary color for legibility. */
+        mark {
+            background: ${colors.markBg};
+            color: ${colors.textPrimary};
+            padding: 0.05em 0.15em;
+            border-radius: 0.2em;
+        }
+
+        /* Definition lists (remark-definition-list) — mirrors the preview. */
+        dl {
+            margin: 0 0 1rem;
+        }
+
+        dt {
+            font-weight: 600;
+            color: ${colors.syntaxBold};
+            margin-top: 0.5rem;
+        }
+
+        dd {
+            margin: 0 0 0.25rem 1.5rem;
         }
 
         em {

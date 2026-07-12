@@ -789,6 +789,34 @@ select:focus-visible,
   color: var(--syntax-bold);
 }
 
+/* ==highlight== (remark-flexible-markers). Same translucent amber family as
+   the find-in-preview highlights above (::highlight(paperling-find)) so
+   "highlighted" reads as one concept; the alpha fill composites legibly over
+   every theme's background, and --text-primary keeps the text readable in
+   all four themes. */
+.markdown-body mark {
+  background: rgba(255, 196, 0, 0.35);
+  color: var(--text-primary);
+  padding: 0.05em 0.15em;
+  border-radius: 0.2em;
+}
+
+/* Definition lists (remark-definition-list): bold terms, indented
+   definitions — the classic dictionary layout. */
+.markdown-body dl {
+  margin: 0 0 1rem;
+}
+
+.markdown-body dt {
+  font-weight: 600;
+  color: var(--syntax-bold);
+  margin-top: 0.5rem;
+}
+
+.markdown-body dd {
+  margin: 0 0 0.25rem 1.5rem;
+}
+
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;

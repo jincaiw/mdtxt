@@ -50,6 +50,117 @@ describe("footnote links", () => {
     });
 });
 
+// Extended markdown syntaxes (SYNTAX-01, CodenameFlux review): ==highlight==,
+// ^sup^/~sub~, definition lists and {#custom-id} heading ids. Exports capture
+// the preview DOM, so asserting the rendered elements covers exports too.
+describe("extended markdown syntax", () => {
+    it("renders mark, sup, sub, definition lists and a custom heading id", async () => {
+        const md = [
+            "# My Title {#custom-id}",
+            "",
+            "Water is H~2~O and E = mc^2^, said the ==highlighted== part.",
+            "",
+            "Term one",
+            ": The first definition",
+        ].join("\n");
+        const { container } = renderPreview(md);
+        await waitFor(() => expect(container.querySelector("mark")).toBeTruthy());
+        expect(container.querySelector("mark")!.textContent).toBe("highlighted");
+        expect(container.querySelector("sub")!.textContent).toBe("2");
+        expect(container.querySelector("sup")!.textContent).toBe("2");
+        expect(container.querySelector("dl")).toBeTruthy();
+        expect(container.querySelector("dt")!.textContent).toBe("Term one");
+        expect(container.querySelector("dd")!.textContent).toContain("The first definition");
+        const h1 = container.querySelector("h1")!;
+        expect(h1.id).toBe("custom-id");
+        // The {#custom-id} marker itself must not leak into the rendered text.
+        expect(h1.textContent).not.toContain("{#custom-id}");
+    });
+
+    it("keeps GFM strikethrough (~~) working next to mark (==) and sub (~)", async () => {
+        const { container } = renderPreview("==x== then ~~y~~ then ~z~");
+        await waitFor(() => expect(container.querySelector("mark")).toBeTruthy());
+        expect(container.querySelector("mark")!.textContent).toBe("x");
+        expect(container.querySelector("del")!.textContent).toBe("y");
+        expect(container.querySelector("sub")!.textContent).toBe("z");
+    });
+
+    it("still gives headings without {#id} their slug id (fallback intact)", async () => {
+        const { container } = renderPreview("## Regular Heading\n\n## Regular Heading");
+        const headings = await waitFor(() => {
+            const hs = Array.from(container.querySelectorAll<HTMLHeadingElement>("h2"));
+            expect(hs.length).toBe(2);
+            return hs;
+        });
+        expect(headings[0].id).toBe("regular-heading");
+        // Dedup suffixing must survive the custom-id change too.
+        expect(headings[1].id).toBe("regular-heading-1");
+    });
+
+    it("keeps GFM task lists working alongside the new plugins", async () => {
+        const { container } = renderPreview("- [ ] open item\n- [x] done item");
+        await waitFor(() => {
+            const boxes = container.querySelectorAll<HTMLInputElement>("input[type='checkbox']");
+            expect(boxes.length).toBe(2);
+            expect(boxes[1].checked).toBe(true);
+        });
+    });
+
+    // The npm remark-supersub plugin split text on ANY even marker count,
+    // corrupting ordinary prose. The local plugin requires Pandoc's rule:
+    // non-empty content with no whitespace between the markers.
+    it("leaves prose with unpaired or spaced markers untouched", async () => {
+        const md = [
+            "x^2 + y^2 stays literal",
+            "",
+            "edit ~/.config and ~/.bashrc now",
+            "",
+            "see [^a] and [^b] here",
+        ].join("\n");
+        const { container } = renderPreview(md);
+        await waitFor(() => expect(container.textContent).toContain("x^2 + y^2 stays literal"));
+        expect(container.querySelector("sup")).toBeFalsy();
+        expect(container.querySelector("sub")).toBeFalsy();
+        expect(container.textContent).toContain("edit ~/.config and ~/.bashrc now");
+        expect(container.textContent).toContain("see [^a] and [^b] here");
+    });
+
+    it("rejects {#ids} that are not valid anchors and dedupes repeated custom ids", async () => {
+        const md = [
+            "# Bad One {#My Id}",
+            "",
+            "# Twin {#dup}",
+            "",
+            "# Other Twin {#dup}",
+        ].join("\n");
+        const { container } = renderPreview(md);
+        const headings = await waitFor(() => {
+            const hs = Array.from(container.querySelectorAll<HTMLHeadingElement>("h1"));
+            expect(hs.length).toBe(3);
+            return hs;
+        });
+        // Invalid id (space) stays literal text and falls back to the slug.
+        expect(headings[0].textContent).toContain("{#My Id}");
+        expect(headings[0].id).not.toBe("My Id");
+        // Duplicate custom ids must not produce duplicate DOM ids.
+        expect(headings[1].id).toBe("dup");
+        expect(headings[2].id).toBe("dup-1");
+    });
+
+    it("does not mangle tildes inside inline math when KaTeX is active", async () => {
+        // hasMath() triggers the lazy math chain; remark-math extracts $a~b$
+        // into an inlineMath node at parse time, so remark-supersub must only
+        // see the ~z~ outside the math span.
+        const { container } = renderPreview("$a~b$ stays math but ~z~ is sub");
+        await waitFor(() => expect(container.querySelector(".katex")).toBeTruthy(), { timeout: 10000 });
+        const sub = container.querySelector("sub");
+        expect(sub).toBeTruthy();
+        expect(sub!.textContent).toBe("z");
+        // The math span must not contain a <sub> injected by supersub.
+        expect(container.querySelector(".katex sub")).toBeFalsy();
+    }, 15000);
+});
+
 // Relative .md links used to render as href="#" with the target held only in
 // the onClick closure — exports captured dead anchors. The real href must be
 // in the DOM, with in-app navigation still going through the callback.

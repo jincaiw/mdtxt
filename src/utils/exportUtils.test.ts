@@ -42,6 +42,18 @@ describe("generateHTML", () => {
         expect(out).toContain("18px"); // large base size
     });
 
+    // ==highlight== and definition lists render in the preview DOM that exports
+    // capture, so the export stylesheet must ship matching rules (SYNTAX-01).
+    it("ships mark and definition-list styling in the export CSS", () => {
+        const out = generateHTML("<p>x</p>", "t", "dark", "inter", "medium");
+        expect(out).toMatch(/mark \{[^}]*background: rgba\(255, 196, 0, 0\.35\)/);
+        expect(out).toMatch(/dt \{[^}]*font-weight: 600/);
+        expect(out).toMatch(/dd \{[^}]*margin: 0 0 0\.25rem 1\.5rem/);
+        // Each theme picks its own amber-ish highlight.
+        expect(generateHTML("<p>x</p>", "t", "light", "inter", "medium")).toContain("#ffe28a");
+        expect(generateHTML("<p>x</p>", "t", "paper", "inter", "medium")).toContain("#efd489");
+    });
+
     // Mermaid SVGs carry an inline natural-size max-width from the preview;
     // export CSS must scale them to the column or they render tiny.
     it("ships column-scaling CSS for rendered mermaid diagrams", () => {

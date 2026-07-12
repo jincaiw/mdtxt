@@ -1,6 +1,10 @@
 import { useRef, useEffect, useCallback, useMemo, useState, useTransition, memo, createContext, useContext } from "react";
 import Markdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkFlexibleMarkers from "remark-flexible-markers";
+import remarkSupersub from "../utils/remarkSupersub";
+import { remarkDefinitionList, defListHastHandlers } from "remark-definition-list";
+import remarkCustomHeadingId from "../utils/remarkCustomHeadingId";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -23,6 +27,23 @@ const hasMath = (s: string): boolean => MATH_DETECTION_REGEX.test(s);
 // highlighted; untagged blocks render plain. Unknown language tags are ignored
 // gracefully by the plugin (no throw). PREVIEW-02.
 const HIGHLIGHT_OPTIONS = { detect: false } as const;
+
+// GFM's strikethrough tokenizer claims single tildes by default (micromark's
+// `singleTilde` defaults to true), which would consume `~sub~` at PARSE time —
+// the supersub plugin only transforms plain text nodes, so it would never see
+// the tildes. Turning singleTilde off keeps `~~strike~~` working (GitHub's
+// actual syntax) while leaving `~x~` in the text for the subscript plugin.
+// SYNTAX-01.
+const GFM_OPTIONS = { singleTilde: false } as const;
+
+// remark-definition-list only parses `Term / : definition` into mdast nodes; it
+// ships the matching mdast->hast handlers separately, and they must be handed to
+// remark-rehype or the defList nodes never become <dl>/<dt>/<dd>. react-markdown
+// merges this as `{...remarkRehypeOptions, ...{allowDangerousHtml: true}}` — its
+// own defaults are spread LAST, so allowDangerousHtml can't be clobbered from
+// here, and remark-rehype's `clobberPrefix` default ("user-content-", which the
+// footnote ids rely on) is untouched because neither side sets it. SYNTAX-01.
+const REMARK_REHYPE_OPTIONS = { handlers: defListHastHandlers } as const;
 
 // Inline/raw HTML support (GitHub-style). react-markdown ignores raw HTML by
 // default; rehype-raw reparses it into real nodes, and rehype-sanitize then
@@ -49,6 +70,10 @@ const SANITIZE_SCHEMA = {
     // DOM-clobbering needs (form/iframe/object/embed) and the bundled app
     // never reads bare window globals an id could shadow.
     clobberPrefix: "",
+    // `mark` is not in GitHub's default allowlist; the ==highlight== syntax
+    // (remark-flexible-markers) emits it, so it must survive sanitize. `sup`,
+    // `sub`, `dl`, `dt` and `dd` are already in defaultSchema.tagNames. SYNTAX-01.
+    tagNames: [...(defaultSchema.tagNames ?? []), "mark"],
     attributes: {
         ...defaultSchema.attributes,
         span: [...(defaultSchema.attributes?.span ?? []), ["className", "math", "math-inline", "math-display"]],
@@ -104,11 +129,23 @@ function rehypeHeadingIds() {
             if (!nodes) return;
             for (const node of nodes) {
                 if (node.type === "element" && node.tagName && HEADING_TAGS.has(node.tagName)) {
-                    const base = slugify(hastText(node)) || "section";
-                    const count = seen.get(base) ?? 0;
-                    seen.set(base, count + 1);
                     node.properties = node.properties || {};
-                    node.properties.id = count === 0 ? base : `${base}-${count}`;
+                    // A `{#custom-id}` id (remarkCustomHeadingId -> hProperties)
+                    // has already survived sanitize (clobberPrefix "") — respect
+                    // it, reserve it so a later auto-slug can't collide, and
+                    // suffix repeats so the DOM never carries duplicate ids.
+                    // Slugs stay the fallback. SYNTAX-01.
+                    const existing = node.properties.id;
+                    if (typeof existing === "string" && existing !== "") {
+                        const count = seen.get(existing) ?? 0;
+                        seen.set(existing, count + 1);
+                        if (count > 0) node.properties.id = `${existing}-${count}`;
+                    } else {
+                        const base = slugify(hastText(node)) || "section";
+                        const count = seen.get(base) ?? 0;
+                        seen.set(base, count + 1);
+                        node.properties.id = count === 0 ? base : `${base}-${count}`;
+                    }
                 }
                 walk(node.children);
             }
@@ -866,8 +903,14 @@ function MarkdownPreviewImpl({
         return () => { cancelled = true; };
     }, [renderBody, mathPlugins]);
 
+    // Order matters: GFM first (its tokenizer must own `~~strike~~` before
+    // the supersub text pass sees single tildes), math next when active
+    // (`$a~b$` becomes an inlineMath node the text-level plugins skip), then the
+    // extended syntaxes: ==mark==, ^sup^/~sub~, definition lists, {#id}. SYNTAX-01.
     const remarkPlugins = useMemo(
-        () => (mathPlugins ? [remarkGfm, mathPlugins.remark] : [remarkGfm]),
+        () => (mathPlugins
+            ? [[remarkGfm, GFM_OPTIONS], mathPlugins.remark, remarkFlexibleMarkers, remarkSupersub, remarkDefinitionList, remarkCustomHeadingId]
+            : [[remarkGfm, GFM_OPTIONS], remarkFlexibleMarkers, remarkSupersub, remarkDefinitionList, remarkCustomHeadingId]),
         [mathPlugins]
     );
     const rehypePlugins = useMemo(
@@ -1026,6 +1069,7 @@ function MarkdownPreviewImpl({
                             remarkPlugins={remarkPlugins as any}
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             rehypePlugins={rehypePlugins as any}
+                            remarkRehypeOptions={REMARK_REHYPE_OPTIONS}
                             urlTransform={mdUrlTransform}
                             components={components}
                         >
