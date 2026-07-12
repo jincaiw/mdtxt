@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.49] - 2026-07-12
+
 ### Added
 
 - **More markdown syntax.** `==highlight==`, superscript (`x^2^`), subscript
