@@ -870,6 +870,29 @@ mod tests {
     }
 
     #[test]
+    fn unchanged_utf8_bom_crlf_and_trailing_newline_round_trip() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let dir = std::env::temp_dir()
+                .join(format!("paperling-format-roundtrip-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("format.md").to_string_lossy().to_string();
+            let original = b"\xEF\xBB\xBF# title\r\n\r\n::: custom {x}\r\n";
+            std::fs::write(&path, original).unwrap();
+
+            let opened = read_file(path.clone()).await.unwrap();
+            assert_eq!(opened.content, "\u{feff}# title\n\n::: custom {x}\n");
+            save_file(path.clone(), opened.content).await.unwrap();
+
+            assert_eq!(std::fs::read(&path).unwrap(), original);
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
+    #[test]
     fn rel_path_accepts_safe_relatives() {
         assert!(validate_rel_path("images/foo.png").is_ok());
         assert!(validate_rel_path("foo.png").is_ok());

@@ -37,6 +37,7 @@ import { matchWikilinkPrefix, rankFileNames, toWikiName } from "../utils/wikilin
 import { applyTableOp, findTableAt, locateCell, type Align } from "../utils/tableModel";
 import type { Scroller } from "../utils/scrollSync";
 import { useLocale } from "../context/LocaleContext";
+import { minimalTextChange } from "../utils/minimalTextChange";
 
 interface CodeEditorProps {
     content: string;
@@ -525,13 +526,16 @@ function CodeEditorImpl({
     }
 
     // Sync external content changes (file open, AI replace via App, frontmatter
-    // edits) into the editor — skipping our own keystroke echoes cheaply.
+    // edits) into the editor — skipping our own keystroke echoes cheaply. Until
+    // P4 removes this React bridge, preserve unaffected ranges rather than
+    // recording every external update as a full-document replacement.
     useEffect(() => {
         if (content === lastEmittedRef.current) return;
         const view = viewRef.current;
         if (!view) return;
-        if (content !== view.state.doc.toString()) {
-            view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } });
+        const change = minimalTextChange(view.state.doc.toString(), content);
+        if (change) {
+            view.dispatch({ changes: change });
         }
         lastEmittedRef.current = content;
     }, [content]);

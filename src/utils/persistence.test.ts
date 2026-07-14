@@ -6,6 +6,7 @@ import {
     getWordWrap,
     migrateLegacyKeys, getLastFile,
     getOpenInReader, setOpenInReader,
+    getSession, setSession,
 } from "./persistence";
 
 beforeEach(() => localStorage.clear());
@@ -74,6 +75,28 @@ describe("split ratio", () => {
         expect(getSplitRatio()).toBe(0.3);
         setSplitRatio(0.99); // out of (0.15, 0.85) -> falls back to 0.5
         expect(getSplitRatio()).toBe(0.5);
+    });
+});
+
+describe("saved tab session", () => {
+    it("round-trips tab paths and clamps the restored active index", () => {
+        setSession({
+            tabs: [{ path: "/notes/one.md", cursorLine: 4 }, { path: "/notes/two.md" }],
+            activeIndex: 99,
+        });
+
+        expect(getSession()).toEqual({
+            tabs: [{ path: "/notes/one.md", cursorLine: 4 }, { path: "/notes/two.md" }],
+            activeIndex: 1,
+        });
+    });
+
+    it("rejects malformed or empty recovery data instead of restoring arbitrary values", () => {
+        localStorage.setItem("paperling:session", JSON.stringify({ tabs: [{ path: 123 }], activeIndex: -1 }));
+        expect(getSession()).toBeNull();
+
+        setSession(null);
+        expect(getSession()).toBeNull();
     });
 });
 

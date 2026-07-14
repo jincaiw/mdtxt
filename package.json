@@ -12,6 +12,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "check:i18n": "node scripts/check-i18n.mjs",
+    "check:user-copy": "node scripts/check-user-copy.mjs",
     "release:check": "node scripts/release-preflight.mjs",
     "preview": "vite preview",
     "test": "vitest run",
