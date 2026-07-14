@@ -228,6 +228,9 @@ function AppContent() {
   // Pending dirty-tab close, awaiting the Save/Discard/Cancel dialog. TABS-05.
   const [closeTabPrompt, setCloseTabPrompt] = useState<{ id: string; fileName: string } | null>(null);
   const [fileConflict, setFileConflict] = useState<{ documentId: string; path: string; name: string } | null>(null);
+  // Metadata only: a dirty background session observed an external disk
+  // change. The document bytes stay solely in DocumentSession.
+  const [conflictedTabIds, setConflictedTabIds] = useState<ReadonlySet<string>>(() => new Set());
   const [recoveryEntries, setRecoveryEntries] = useState<import("./components/RecoveryDialog").RecoveryCandidate[]>([]);
   // Find bar over the reader-mode preview (Ctrl+F when mode === "preview").
   const [previewFindOpen, setPreviewFindOpen] = useState(false);
@@ -411,6 +414,18 @@ function AppContent() {
     setActiveEditorState(id ? editorStateStore.get(id) : null);
     setActiveTabId(id);
   }, [sessionController, editorStateStore]);
+  const rememberFileConflict = useCallback((conflict: { documentId: string; path: string; name: string }, openDialog = true) => {
+    setConflictedTabIds((ids) => ids.has(conflict.documentId) ? ids : new Set(ids).add(conflict.documentId));
+    if (openDialog) setFileConflict(conflict);
+  }, []);
+  const clearRememberedConflict = useCallback((documentId: string) => {
+    setConflictedTabIds((ids) => {
+      if (!ids.has(documentId)) return ids;
+      const next = new Set(ids);
+      next.delete(documentId);
+      return next;
+    });
+  }, []);
   const newTabId = useCallback(() => `tab-${++tabSeqRef.current}`, []);
 
 
@@ -481,7 +496,11 @@ function AppContent() {
     if (!target) return;
     setActiveTab(id);
     applyTabToLive(target);
-  }, [snapshotActiveTab, setActiveTab, applyTabToLive]);
+    if (conflictedTabIds.has(id)) {
+      const session = sessionController.get(id);
+      if (session?.path) rememberFileConflict({ documentId: session.id, path: session.path, name: session.name });
+    }
+  }, [snapshotActiveTab, setActiveTab, applyTabToLive, conflictedTabIds, rememberFileConflict, sessionController]);
 
   // Switch to the previous / next tab (Alt+Left / Alt+Right), wrapping around.
   const cycleTab = useCallback((delta: number) => {
@@ -561,8 +580,12 @@ function AppContent() {
     if (!conflict) return;
     setFileConflict(null);
     await loadFileDirect(conflict.path);
-    showToast(tr("File changed on disk, reloaded the latest version"), "info");
-  }, [fileConflict, loadFileDirect, showToast, tr]);
+    const reloaded = sessionController.get(conflict.documentId);
+    if (reloaded && reloaded.version === reloaded.savedVersion) {
+      clearRememberedConflict(conflict.documentId);
+      showToast(tr("File changed on disk, reloaded the latest version"), "info");
+    }
+  }, [clearRememberedConflict, fileConflict, loadFileDirect, sessionController, showToast, tr]);
 
   // Settings flags above persist themselves via usePersistedState; the matching
   // setters (setSavedViewMode, setSplitRatio, …) are passed into that hook.
@@ -841,7 +864,7 @@ function AppContent() {
       } catch (err) {
         const msg = errMessage(err);
         if (isDiskConflictMessage(msg)) {
-          setFileConflict({ documentId: snapshot.documentId, path, name: snapshot.name });
+          rememberFileConflict({ documentId: snapshot.documentId, path, name: snapshot.name });
           return;
         }
         showToast(msg || tr("Failed to save {file}", { file: snapshot.name }), "error");
@@ -867,9 +890,8 @@ function AppContent() {
     () => {
       const session = activeSessionRef.current;
       if (!session?.path) return;
-    setFileConflict({ documentId: session.id, path: session.path, name: session.name });
-    },
-    []
+    rememberFileConflict({ documentId: session.id, path: session.path, name: session.name });
+  }, [rememberFileConflict]
   );
   const handleExternalDiskRevision = useCallback((documentId: string, diskRevision: number) => {
     sessionController.updateFileMetadata(documentId, {
@@ -902,11 +924,11 @@ function AppContent() {
   }, [sessionController]);
   const handleAutosaveError = useCallback((msg: string, snapshot: NonNullable<Parameters<typeof useAutosave>[0]["snapshot"]>) => {
     if (isDiskConflictMessage(msg) && snapshot.filePath) {
-      setFileConflict({ documentId: snapshot.documentId, path: snapshot.filePath, name: sessionController.get(snapshot.documentId)?.name ?? "Untitled.md" });
+      rememberFileConflict({ documentId: snapshot.documentId, path: snapshot.filePath, name: sessionController.get(snapshot.documentId)?.name ?? "Untitled.md" });
       return;
     }
     showToast(msg, "error");
-  }, [sessionController, showToast]);
+  }, [rememberFileConflict, sessionController, showToast]);
   useAutosave({
     enabled: autoSaveEnabled,
     snapshot: autosaveSnapshot,
@@ -971,7 +993,7 @@ function AppContent() {
         } catch (err) {
           const msg = errMessage(err);
           if (isDiskConflictMessage(msg)) {
-            setFileConflict({ documentId: summary.id, path: summary.path, name: summary.name });
+            rememberFileConflict({ documentId: summary.id, path: summary.path, name: summary.name });
           }
           // Other background autosave failures remain non-modal; their next
           // active save reports the native error without interrupting typing.
@@ -979,7 +1001,7 @@ function AppContent() {
       }
     }, 1500);
     return () => window.clearTimeout(timer);
-  }, [autoSaveEnabled, commitTabs, sessionController, sessionSnapshot]);
+  }, [autoSaveEnabled, commitTabs, rememberFileConflict, sessionController, sessionSnapshot]);
 
   // External-change detection for BACKGROUND tabs. The active tab is handled by
   // useExternalChangeWatcher; on window focus we also stat every other open
@@ -1008,6 +1030,7 @@ function AppContent() {
             );
           } else {
             commitTabs(tabsRef.current.map((x) => (x.id === summary.id ? { ...x, knownMtime: info.modified } : x)));
+            rememberFileConflict({ documentId: summary.id, path: summary.path, name: summary.name }, false);
             showToast(tr("{file} changed on disk in a background tab. Saving is blocked until you reload or save a copy.", { file: summary.name }), "error");
           }
         } catch {/* file gone / stat failed — surfaced when that tab is saved */}
@@ -1015,7 +1038,7 @@ function AppContent() {
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [commitTabs, showToast, sessionController, sessionSnapshot, tr]);
+  }, [commitTabs, rememberFileConflict, showToast, sessionController, sessionSnapshot, tr]);
 
   // Persist the whole open-tab session (paths + which is active) so a relaunch
   // reopens everything, not just one file. Runs whenever the tab list or the
@@ -1176,7 +1199,7 @@ function AppContent() {
     } catch (err) {
       const msg = errMessage(err);
       if (isDiskConflictMessage(msg)) {
-        setFileConflict({ documentId: prompt.id, path, name: data.fileName });
+        rememberFileConflict({ documentId: prompt.id, path, name: data.fileName });
         return;
       }
       showToast(msg || tr("Failed to save file"), "error");
@@ -1184,7 +1207,7 @@ function AppContent() {
     }
     setCloseTabPrompt(null);
     finalizeCloseTab(prompt.id);
-  }, [closeTabPrompt, finalizeCloseTab, getTabSaveData, sessionController, showToast, tr]);
+  }, [closeTabPrompt, finalizeCloseTab, getTabSaveData, rememberFileConflict, sessionController, showToast, tr]);
 
   const handleDiscardCloseTab = useCallback(() => {
     const prompt = closeTabPrompt;
@@ -1498,9 +1521,13 @@ function AppContent() {
   }, [fileName, showToast, commitTabs, tr, sessionController]);
 
   const handleSaveConflictCopy = useCallback(async () => {
+    const conflict = fileConflict;
     setFileConflict(null);
     await handleSaveAs();
-  }, [handleSaveAs]);
+    if (conflict && sessionController.get(conflict.documentId)?.path !== conflict.path) {
+      clearRememberedConflict(conflict.documentId);
+    }
+  }, [clearRememberedConflict, fileConflict, handleSaveAs, sessionController]);
 
   const handleKeepLocalConflict = useCallback(() => {
     setFileConflict(null);
@@ -1530,12 +1557,12 @@ function AppContent() {
       console.error("Failed to save file:", err);
       const msg = errMessage(err);
       if (isDiskConflictMessage(msg)) {
-        setFileConflict({ documentId: snapshot!.documentId, path, name: sessionController.get(snapshot!.documentId)?.name ?? "Untitled.md" });
+        rememberFileConflict({ documentId: snapshot!.documentId, path, name: sessionController.get(snapshot!.documentId)?.name ?? "Untitled.md" });
         return;
       }
       showToast(msg || tr("Failed to save file"), "error");
     }
-  }, [showToast, handleSaveAs, tr, sessionController]);
+  }, [showToast, handleSaveAs, rememberFileConflict, tr, sessionController]);
 
   // Runtime file-open forwards. Cold-start CLI files are handled by the pull
   // in the boot effect above; this event now arrives only from the
@@ -2077,8 +2104,9 @@ function AppContent() {
       name: t.fileName,
       label: labels.get(t.id) ?? t.fileName,
       dirty: t.dirty,
+      hasConflict: conflictedTabIds.has(t.id),
     }));
-  }, [tabs, activeTabId, fileName, filePath, isDirty, sessionSummaryById]);
+  }, [tabs, activeTabId, conflictedTabIds, fileName, filePath, isDirty, sessionSummaryById]);
 
   // Drag-reorder: move a tab to a new index. TABS-10.
   const handleReorderTab = useCallback((fromIndex: number, toIndex: number) => {

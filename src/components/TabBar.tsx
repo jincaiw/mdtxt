@@ -8,6 +8,8 @@ export interface TabBarItem {
     /** Display label; may be disambiguated with a folder suffix (TABS-09). */
     label: string;
     dirty: boolean;
+    /** The durable file changed while this dirty session was inactive. */
+    hasConflict?: boolean;
 }
 
 interface TabBarProps {
@@ -135,6 +137,13 @@ function TabBarImpl({ tabs, activeId, onSelect, onClose, onNewTab, onReorder, on
                         {isActive && <span className="absolute left-0 top-0 h-[2px] w-full bg-[var(--accent)]" aria-hidden="true" />}
                         <span className="material-symbols-outlined text-[14px] shrink-0 opacity-70">description</span>
                         <span className="truncate text-xs">{tab.label}</span>
+                        {tab.hasConflict && (
+                            <span
+                                className="material-symbols-outlined shrink-0 text-[15px] text-[var(--status-error)]"
+                                title={t("External disk change")}
+                                aria-label={t("External disk change")}
+                            >warning</span>
+                        )}
                         {/* Trailing control. On hover it's always a close (×)
                             button. When the tab has unsaved edits and isn't
                             hovered, it shows a small "unsaved" dot instead —

@@ -169,6 +169,7 @@ const zhCN = {
     "Could not create note": "无法创建笔记",
     "File changed on disk, reloaded the latest version": "磁盘文件已更改，已重新载入最新版本",
     "File changed on disk": "磁盘文件已更改",
+    "External disk change": "磁盘文件发生外部更改",
     "{file} was edited outside mdtxt. Choose which version to keep.": "{file} 已在 mdtxt 外部被编辑。请选择要保留的版本。",
     "Reload uses the disk version and discards this tab's local edits.": "重新载入会使用磁盘版本，并丢弃此标签页的本地编辑。",
     "Save As keeps local edits in a new file without changing the disk version.": "另存为会把本地编辑保存在新文件中，不会更改磁盘版本。",
