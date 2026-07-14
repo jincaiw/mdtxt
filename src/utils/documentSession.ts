@@ -93,6 +93,10 @@ export function replaceSessionContent(session: DocumentSession, content: string)
     };
 }
 
+export function setSessionViewMode(session: DocumentSession, viewMode: DocumentViewMode): DocumentSession {
+    return session.viewMode === viewMode ? session : { ...session, viewMode };
+}
+
 /** Applies a successful save only when the request still describes this exact revision. */
 export function markSessionSaved(session: DocumentSession, result: SessionResult<number>): DocumentSession {
     if (result.documentId !== session.id || result.version !== session.version) return session;

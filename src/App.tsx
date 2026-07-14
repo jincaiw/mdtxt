@@ -116,6 +116,7 @@ import {
   createDocumentSession,
   markSessionSaved,
   replaceSessionContent,
+  setSessionViewMode,
   type DocumentSession,
 } from "./utils/documentSession";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
@@ -174,7 +175,7 @@ function AppContent() {
   const [fileSize, setFileSize] = useState<number>(0);
 
   // UI state
-  const [mode, setMode] = usePersistedState<ViewMode>(getSavedViewMode, setSavedViewMode);
+  const [mode, setModeState] = usePersistedState<ViewMode>(getSavedViewMode, setSavedViewMode);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -395,6 +396,16 @@ function AppContent() {
     return synced;
   }, [mode]);
 
+  const setMode = useCallback((next: ViewMode | ((previous: ViewMode) => ViewMode)) => {
+    setModeState((previous) => {
+      const resolved = typeof next === "function" ? next(previous) : next;
+      const activeId = activeTabIdRef.current;
+      const session = activeId ? sessionsRef.current.get(activeId) : undefined;
+      if (session) sessionsRef.current.set(activeId!, setSessionViewMode(session, resolved));
+      return resolved;
+    });
+  }, [setModeState]);
+
   // Every open tab that has unsaved changes, reading the ACTIVE tab from live
   // state (its stored snapshot lags until the next switch) and the rest from
   // their snapshots. Used by the window-close guard so background tabs can't be
@@ -432,6 +443,16 @@ function AppContent() {
     setOriginalContent(tab.originalContent);
     setFileSize(tab.fileSize);
     knownMtimeRef.current = tab.knownMtime;
+    let session = sessionsRef.current.get(tab.id);
+    if (!session) {
+      session = createDocumentSession({
+        id: tab.id, path: tab.filePath, name: tab.fileName, content: tab.content,
+        savedContent: tab.originalContent, diskRevision: tab.knownMtime,
+        fileSize: tab.fileSize, viewMode: mode, cursorLine: tab.cursorLine,
+      });
+      sessionsRef.current.set(tab.id, session);
+    }
+    setModeState(session.viewMode);
     if (tab.filePath) setLastFile(tab.filePath);
     // Restore where you were in this tab — jump to the remembered line, or fall
     // back to the top for a never-focused / line-1 tab. TABS-02.
@@ -440,7 +461,7 @@ function AppContent() {
       if (line > 1) window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line } }));
       else window.dispatchEvent(new CustomEvent("mdtxt:scroll-top"));
     });
-  }, [bumpDocSwap]);
+  }, [bumpDocSwap, mode, setModeState]);
 
   // Switch to an already-open tab, snapshotting the current one first.
   const activateTab = useCallback((id: string) => {

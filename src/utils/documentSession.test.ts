@@ -6,6 +6,7 @@ import {
     isSessionDirty,
     markSessionSaved,
     replaceSessionContent,
+    setSessionViewMode,
 } from "./documentSession";
 
 const create = () => createDocumentSession({
@@ -33,6 +34,13 @@ describe("DocumentSession", () => {
         const changed = replaceSessionContent(session, "second");
         expect(changed.version).toBe(1);
         expect(isSessionDirty(changed)).toBe(true);
+    });
+
+    it("keeps view mode with its document without changing document revision", () => {
+        const session = create();
+        const changed = setSessionViewMode(session, "preview");
+        expect(changed).toMatchObject({ viewMode: "preview", version: session.version, savedVersion: session.savedVersion });
+        expect(setSessionViewMode(changed, "preview")).toBe(changed);
     });
 
     it("does not let an old save mark a newer edit clean", () => {
