@@ -113,9 +113,6 @@ import { PreviewFindBar } from "./components/PreviewFindBar";
 import { useLocale } from "./context/LocaleContext";
 import {
   acceptsSessionResult,
-  createDocumentSession,
-  markSessionSaved,
-  replaceSessionContent,
   type DocumentSession,
 } from "./utils/documentSession";
 import { DocumentSessionController } from "./utils/documentSessionController";
@@ -171,8 +168,6 @@ function AppContent() {
   // File state
   const [filePath, setFilePath] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [content, setContent] = useState<string>("");
-  const [originalContent, setOriginalContent] = useState<string>("");
   const [fileSize, setFileSize] = useState<number>(0);
 
   // UI state
@@ -253,7 +248,7 @@ function AppContent() {
   }, []);
 
   // Derived state
-  const isDirty = content !== originalContent;
+  let isDirty = false;
   // "Has a buffer" — true once a file is opened OR a blank Untitled buffer is started
   const hasFile = filePath !== null || fileName !== null;
 
@@ -301,8 +296,6 @@ function AppContent() {
   // Stack of recently-closed tabs (path + caret line) for Ctrl+Shift+T. Only
   // saved files are recoverable; untitled buffers aren't pushed. TABS-15.
   const closedTabsRef = useRef<{ path: string; cursorLine?: number }[]>([]);
-  const liveRef = useRef({ filePath, fileName, content, originalContent, fileSize });
-  liveRef.current = { filePath, fileName, content, originalContent, fileSize };
   // P4b owns all session mutation behind a controller. The temporary tab/live
   // bridge remains only until P4d, but it no longer owns a competing session Map.
   const sessionControllerRef = useRef<DocumentSessionController | null>(null);
@@ -322,12 +315,14 @@ function AppContent() {
   const activeSessionSummary = sessionSnapshot.activeId
     ? sessionSummaryById.get(sessionSnapshot.activeId) ?? null
     : null;
+  isDirty = activeSessionSummary?.dirty ?? false;
   const activeSessionRead = useMemo(
     () => activeSessionSummary ? sessionController.read(activeSessionSummary.id) : null,
     [activeSessionSummary?.id, activeSessionSummary?.version, sessionController],
   );
   const presentationSnapshot = useDocumentPresentationSnapshot(activeSessionRead);
   const presentationContent = presentationSnapshot?.value ?? "";
+  const editorContent = activeSessionRead?.value ?? "";
 
   // Heavy document consumers deliberately read this debounced, versioned
   // projection rather than React's legacy editor bridge. This is the P4d-3
@@ -372,34 +367,6 @@ function AppContent() {
   }, [sessionController, editorStateStore]);
   const newTabId = useCallback(() => `tab-${++tabSeqRef.current}`, []);
 
-  const activeSession = useCallback((): DocumentSession | null => {
-    const id = activeTabIdRef.current;
-    if (!id) return null;
-    const live = liveRef.current;
-    const current = sessionController.get(id);
-    if (!current) {
-      const created = createDocumentSession({
-        id,
-        path: live.filePath,
-        name: live.fileName ?? "Untitled.md",
-        content: live.content,
-        savedContent: live.originalContent,
-        diskRevision: knownMtimeRef.current,
-        fileSize: live.fileSize,
-        viewMode: mode,
-        cursorLine: currentLineRef.current,
-      });
-      sessionController.replaceSession(created);
-      return created;
-    }
-    if (current.content === live.content) return current;
-    let synced = replaceSessionContent(current, live.content);
-    if (live.content === live.originalContent) {
-      synced = markSessionSaved(synced, { documentId: id, version: synced.version, value: knownMtimeRef.current });
-    }
-    sessionController.replaceSession(synced);
-    return synced;
-  }, [mode, sessionController]);
 
   const setMode = useCallback((next: ViewMode | ((previous: ViewMode) => ViewMode)) => {
     setModeState((previous) => {
@@ -422,16 +389,17 @@ function AppContent() {
   const snapshotActiveTab = useCallback(() => {
     const id = activeTabIdRef.current;
     if (!id) return;
-    const live = liveRef.current;
+    const session = sessionController.get(id);
+    if (!session) return;
     commitTabs(tabsRef.current.map((t) => (t.id === id ? {
       ...t,
-      filePath: live.filePath,
-      fileName: live.fileName ?? "Untitled.md",
-      fileSize: live.fileSize,
-      knownMtime: knownMtimeRef.current,
+      filePath: session.path,
+      fileName: session.name,
+      fileSize: session.fileSize,
+      knownMtime: session.diskRevision,
       cursorLine: currentLineRef.current,
     } : t)));
-  }, [commitTabs]);
+  }, [commitTabs, sessionController]);
 
   // Load a tab's stored snapshot into the live editor state.
   const applyTabToLive = useCallback((tab: TabState) => {
@@ -1000,8 +968,6 @@ function AppContent() {
       setProposedDoc(null);
       setFilePath(null);
       setFileName(null);
-      setContent("");
-      setOriginalContent("");
       setFileSize(0);
       knownMtimeRef.current = 0;
       setLastFile(null);
@@ -1237,8 +1203,6 @@ function AppContent() {
     setProposedDoc(null);
     setFilePath(null);
     setFileName(name);
-    setContent("");
-    setOriginalContent("");
     setFileSize(0);
     knownMtimeRef.current = 0;
     setLastFile(null);
@@ -1284,8 +1248,6 @@ function AppContent() {
     setProposedDoc(null);
     setFilePath(null);
     setFileName(name);
-    setContent(tutorial);
-    setOriginalContent(tutorial);
     setFileSize(bytes);
     knownMtimeRef.current = 0;
     setLastFile(null);
@@ -1347,7 +1309,6 @@ function AppContent() {
       knownMtimeRef.current = mtime;
       setFilePath(selected);
       setFileName(name);
-      setOriginalContent(snapshot.value);
       addRecentFile(selected, name);
       setLastFile(selected);
       // Keep the active tab's entry in step with the new path/name so reopening
@@ -1380,7 +1341,6 @@ function AppContent() {
       if (!sessionController.acceptsResult(snapshot!.documentId, snapshot!)) return;
       sessionController.markSaved(snapshot!.documentId, { documentId: snapshot!.documentId, version: snapshot!.version, value: mtime });
       knownMtimeRef.current = mtime;
-      setOriginalContent(snapshot!.value);
       showToast(tr("File saved"), "success");
     } catch (err) {
       console.error("Failed to save file:", err);
@@ -1456,13 +1416,12 @@ function AppContent() {
   // Review finished: commit the accepted document (or keep the original on reject).
   const handleReviewResolve = useCallback((finalDoc: string | null) => {
     const review = proposedDoc;
-    const session = activeSession();
+    const session = sessionController.getActive();
     if (finalDoc != null && review && session && acceptsSessionResult(session, { documentId: review.documentId, version: review.version, value: review.content })) {
       sessionController.replaceContent(session.id, finalDoc);
-      setContent(finalDoc);
     }
     setProposedDoc(null);
-  }, [activeSession, proposedDoc, sessionController]);
+  }, [proposedDoc, sessionController]);
 
   // Close all panels
   const closeAllPanels = useCallback(() => {
@@ -1480,10 +1439,9 @@ function AppContent() {
 
 // Handle content change
   const handleContentChange = useCallback((newContent: string) => {
-    const session = activeSession();
+    const session = sessionController.getActive();
     if (session) sessionController.replaceContent(session.id, newContent);
-    setContent(newContent);
-  }, [activeSession, sessionController]);
+  }, [sessionController]);
 
   const handleEditorStateChange = useCallback((documentId: string, state: CMEditorState) => {
     editorStateStore.set(documentId, state);
@@ -1561,7 +1519,7 @@ function AppContent() {
     nextTab: () => cycleTab(1),
     reopenClosedTab,
     gotoTab: gotoTabByIndex,
-    hasFile, content, mode,
+    hasFile, content: editorContent, mode,
   });
 
   // Get export HTML from the visible preview on demand (avoids duplicate rendering)
@@ -2052,7 +2010,7 @@ function AppContent() {
                 documentId={activeTabId ?? "welcome"}
                 sessionState={activeEditorState}
                 onStateChange={handleEditorStateChange}
-                content={content}
+                content={editorContent}
                 onChange={handleContentChange}
                 onCursorChange={handleCursorChange}
                 onSelectionChange={handleSelectionChange}
