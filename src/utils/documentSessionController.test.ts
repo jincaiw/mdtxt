@@ -44,6 +44,23 @@ describe("DocumentSessionController", () => {
         expect(controller.read("missing")).toBeNull();
     });
 
+    it("collects only dirty versioned reads for close-time saves", () => {
+        const controller = new DocumentSessionController();
+        controller.open(input("saved", "unchanged"));
+        controller.open(input("dirty", "before"));
+        controller.replaceContent("dirty", "after");
+
+        expect(controller.readDirty()).toEqual([
+            {
+                documentId: "dirty",
+                version: 1,
+                value: "after",
+                path: "/notes/dirty.md",
+                name: "dirty.md",
+            },
+        ]);
+    });
+
     it("notifies subscribers only when a session projection changes", () => {
         const controller = new DocumentSessionController();
         const listener = vi.fn();

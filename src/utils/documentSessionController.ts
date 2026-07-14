@@ -46,6 +46,12 @@ export interface DocumentSessionFileMetadata {
 /** Immutable content read for work that may complete asynchronously. */
 export interface DocumentSessionContentSnapshot extends SessionResult<string> {}
 
+/** A dirty document read paired with the metadata needed by a save operation. */
+export interface DirtyDocumentSessionSnapshot extends DocumentSessionContentSnapshot {
+    path: string | null;
+    name: string;
+}
+
 type SnapshotListener = () => void;
 
 /**
@@ -83,6 +89,24 @@ export class DocumentSessionController {
 
     readActive(): DocumentSessionContentSnapshot | null {
         return this.activeId ? this.read(this.activeId) : null;
+    }
+
+    /**
+     * Versioned reads for the close-window save flow. Returning these from the
+     * controller, rather than collecting tab buffers in React, prevents an old
+     * tab projection from being written after a newer editor transaction.
+     */
+    readDirty(): readonly DirtyDocumentSessionSnapshot[] {
+        return Array.from(this.sessions.values(), (session) => ({
+            documentId: session.id,
+            version: session.version,
+            value: session.content,
+            path: session.path,
+            name: session.name,
+            dirty: isSessionDirty(session),
+        }))
+            .filter((snapshot) => snapshot.dirty)
+            .map(({ dirty: _dirty, ...snapshot }) => snapshot);
     }
 
     open(input: DocumentSessionInput, activate = true): DocumentSession {

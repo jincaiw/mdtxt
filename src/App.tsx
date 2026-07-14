@@ -105,7 +105,6 @@ import {
   findReusableUntitledTab,
   computeTabLabels,
   moveTab,
-  collectDirtyTabs as computeDirtyTabs,
   type TabState,
 } from "./utils/tabsModel";
 import { countSourceWords, countWords } from "./utils/documentStats";
@@ -429,14 +428,12 @@ function AppContent() {
     });
   }, [setModeState, sessionController]);
 
-  // Every open tab that has unsaved changes, reading the ACTIVE tab from live
-  // state (its stored snapshot lags until the next switch) and the rest from
-  // their snapshots. Used by the window-close guard so background tabs can't be
-  // discarded silently. The dirty-collection logic itself is a pure helper so it
-  // stays unit-testable; this wrapper just feeds it the current refs. TABS-04.
-  const collectDirtyTabs = useCallback(
-    () => computeDirtyTabs(tabsRef.current, activeTabIdRef.current, liveRef.current),
-    []
+  // Every close-time save reads the controller's versioned snapshots. React tab
+  // projections may lag while the P4d migration is in progress and therefore
+  // must never supply text to the write path. TABS-04 / P4d-2.
+  const collectDirtySessions = useCallback(
+    () => sessionController.readDirty(),
+    [sessionController],
   );
 
   // Write the live editor state back into the active tab's entry.
@@ -780,7 +777,7 @@ function AppContent() {
         .onCloseRequested((event) => {
           // Guard ALL tabs, not just the active one — a dirty background tab used
           // to be discarded silently on Alt+F4 / taskbar close. TABS-04.
-          if (collectDirtyTabs().length > 0) {
+          if (collectDirtySessions().length > 0) {
             event.preventDefault();
             setShowUnsavedBeforeClose(true);
           }
@@ -795,7 +792,7 @@ function AppContent() {
       mounted = false;
       unlisten?.();
     };
-    // Registered once; collectDirtyTabs is stable (reads refs).
+    // Registered once; collectDirtySessions is stable (reads the controller).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -809,26 +806,42 @@ function AppContent() {
   // cancelling that (or any failed save) aborts the close so nothing is lost. TABS-04.
   const handleSaveAndCloseWindow = useCallback(async () => {
     setShowUnsavedBeforeClose(false);
-    for (const t of collectDirtyTabs()) {
-      let path = t.filePath;
+    for (const snapshot of collectDirtySessions()) {
+      let path = snapshot.path;
       if (!path) {
         const selected = await save({
           filters: [{ name: "Markdown", extensions: ["md"] }],
-          defaultPath: t.fileName,
+          defaultPath: snapshot.name,
         });
         if (!selected) return; // cancelled a save-as → keep the app open
         path = selected;
       }
       try {
-        await invoke("save_file", { path, content: t.content });
+        const mtime = await invoke<number>("save_file", { path, content: snapshot.value });
+        if (!sessionController.acceptsResult(snapshot.documentId, snapshot)) {
+          showToast(tr("The document changed while saving. Please save again."), "error");
+          return;
+        }
+        if (!snapshot.path) {
+          sessionController.updateFileMetadata(snapshot.documentId, {
+            path,
+            name: path.split(/[\\/]/).pop() ?? snapshot.name,
+            diskRevision: mtime,
+          });
+        }
+        sessionController.markSaved(snapshot.documentId, {
+          documentId: snapshot.documentId,
+          version: snapshot.version,
+          value: mtime,
+        });
       } catch (err) {
         const msg = errMessage(err);
-        showToast(msg || tr("Failed to save {file}", { file: t.fileName }), "error");
+        showToast(msg || tr("Failed to save {file}", { file: snapshot.name }), "error");
         return; // don't close on a failed save — the user would lose the buffer
       }
     }
     forceCloseWindow();
-  }, [collectDirtyTabs, forceCloseWindow, showToast, tr]);
+  }, [collectDirtySessions, forceCloseWindow, sessionController, showToast, tr]);
 
   const handleDiscardAndCloseWindow = useCallback(() => {
     setShowUnsavedBeforeClose(false);
@@ -876,40 +889,36 @@ function AppContent() {
     onError: handleAutosaveError,
   });
 
-  // Autosave dirty BACKGROUND tabs too (useAutosave above only covers the active
-  // buffer). A background tab's content only changes when you switch away from
-  // it, so this effect keys on `tabs` — it never re-runs on active-tab keystrokes
-  // (those live in `content`, not the snapshot). Saved tabs get their
-  // originalContent/knownMtime updated, which clears them from the dirty set so
-  // the effect settles without looping. TABS-06.
+  // Autosave dirty BACKGROUND tabs from their versioned sessions. `tabs` still
+  // carries transitional UI metadata, but never supplies the text written here.
   useEffect(() => {
     if (!autoSaveEnabled) return;
     const activeId = activeTabIdRef.current;
-    const dirtyBg = tabs.filter(
-      (t) => t.id !== activeId && t.filePath && t.content !== t.originalContent
+    const dirtyBg = sessionSnapshot.sessions.filter((session) =>
+      session.id !== activeId && session.path && session.dirty
     );
     if (dirtyBg.length === 0) return;
     const timer = window.setTimeout(async () => {
-      for (const t of dirtyBg) {
+      for (const summary of dirtyBg) {
+        const snapshot = sessionController.read(summary.id);
+        if (!snapshot || !summary.path) continue;
         try {
-          const mtime = await invoke<number>("save_file", { path: t.filePath!, content: t.content });
-          // Only mark saved if the snapshot still holds exactly what we wrote.
+          const mtime = await invoke<number>("save_file", { path: summary.path, content: snapshot.value });
+          if (!sessionController.acceptsResult(summary.id, snapshot)) continue;
+          sessionController.markSaved(summary.id, { documentId: summary.id, version: snapshot.version, value: mtime });
+          // Keep the temporary tab projection synchronized until P4d removes it.
           commitTabs(
             tabsRef.current.map((x) =>
-              x.id === t.id && x.content === t.content
-                ? { ...x, originalContent: t.content, knownMtime: mtime }
+              x.id === summary.id && x.content === snapshot.value
+                ? { ...x, originalContent: snapshot.value, knownMtime: mtime }
                 : x
             )
           );
-          const session = sessionController.get(t.id);
-          if (session && session.content === t.content) {
-            sessionController.markSaved(t.id, { documentId: t.id, version: session.version, value: mtime });
-          }
         } catch {/* best-effort; the active-tab path surfaces disk errors */}
       }
     }, 1500);
     return () => window.clearTimeout(timer);
-  }, [tabs, autoSaveEnabled, commitTabs, sessionController]);
+  }, [autoSaveEnabled, commitTabs, sessionController, sessionSnapshot]);
 
   // External-change detection for BACKGROUND tabs. The active tab is handled by
   // useExternalChangeWatcher; on window focus we also stat every other open
@@ -919,35 +928,33 @@ function AppContent() {
   useEffect(() => {
     const onFocus = async () => {
       const activeId = activeTabIdRef.current;
-      const bg = tabsRef.current.filter((t) => t.id !== activeId && t.filePath);
-      for (const t of bg) {
+      const bg = sessionSnapshot.sessions.filter((session) => session.id !== activeId && session.path);
+      for (const summary of bg) {
+        const tab = tabsRef.current.find((item) => item.id === summary.id);
+        if (!tab || !summary.path) continue;
         try {
-          const info = await invoke<{ modified: number }>("get_file_info", { path: t.filePath! });
-          if (!(t.knownMtime > 0 && info.modified > t.knownMtime)) continue;
-          if (t.content === t.originalContent) {
-            const fd = await invoke<FileData>("read_file", { path: t.filePath! });
-            sessionController.open({
-              id: t.id, path: fd.path, name: fd.name, content: fd.content,
-              diskRevision: fd.modified ?? 0, fileSize: fd.size, viewMode: mode,
-              cursorLine: t.cursorLine,
-            }, false);
+          const info = await invoke<{ modified: number }>("get_file_info", { path: summary.path });
+          if (!(summary.diskRevision > 0 && info.modified > summary.diskRevision)) continue;
+          if (!summary.dirty) {
+            const fd = await invoke<FileData>("read_file", { path: summary.path });
+            sessionController.applyExternalContent(summary.id, fd.content, fd.modified ?? 0);
             commitTabs(
               tabsRef.current.map((x) =>
-                x.id === t.id
+                x.id === summary.id
                   ? { ...x, content: fd.content, originalContent: fd.content, fileSize: fd.size, knownMtime: fd.modified ?? 0 }
                   : x
               )
             );
           } else {
-            commitTabs(tabsRef.current.map((x) => (x.id === t.id ? { ...x, knownMtime: info.modified } : x)));
-            showToast(`"${t.fileName}" changed on disk in a background tab. Saving it will overwrite those changes.`, "error");
+            commitTabs(tabsRef.current.map((x) => (x.id === summary.id ? { ...x, knownMtime: info.modified } : x)));
+            showToast(tr("{file} changed on disk in a background tab. Saving it will overwrite those changes.", { file: summary.name }), "error");
           }
         } catch {/* file gone / stat failed — surfaced when that tab is saved */}
       }
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [commitTabs, showToast, mode]);
+  }, [commitTabs, showToast, sessionController, sessionSnapshot, tr]);
 
   // Persist the whole open-tab session (paths + which is active) so a relaunch
   // reopens everything, not just one file. Runs whenever the tab list or the
@@ -1005,11 +1012,11 @@ function AppContent() {
   // No dirty check here — callers decide whether to prompt first. TABS-01.
   const finalizeCloseTab = useCallback((id: string) => {
     // Remember saved tabs so Ctrl+Shift+T can reopen them. TABS-15.
-    const closing = tabsRef.current.find((t) => t.id === id);
-    if (closing?.filePath) {
+    const closing = sessionController.get(id);
+    if (closing?.path) {
       const isActiveClosing = id === activeTabIdRef.current;
       closedTabsRef.current.push({
-        path: closing.filePath,
+        path: closing.path,
         cursorLine: isActiveClosing ? currentLineRef.current : closing.cursorLine,
       });
       if (closedTabsRef.current.length > 25) closedTabsRef.current.shift();
@@ -1045,29 +1052,25 @@ function AppContent() {
   const closeTab = useCallback((id: string) => {
     const tab = tabsRef.current.find((t) => t.id === id);
     if (!tab) return;
-    const isActive = id === activeTabIdRef.current;
-    const dirty = isActive
-      ? liveRef.current.content !== liveRef.current.originalContent
-      : tab.content !== tab.originalContent;
-    if (dirty) {
-      setCloseTabPrompt({ id, fileName: isActive ? (liveRef.current.fileName ?? "Untitled.md") : tab.fileName });
+    const session = sessionController.get(id);
+    if (session && session.version !== session.savedVersion) {
+      setCloseTabPrompt({ id, fileName: session.name });
       return;
     }
     finalizeCloseTab(id);
-  }, [finalizeCloseTab]);
+  }, [finalizeCloseTab, sessionController]);
 
-  // The effective save target for a tab, reading the active tab from live state.
+  // The effective save target for a tab is a versioned controller snapshot.
   const getTabSaveData = useCallback((id: string) => {
-    const t = tabsRef.current.find((x) => x.id === id);
-    if (!t) return null;
-    const isActive = id === activeTabIdRef.current;
-    const live = liveRef.current;
+    const session = sessionController.get(id);
+    const snapshot = sessionController.read(id);
+    if (!session || !snapshot) return null;
     return {
-      filePath: isActive ? live.filePath : t.filePath,
-      fileName: isActive ? (live.fileName ?? "Untitled.md") : t.fileName,
-      content: isActive ? live.content : t.content,
+      filePath: session.path,
+      fileName: session.name,
+      snapshot,
     };
-  }, []);
+  }, [sessionController]);
 
   // "Save" in the close-tab dialog: persist the tab (prompting a location for an
   // untitled buffer), then close it. Cancel/failure keeps the tab open. TABS-05.
@@ -1086,15 +1089,31 @@ function AppContent() {
       path = selected;
     }
     try {
-      await invoke("save_file", { path, content: data.content });
+      const mtime = await invoke<number>("save_file", { path, content: data.snapshot.value });
+      if (!sessionController.acceptsResult(prompt.id, data.snapshot)) {
+        showToast(tr("The document changed while saving. Please save again."), "error");
+        return;
+      }
+      if (!data.filePath) {
+        sessionController.updateFileMetadata(prompt.id, {
+          path,
+          name: path.split(/[\\/]/).pop() ?? data.fileName,
+          diskRevision: mtime,
+        });
+      }
+      sessionController.markSaved(prompt.id, {
+        documentId: prompt.id,
+        version: data.snapshot.version,
+        value: mtime,
+      });
     } catch (err) {
       const msg = errMessage(err);
-      showToast(msg || "Failed to save file", "error");
+      showToast(msg || tr("Failed to save file"), "error");
       return; // keep the tab open on a failed save
     }
     setCloseTabPrompt(null);
     finalizeCloseTab(prompt.id);
-  }, [closeTabPrompt, getTabSaveData, showToast, finalizeCloseTab]);
+  }, [closeTabPrompt, finalizeCloseTab, getTabSaveData, sessionController, showToast, tr]);
 
   const handleDiscardCloseTab = useCallback(() => {
     const prompt = closeTabPrompt;
@@ -1957,18 +1976,15 @@ function AppContent() {
   const closeManyClean = useCallback((ids: string[]) => {
     let keptDirty = 0;
     for (const id of ids) {
-      const t = tabsRef.current.find((x) => x.id === id);
-      if (!t) continue;
-      const dirty = id === activeTabIdRef.current
-        ? liveRef.current.content !== liveRef.current.originalContent
-        : t.content !== t.originalContent;
-      if (dirty) { keptDirty++; continue; }
+      const session = sessionController.get(id);
+      if (!session) continue;
+      if (session.version !== session.savedVersion) { keptDirty++; continue; }
       finalizeCloseTab(id);
     }
     if (keptDirty > 0) {
       showToast(`Kept ${keptDirty} unsaved tab${keptDirty > 1 ? "s" : ""} open`, "info");
     }
-  }, [finalizeCloseTab, showToast]);
+  }, [finalizeCloseTab, sessionController, showToast]);
 
   const handleTabMenuAction = useCallback((action: "closeOthers" | "closeRight", id: string) => {
     const list = tabsRef.current;

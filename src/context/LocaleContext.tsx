@@ -159,6 +159,8 @@ const zhCN = {
     "Could not create note": "无法创建笔记",
     "File changed on disk, reloaded the latest version": "磁盘文件已更改，已重新载入最新版本",
     "This file changed on disk. Saving will overwrite those changes.": "磁盘文件已更改，保存将覆盖这些更改。",
+    "The document changed while saving. Please save again.": "文档在保存期间发生了变化，请重新保存。",
+    "{file} changed on disk in a background tab. Saving it will overwrite those changes.": "后台标签中的 {file} 已在磁盘上更改，保存将覆盖这些更改。",
     "New file": "新建文件",
     "Open file…": "打开文件…",
     "Save": "保存",
