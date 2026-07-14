@@ -29,7 +29,6 @@ import { SlashMenu, type SlashCommand } from "./SlashMenu";
 import { AIBubble } from "./AIBubble";
 import { TableToolbar } from "./TableToolbar";
 import { pasteUrlOnSelection, pasteUrlAutolink, pasteTsvAsTable, htmlToMarkdown } from "../utils/smartPaste";
-import { getAIEnabled } from "../utils/persistence";
 import { applyTableOp, findTableAt, locateCell, type Align } from "../utils/tableModel";
 import type { Scroller } from "../utils/scrollSync";
 import { useLocale } from "../context/LocaleContext";
@@ -42,6 +41,7 @@ import {
 import { useEditorViewportBridge } from "../editor/bridge/useEditorViewportBridge";
 import { useEditorDocumentSession } from "../editor/core/useEditorDocumentSession";
 import { useWikilinkCompletion } from "../editor/interactions/useWikilinkCompletion";
+import { useAIAssistShortcut } from "../editor/interactions/useAIAssistShortcut";
 
 interface CodeEditorProps {
     /** Stable owner used to restore this document's EditorState. */
@@ -477,38 +477,7 @@ function CodeEditorImpl({
 
     useEditorViewportBridge({ viewRef, onScrollFractionRef, registerScroller });
 
-    // Alt+J (and the command palette's "AI assist") is selection-aware, matching
-    // the docs: with text selected it opens the inline selection-assist bubble;
-    // with no selection it opens the docked AI side panel (chat about the doc).
-    // App owns the panel's open state, so we ask it to toggle via an event.
-    useEffect(() => {
-        const handler = () => {
-            // AI can be switched off entirely in Settings — Alt+J and the
-            // command palette dispatch this event regardless, so gate here.
-            if (!getAIEnabled()) return;
-            const view = viewRef.current;
-            if (!view) return;
-            const sel = view.state.selection.main;
-            if (sel.from !== sel.to) {
-                view.focus();
-                openAIBubble();
-            } else {
-                window.dispatchEvent(new CustomEvent("mdtxt:toggle-ai-panel"));
-            }
-        };
-        window.addEventListener("mdtxt:ai-assist", handler);
-        return () => window.removeEventListener("mdtxt:ai-assist", handler);
-    }, [openAIBubble]);
-
-    // Mirror of the Settings "Enable AI" switch; drives whether the format
-    // toolbar shows its AI sparkle. Event-synced so flipping the setting
-    // updates an already-mounted editor.
-    const [aiEnabled, setAiEnabled] = useState(getAIEnabled);
-    useEffect(() => {
-        const h = (e: Event) => setAiEnabled(!!(e as CustomEvent).detail?.enabled);
-        window.addEventListener("mdtxt:ai-enabled-toggle", h);
-        return () => window.removeEventListener("mdtxt:ai-enabled-toggle", h);
-    }, []);
+    const aiEnabled = useAIAssistShortcut(viewRef, openAIBubble);
 
     // === Imperative helpers for child UI (toolbar, find/replace, slash, AI) ===
     const getState = useCallback((): EditorState | null => {
