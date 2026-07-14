@@ -33,6 +33,10 @@ export interface EditorControllerOptions {
     spellCheck?: boolean;
     /** Beta-only Source-compatible syntax presentation; false unless explicitly enabled. */
     liveMode?: boolean;
+    /** Large/complex documents retain only P6's low-cost source styling. */
+    liveRestricted?: boolean;
+    /** Localized reason displayed when Live is restricted. */
+    liveRestrictionReason?: string;
     aiConfig?: { endpoint: string; model: string; apiKey: string };
     reviewDoc?: string | null;
     onReviewResolve?: (finalDoc: string | null) => void;
@@ -46,7 +50,7 @@ export function useEditorController({
     documentId, sessionState, onStateChange, content, onChange, onCursorChange,
     onSelectionChange, onImagePaste, onError, onNotice, filePath,
     onScrollFraction, registerScroller, typewriterMode, showToolbar,
-    wordWrap = true, spellCheck = false, liveMode = false, aiConfig, reviewDoc, onReviewResolve,
+    wordWrap = true, spellCheck = false, liveMode = false, liveRestricted = false, aiConfig, reviewDoc, onReviewResolve,
 }: EditorControllerOptions) {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
@@ -91,14 +95,14 @@ export function useEditorController({
         wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef,
         onChangeRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
         typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-        content, wordWrap, spellCheck, liveMode, detectSlash, detectTable, openFind, handlePaste,
+        content, wordWrap, spellCheck, liveMode, liveRestricted, detectSlash, detectTable, openFind, handlePaste,
     });
     useEditorDocumentSession({
         viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef, contentRef,
         onStateChangeRef, documentId, sessionState, content,
     });
     useEditorPreferences({ viewRef, wrapCompRef, spellCompRef, wordWrap, spellCheck });
-    useLiveMarkdownPresentation({ viewRef, liveCompRef, enabled: liveMode });
+    useLiveMarkdownPresentation({ viewRef, liveCompRef, enabled: liveMode, restricted: liveRestricted, documentId });
     useEditorViewportBridge({ viewRef, onScrollFractionRef, registerScroller });
 
     return { containerRef, reviewActive, acceptAllChanges, rejectAllChanges, toolbar, floatingOverlays };

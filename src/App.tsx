@@ -119,6 +119,7 @@ import {
 } from "./utils/documentSession";
 import { DocumentSessionController } from "./utils/documentSessionController";
 import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
+import { assessLiveEligibility } from "./editor/live/liveEligibility";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
 import tutorialMarkdown from "./assets/tutorial.md?raw";
@@ -330,6 +331,27 @@ function AppContent() {
   const presentationSnapshot = useDocumentPresentationSnapshot(activeSessionRead);
   const presentationContent = presentationSnapshot?.value ?? "";
   const editorContent = activeSessionRead?.value ?? "";
+  // Admission control runs when entering Live or activating another document,
+  // rather than for every keystroke. It keeps Live's performance guard out of
+  // the editing hot path; a document opened above a threshold is restricted
+  // before any Live decorations are attached.
+  const liveEligibility = useMemo(
+    () => mode === "live" ? assessLiveEligibility(editorContent) : null,
+    // editorContent intentionally is not a dependency: document switches and
+    // mode switches are the only admission points for this P6 Beta guard.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeSessionRead?.documentId, mode],
+  );
+  const liveRestrictionReason = useMemo(() => {
+    if (!liveEligibility?.restricted) return undefined;
+    const labels = {
+      bytes: tr("document exceeds 5 MiB"),
+      lines: tr("document exceeds 100,000 lines"),
+      lineLength: tr("a line exceeds 32,000 characters"),
+      complexBlocks: tr("too many complex blocks"),
+    } as const;
+    return `${tr("Limited Live: ")}${liveEligibility.reasons.map((reason) => labels[reason]).join(", ")}`;
+  }, [liveEligibility, tr]);
 
   // Heavy document consumers deliberately read this debounced, versioned
   // projection rather than React's legacy editor bridge. This is the P4d-3
@@ -2045,6 +2067,8 @@ function AppContent() {
                 wordWrap={wordWrapEnabled}
                 spellCheck={spellCheckEnabled}
                 liveMode={mode === "live" && liveBetaEnabled}
+                liveRestricted={liveEligibility?.restricted ?? false}
+                liveRestrictionReason={liveRestrictionReason}
                 aiConfig={aiConfig}
                 reviewDoc={proposedDoc?.content ?? null}
                 onReviewResolve={handleReviewResolve}

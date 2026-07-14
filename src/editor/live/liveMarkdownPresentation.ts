@@ -136,18 +136,30 @@ const liveEditFocusPlugin = ViewPlugin.fromClass(class {
 });
 
 export const liveMarkdownPresentation: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
+const liveRestrictedAttributes = EditorView.contentAttributes.of({ "data-mdtxt-live": "restricted" });
+/** Restricted Live intentionally keeps only P6's low-cost source styling. */
+export const restrictedLiveMarkdownPresentation: Extension = [liveMarkdownPresentation, liveRestrictedAttributes];
 
 /** Reconfigures the isolated Live compartment without rebuilding EditorView. */
 export function useLiveMarkdownPresentation({
     viewRef,
     liveCompRef,
     enabled,
+    restricted = false,
+    documentId,
 }: {
     viewRef: RefObject<EditorView | null>;
     liveCompRef: RefObject<Compartment>;
     enabled: boolean;
+    restricted?: boolean;
+    /** Reconfigure after retained EditorState switches between documents. */
+    documentId: string;
 }) {
     useEffect(() => {
-        viewRef.current?.dispatch({ effects: liveCompRef.current.reconfigure(enabled ? liveMarkdownPresentation : []) });
-    }, [enabled, liveCompRef, viewRef]);
+        viewRef.current?.dispatch({
+            effects: liveCompRef.current.reconfigure(enabled
+                ? (restricted ? restrictedLiveMarkdownPresentation : liveMarkdownPresentation)
+                : []),
+        });
+    }, [documentId, enabled, liveCompRef, restricted, viewRef]);
 }

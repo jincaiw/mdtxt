@@ -21,6 +21,11 @@ function CodeEditorImpl(options: CodeEditorProps) {
             {toolbar}
             <div className="flex-1 overflow-hidden relative">
                 <div ref={containerRef} className="absolute inset-0 [&_.cm-editor]:h-full [&_.cm-editor]:outline-none" />
+                {options.liveMode && options.liveRestricted && options.liveRestrictionReason && (
+                    <div role="status" className="absolute top-2 right-3 z-20 rounded-md border border-[var(--border)] bg-[var(--bg-secondary)]/95 px-2.5 py-1 text-[11px] text-[var(--text-secondary)] shadow-sm">
+                        {options.liveRestrictionReason}
+                    </div>
+                )}
                 {floatingOverlays}
             </div>
         </main>

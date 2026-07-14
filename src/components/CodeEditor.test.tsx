@@ -52,4 +52,25 @@ describe("editor selection theming", () => {
         await waitFor(() => expect(content.querySelector(".cm-live-heading-1")).toBeNull());
         expect(container.querySelector(".cm-content")).toBe(content);
     });
+
+    it("marks an over-threshold document as restricted without removing its source editor", async () => {
+        const { container } = render(
+            <CodeEditor
+                documentId="large"
+                content="# large heading"
+                onChange={() => {}}
+                liveMode
+                liveRestricted
+                liveRestrictionReason="Limited Live: large document"
+            />,
+        );
+        const content = await waitFor(() => {
+            const element = container.querySelector<HTMLElement>(".cm-content[data-mdtxt-live='restricted']");
+            expect(element).toBeTruthy();
+            return element!;
+        });
+
+        expect(content.textContent).toBe("# large heading");
+        expect(container.querySelector("[role='status']")).toHaveTextContent("Limited Live: large document");
+    });
 });
