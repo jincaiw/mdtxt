@@ -72,6 +72,7 @@ import {
   getAIEnabled,
   initAIKey,
   getLastFile,
+  getLiveBetaEnabled,
   getOpenInReader,
   getSavedViewMode,
   getSession,
@@ -113,6 +114,7 @@ import { PreviewFindBar } from "./components/PreviewFindBar";
 import { useLocale } from "./context/LocaleContext";
 import {
   acceptsSessionResult,
+  resolveLiveBetaViewMode,
   type DocumentSession,
 } from "./utils/documentSession";
 import { DocumentSessionController } from "./utils/documentSessionController";
@@ -162,6 +164,10 @@ const THEME_CHOICES: { id: Theme; label: string }[] = [
   { id: "dracula", label: "Dracula" },
 ];
 
+function getSafeSavedViewMode(): ViewMode {
+  return resolveLiveBetaViewMode(getSavedViewMode(), getLiveBetaEnabled());
+}
+
 function AppContent() {
   const { theme, setTheme } = useTheme();
   const { locale, t: tr } = useLocale();
@@ -171,7 +177,7 @@ function AppContent() {
   const [fileSize, setFileSize] = useState<number>(0);
 
   // UI state
-  const [mode, setModeState] = usePersistedState<ViewMode>(getSavedViewMode, setSavedViewMode);
+  const [mode, setModeState] = usePersistedState<ViewMode>(getSafeSavedViewMode, setSavedViewMode);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -189,6 +195,7 @@ function AppContent() {
   const [toolbarVisible, setToolbarVisible] = usePersistedState<boolean>(getToolbarEnabled, setToolbarEnabled);
   const [wordWrapEnabled, setWordWrapEnabled] = usePersistedState<boolean>(getWordWrap, setWordWrap);
   const [spellCheckEnabled, setSpellCheckEnabled] = usePersistedState<boolean>(getSpellCheck, setSpellCheck);
+  const [liveBetaEnabled, setLiveBetaEnabledState] = useState(getLiveBetaEnabled);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   // True while the launch-time file resolution (OS-opened CLI file, then
   // last-session restore) is still in flight. Shows a neutral splash instead
@@ -372,7 +379,8 @@ function AppContent() {
     // Do not notify the external session store from React's state-updater
     // callback: React may invoke that callback while rendering, and the store
     // subscription would then try to update App during its own render.
-    const resolved = typeof next === "function" ? next(modeRef.current) : next;
+    const requested = typeof next === "function" ? next(modeRef.current) : next;
+    const resolved = resolveLiveBetaViewMode(requested, getLiveBetaEnabled());
     const activeId = activeTabIdRef.current;
     if (activeId) sessionController.setViewMode(activeId, resolved);
     setModeState(resolved);
@@ -413,7 +421,9 @@ function AppContent() {
     if (!session) {
       return;
     }
-    setModeState(session.viewMode);
+    const restoredMode = resolveLiveBetaViewMode(session.viewMode, getLiveBetaEnabled());
+    if (restoredMode !== session.viewMode) sessionController.setViewMode(session.id, restoredMode);
+    setModeState(restoredMode);
     if (tab.filePath) setLastFile(tab.filePath);
     // Restore where you were in this tab — jump to the remembered line, or fall
     // back to the top for a never-focused / line-1 tab. TABS-02.
@@ -517,6 +527,15 @@ function AppContent() {
       ["mdtxt:toolbar-toggle", (e) => setToolbarVisible(!!(e as CustomEvent).detail?.enabled)],
       ["mdtxt:wordwrap-toggle", (e) => setWordWrapEnabled(!!(e as CustomEvent).detail?.enabled)],
       ["mdtxt:spellcheck-toggle", (e) => setSpellCheckEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["mdtxt:live-beta-toggle", (e) => {
+        const enabled = !!(e as CustomEvent).detail?.enabled;
+        setLiveBetaEnabledState(enabled);
+        if (!enabled && modeRef.current === "live") {
+          const activeId = activeTabIdRef.current;
+          if (activeId) sessionController.setViewMode(activeId, "code");
+          setModeState("code");
+        }
+      }],
       ["mdtxt:autosave-toggle", (e) => setAutoSaveEnabled(!!(e as CustomEvent).detail?.enabled)],
       // Opened from the title-bar settings dropdown's "More settings…" entry.
       ["mdtxt:open-settings", () => setShowSettings(true)],
@@ -2000,7 +2019,7 @@ function AppContent() {
               data-split-left
               className="overflow-hidden flex flex-col"
               style={{
-                display: mode === "code" || mode === "split" ? "flex" : "none",
+                display: mode === "code" || mode === "split" || mode === "live" ? "flex" : "none",
                 flexBasis: mode === "split" ? `${splitRatio * 100}%` : "100%",
                 flexGrow: mode === "split" ? 0 : 1,
                 flexShrink: 0,
@@ -2025,6 +2044,7 @@ function AppContent() {
                 showToolbar={toolbarVisible}
                 wordWrap={wordWrapEnabled}
                 spellCheck={spellCheckEnabled}
+                liveMode={mode === "live" && liveBetaEnabled}
                 aiConfig={aiConfig}
                 reviewDoc={proposedDoc?.content ?? null}
                 onReviewResolve={handleReviewResolve}
@@ -2079,7 +2099,7 @@ function AppContent() {
             </div>
           </div>
 
-          <ModeToggle mode={mode} onSetMode={setMode} aiPanelOpen={showAIPanel} />
+          <ModeToggle mode={mode} onSetMode={setMode} aiPanelOpen={showAIPanel} liveEnabled={liveBetaEnabled} />
 
           {/* Sidebar Panels — only mount when actually open so they don't
               load their module until first use. */}

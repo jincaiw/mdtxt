@@ -6,6 +6,7 @@ import {
     isSessionDirty,
     markSessionSaved,
     replaceSessionContent,
+    resolveLiveBetaViewMode,
     setSessionViewMode,
 } from "./documentSession";
 
@@ -41,6 +42,15 @@ describe("DocumentSession", () => {
         const changed = setSessionViewMode(session, "preview");
         expect(changed).toMatchObject({ viewMode: "preview", version: session.version, savedVersion: session.savedVersion });
         expect(setSessionViewMode(changed, "preview")).toBe(changed);
+
+        const live = setSessionViewMode(changed, "live");
+        expect(live).toMatchObject({ viewMode: "live", version: session.version, savedVersion: session.savedVersion });
+    });
+
+    it("restores a persisted Live mode only after explicit Beta consent", () => {
+        expect(resolveLiveBetaViewMode("live", false)).toBe("code");
+        expect(resolveLiveBetaViewMode("live", true)).toBe("live");
+        expect(resolveLiveBetaViewMode("split", false)).toBe("split");
     });
 
     it("does not let an old save mark a newer edit clean", () => {

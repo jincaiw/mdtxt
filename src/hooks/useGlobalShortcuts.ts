@@ -33,7 +33,7 @@ export interface ShortcutHandlers {
     content: string;
     /** Current view mode — Ctrl+F routes to the preview find bar in reader
      *  mode (the CodeMirror keymap owns find when the editor has focus). */
-    mode?: "preview" | "code" | "split";
+    mode?: "preview" | "code" | "split" | "live";
 }
 
 /**

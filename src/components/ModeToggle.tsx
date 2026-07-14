@@ -1,4 +1,4 @@
-export type ViewMode = "preview" | "code" | "split";
+export type ViewMode = "preview" | "code" | "split" | "live";
 import { useLocale } from "../context/LocaleContext";
 
 interface ModeToggleProps {
@@ -6,12 +6,13 @@ interface ModeToggleProps {
     onSetMode: (mode: ViewMode) => void;
     /** Shift left when the AI panel is open so the toggle isn't hidden behind it. */
     aiPanelOpen?: boolean;
+    liveEnabled?: boolean;
 }
 
 const buttonBase =
     "btn-press flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-200";
 
-export function ModeToggle({ mode, onSetMode, aiPanelOpen }: ModeToggleProps) {
+export function ModeToggle({ mode, onSetMode, aiPanelOpen, liveEnabled = false }: ModeToggleProps) {
     const { t } = useLocale();
     return (
         <div
@@ -34,6 +35,20 @@ export function ModeToggle({ mode, onSetMode, aiPanelOpen }: ModeToggleProps) {
                     <span className="material-symbols-outlined text-[20px]">visibility</span>
                     {mode === "preview" && <span className="text-sm font-bold">{t("Reader")}</span>}
                 </button>
+
+                {liveEnabled && <button
+                    onClick={() => onSetMode("live")}
+                    aria-label={t("Live Beta mode")}
+                    aria-pressed={mode === "live"}
+                    title={t("Live Beta (Source-compatible)")}
+                    className={`${buttonBase} ${mode === "live"
+                        ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-md"
+                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        }`}
+                >
+                    <span className="material-symbols-outlined text-[20px]">auto_fix_high</span>
+                    {mode === "live" && <span className="text-sm font-bold">{t("Live")}</span>}
+                </button>}
 
                 <button
                     onClick={() => onSetMode("split")}

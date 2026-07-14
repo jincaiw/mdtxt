@@ -103,9 +103,10 @@ export const getSession = (): SessionState | null => {
 };
 export const setSession = (s: SessionState | null): void => safeSet(KEY_SESSION, s);
 
-export const getSavedViewMode = (): "preview" | "code" | "split" =>
-    safeGet<"preview" | "code" | "split">(KEY_VIEW_MODE, "preview");
-export const setSavedViewMode = (m: "preview" | "code" | "split"): void => safeSet(KEY_VIEW_MODE, m);
+export type PersistedViewMode = "preview" | "code" | "split" | "live";
+export const getSavedViewMode = (): PersistedViewMode =>
+    safeGet<PersistedViewMode>(KEY_VIEW_MODE, "preview");
+export const setSavedViewMode = (m: PersistedViewMode): void => safeSet(KEY_VIEW_MODE, m);
 
 export const getSplitRatio = (): number => {
     const r = safeGet<number>(KEY_SPLIT_RATIO, 0.5);
@@ -129,6 +130,12 @@ export const getWordWrap = (): boolean => safeGet<boolean>(KEY_WORD_WRAP, true);
 export const setWordWrap = (v: boolean): void => safeSet(KEY_WORD_WRAP, v);
 export const getSpellCheck = (): boolean => safeGet<boolean>(KEY_SPELL_CHECK, false);
 export const setSpellCheck = (v: boolean): void => safeSet(KEY_SPELL_CHECK, v);
+
+// Live remains opt-in throughout P6. Its presentation is Source-compatible,
+// but native IME/platform validation is still required before any default flip.
+const KEY_LIVE_BETA = "mdtxt:liveBeta";
+export const getLiveBetaEnabled = (): boolean => safeGet<boolean>(KEY_LIVE_BETA, false);
+export const setLiveBetaEnabled = (v: boolean): void => safeSet(KEY_LIVE_BETA, v);
 
 const KEY_AUTO_SAVE = "mdtxt:autoSave";
 export const getAutoSave = (): boolean => safeGet<boolean>(KEY_AUTO_SAVE, false);

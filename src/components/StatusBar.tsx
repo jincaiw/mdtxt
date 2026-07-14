@@ -5,7 +5,7 @@ interface StatusBarProps {
     isSaved: boolean;
     lineNumber: number;
     columnNumber: number;
-    mode?: "preview" | "code" | "split";
+    mode?: "preview" | "code" | "split" | "live";
     showFileExplorer?: boolean;
     showTOC?: boolean;
     onToggleFileExplorer?: () => void;

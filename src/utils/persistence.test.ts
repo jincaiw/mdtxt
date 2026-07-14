@@ -6,6 +6,7 @@ import {
     getWordWrap,
     migrateLegacyKeys, getLastFile,
     getOpenInReader, setOpenInReader,
+    getLiveBetaEnabled, setLiveBetaEnabled,
     getSession, setSession,
 } from "./persistence";
 
@@ -63,6 +64,14 @@ describe("open in reader", () => {
     it("treats a malformed stored value as the default", () => {
         localStorage.setItem("mdtxt:openInReader", "{not json");
         expect(getOpenInReader()).toBe(false);
+    });
+});
+
+describe("Live Beta", () => {
+    it("defaults off and only changes after explicit opt-in", () => {
+        expect(getLiveBetaEnabled()).toBe(false);
+        setLiveBetaEnabled(true);
+        expect(getLiveBetaEnabled()).toBe(true);
     });
 });
 

@@ -9,6 +9,7 @@ import {
     getSpellCheck, setSpellCheck,
     getAutoSave, setAutoSave,
     getOpenInReader, setOpenInReader,
+    getLiveBetaEnabled, setLiveBetaEnabled,
 } from "../utils/persistence";
 import { AI_PROVIDERS, matchProvider, type AIProvider } from "../utils/aiProviders";
 import { attachFocusTrap } from "../utils/focusTrap";
@@ -101,6 +102,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const [spellCheck, setSpellCheckLocal] = useState(getSpellCheck);
     const [autoSave, setAutoSaveLocal] = useState(getAutoSave);
     const [openInReader, setOpenInReaderLocal] = useState(getOpenInReader);
+    const [liveBeta, setLiveBetaLocal] = useState(getLiveBetaEnabled);
 
     const [ai, setAi] = useState(getAIConfig);
     const [aiEnabled, setAiEnabledLocal] = useState(getAIEnabled);
@@ -343,6 +345,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 {matches("spell check") && (
                                     <ToggleRow label={t("Spell check")} description={t("Underline misspelled words while you type")} checked={spellCheck}
                                         onChange={(v) => { setSpellCheckLocal(v); setSpellCheck(v); fire("mdtxt:spellcheck-toggle", v); }} />
+                                )}
+                                {matches("live beta") && (
+                                    <ToggleRow label={t("Enable Live Beta")} description={t("Source-compatible Markdown styling; keep disabled for stable Source editing")} checked={liveBeta}
+                                        onChange={(v) => { setLiveBetaLocal(v); setLiveBetaEnabled(v); fire("mdtxt:live-beta-toggle", v); }} />
                                 )}
                                 {matches("autosave") && (
                                     <ToggleRow label={t("Autosave")} description={t("Save automatically a moment after you stop typing")} checked={autoSave}

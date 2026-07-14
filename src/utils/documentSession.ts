@@ -1,6 +1,6 @@
 /** Kept independent from React components so sessions can be tested and owned
  * by the editor controller in P5. */
-export type DocumentViewMode = "code" | "split" | "preview";
+export type DocumentViewMode = "code" | "split" | "preview" | "live";
 
 export interface DocumentFormat {
     encoding: "utf-8";
@@ -95,6 +95,16 @@ export function replaceSessionContent(session: DocumentSession, content: string)
 
 export function setSessionViewMode(session: DocumentSession, viewMode: DocumentViewMode): DocumentSession {
     return session.viewMode === viewMode ? session : { ...session, viewMode };
+}
+
+/**
+ * Live is persisted per document, but it cannot be restored until the user
+ * has explicitly opted into the Beta in this installation. Keep the fallback
+ * here, beside the session contract, so startup and tab activation use the
+ * same rule instead of briefly exposing an ungated mode.
+ */
+export function resolveLiveBetaViewMode(viewMode: DocumentViewMode, liveBetaEnabled: boolean): DocumentViewMode {
+    return viewMode === "live" && !liveBetaEnabled ? "code" : viewMode;
 }
 
 /** Applies a successful save only when the request still describes this exact revision. */
