@@ -30,4 +30,5 @@ in the P6 tracking record for every candidate build.
 
 | Commit | OS/WebView | IME | Mode and node | Result | Issue link / notes |
 | --- | --- | --- | --- | --- | --- |
+| `f0839d8` | macOS Darwin 25.5.0 / WKWebView | Accessibility value injection (not an IME) | Live heading, emphasis and task list; undo/redo and Source fallback | Basic source editing passed | This does **not** validate Pinyin/Japanese composition or candidate-window positioning; keep macOS IME status unverified. |
 | | | | | | |
