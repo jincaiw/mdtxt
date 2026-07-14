@@ -43,6 +43,7 @@ import { useEditorDocumentSession } from "../editor/core/useEditorDocumentSessio
 import { useWikilinkCompletion } from "../editor/interactions/useWikilinkCompletion";
 import { useAIAssistShortcut } from "../editor/interactions/useAIAssistShortcut";
 import { useEditorReview } from "../editor/interactions/useEditorReview";
+import { spellcheckAttributes, useEditorPreferences } from "../editor/extensions/useEditorPreferences";
 
 interface CodeEditorProps {
     /** Stable owner used to restore this document's EditorState. */
@@ -251,7 +252,7 @@ function CodeEditorImpl({
                 autocompletion({ override: [wikiCompletionSource], icons: false, aboveCursor: false }),
                 markdown(), markdownPresentationExtensions, editorTheme,
                 wrapComp.of(wordWrap ? EditorView.lineWrapping : []),
-                spellComp.of(EditorView.contentAttributes.of(spellAttrs(spellCheck))),
+                spellComp.of(EditorView.contentAttributes.of(spellcheckAttributes(spellCheck))),
                 mergeComp.of([]), editingKeymap,
                 keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
                 updateListener, pasteHandler, EditorView.theme({ "&": { outline: "none" } }),
@@ -402,13 +403,7 @@ function CodeEditorImpl({
         content,
     });
 
-    // Reconfigure word-wrap / spellcheck when their props change.
-    useEffect(() => {
-        viewRef.current?.dispatch({ effects: wrapCompRef.current.reconfigure(wordWrap ? EditorView.lineWrapping : []) });
-    }, [wordWrap]);
-    useEffect(() => {
-        viewRef.current?.dispatch({ effects: spellCompRef.current.reconfigure(EditorView.contentAttributes.of(spellAttrs(spellCheck))) });
-    }, [spellCheck]);
+    useEditorPreferences({ viewRef, wrapCompRef, spellCompRef, wordWrap, spellCheck });
 
     useEditorViewportBridge({ viewRef, onScrollFractionRef, registerScroller });
 
@@ -534,14 +529,6 @@ function CodeEditorImpl({
             </div>
         </main>
     );
-}
-
-function spellAttrs(spellCheck: boolean): Record<string, string> {
-    return {
-        spellcheck: spellCheck ? "true" : "false",
-        autocorrect: spellCheck ? "on" : "off",
-        autocapitalize: "off",
-    };
 }
 
 export const CodeEditor = memo(CodeEditorImpl);
