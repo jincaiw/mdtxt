@@ -14,7 +14,7 @@ accepted.**
 | Overlapping saves do not share a temporary path | `save_temp_path` combines sibling directory, basename, process id, and an atomic process-local sequence | Implemented; unit test proves distinct paths in one process |
 | Save-format fidelity | Existing EOL/BOM/trailing-newline tests in `commands.rs` | Existing coverage remains green; byte-level preservation of all supported formats is not yet complete |
 | External modification conflict choice | `useExternalChangeWatcher` does not advance a dirty document's revision; `FileConflictDialog` offers reload-disk or save-as for the active document | Active-document choice is implemented without overwriting either version; a side-by-side comparison and per-background-tab entry remain pending |
-| Crash recovery | `src-tauri/src/recovery.rs` writes app-data recovery entries atomically with SHA-256 validation and seven-day retention; dirty controller sessions enqueue a debounced snapshot and clean sessions remove it | Storage lifecycle is implemented and tested; startup discovery plus restore/discard UI are still pending |
+| Crash recovery | `src-tauri/src/recovery.rs` writes app-data recovery entries atomically with SHA-256 validation and seven-day retention; startup lists verified entries in `RecoveryDialog` | Restore creates a new unsaved tab and cannot overwrite the disk path; discard only deletes the recovery entry. Native crash/relaunch smoke remains pending |
 
 ## Automated evidence for the atomic-save slice
 
@@ -32,8 +32,7 @@ accepted.**
    their platform/file-system collision limitations.
 2. Provide a visible, non-destructive conflict flow: compare, reload disk,
    keep local, and save-as. No choice may silently overwrite either version.
-3. Add startup discovery and restore/discard controls for checksum-protected
-   recovery copies; verify a crash/relaunch path end to end.
+3. Verify a native crash/relaunch path end to end for the recovery UI.
 4. Add failure-injection tests for write, sync, rename and directory-sync
    errors; verify the original bytes and editable buffer survive each error.
 5. Record macOS, Windows, and Linux behavior for symbolic links, long paths,

@@ -65,6 +65,9 @@ const UnsavedChangesDialog = lazy(() =>
 const FileConflictDialog = lazy(() =>
     import("./components/FileConflictDialog").then((m) => ({ default: m.FileConflictDialog }))
 );
+const RecoveryDialog = lazy(() =>
+    import("./components/RecoveryDialog").then((m) => ({ default: m.RecoveryDialog }))
+);
 const AIPanel = lazy(() =>
     import("./components/AIPanel").then((m) => ({ default: m.AIPanel }))
 );
@@ -218,6 +221,7 @@ function AppContent() {
   // Pending dirty-tab close, awaiting the Save/Discard/Cancel dialog. TABS-05.
   const [closeTabPrompt, setCloseTabPrompt] = useState<{ id: string; fileName: string } | null>(null);
   const [fileConflict, setFileConflict] = useState<{ path: string; name: string } | null>(null);
+  const [recoveryEntries, setRecoveryEntries] = useState<import("./components/RecoveryDialog").RecoveryCandidate[]>([]);
   // Find bar over the reader-mode preview (Ctrl+F when mode === "preview").
   const [previewFindOpen, setPreviewFindOpen] = useState(false);
   // Autosave: save a moment after the user stops typing (Settings → Editor).
@@ -1307,6 +1311,29 @@ function AppContent() {
     setMode("code");
   }, [snapshotActiveTab, commitTabs, setActiveTab, newTabId, activateTab, sessionController]);
 
+  useEffect(() => {
+    void invoke<import("./components/RecoveryDialog").RecoveryCandidate[]>("list_recoveries")
+      .then(setRecoveryEntries)
+      .catch(() => {});
+  }, []);
+
+  const handleRestoreRecovery = useCallback((entry: import("./components/RecoveryDialog").RecoveryCandidate) => {
+    snapshotActiveTab();
+    const id = newTabId();
+    const name = `${tr("Recovered")} — ${entry.name}`;
+    commitTabs([...tabsRef.current, { id, filePath: null, fileName: name, fileSize: entry.content.length, knownMtime: 0 }]);
+    sessionController.open({ id, path: null, name, content: entry.content, savedContent: "", fileSize: entry.content.length, viewMode: "code" }, false);
+    setActiveTab(id);
+    setFilePath(null); setFileName(name); setFileSize(entry.content.length); setMode("code");
+    void invoke("discard_recovery", { documentId: entry.documentId }).catch(() => {});
+    setRecoveryEntries((entries) => entries.filter((candidate) => candidate.documentId !== entry.documentId));
+  }, [snapshotActiveTab, newTabId, tr, commitTabs, sessionController, setActiveTab, setMode]);
+
+  const handleDiscardRecovery = useCallback((entry: import("./components/RecoveryDialog").RecoveryCandidate) => {
+    void invoke("discard_recovery", { documentId: entry.documentId }).catch(() => {});
+    setRecoveryEntries((entries) => entries.filter((candidate) => candidate.documentId !== entry.documentId));
+  }, []);
+
   // Open the interactive feature guide (offered at the end of the tour and from
   // the command palette). It opens as a real, editable document so users can
   // poke at live math, diagrams and tables. Reuses a pristine empty untitled
@@ -2287,6 +2314,12 @@ function AppContent() {
             onReload={handleReloadConflict}
             onSaveCopy={handleSaveConflictCopy}
           />
+        </Suspense>
+      )}
+
+      {recoveryEntries.length > 0 && (
+        <Suspense fallback={null}>
+          <RecoveryDialog entries={recoveryEntries} onRestore={handleRestoreRecovery} onDiscard={handleDiscardRecovery} />
         </Suspense>
       )}
 
