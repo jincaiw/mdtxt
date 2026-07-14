@@ -1,6 +1,6 @@
 # mdtxt 0.1.0 实施计划（评估优化定稿）
 
-> 状态：**Final v0.5**（2026-07-15，P4 验证收口）
+> 状态：**Final v0.6**（2026-07-15，P6 Beta 实施中；本版为后续执行唯一计划）
 > 适用仓库：当前 Paperling 仓库及其合法 Fork
 > 工作分支：`codex/refactor-mdtxt-0.1.0`
 > 目标：将既有 Paperling 渐进迁移为独立、双语、跨平台的 `mdtxt` 0.1.0。
@@ -12,8 +12,9 @@
 ```text
 已完成：P0 基线 → P1 安全契约 → P2 身份隔离 → P3 双语底座
 已完成：P4 文档会话单一事实源
-后续：P5 编辑器分层 → P6 Live Beta → P7 Widgets
-      P4 完成后可并行推进 P8 文件安全 → P9 AI/导出/平台 → P10 发布工程 → P11 发布判定
+进行中：P6 Live Beta（最小、可逆、默认关闭）
+后续：P6 → P7 Widgets；P8 文件安全可与 P6/P7 独立推进
+      P7 + P8 → P9 AI/导出/平台 → P10 发布工程 → P11 发布判定
 ```
 
 唯一可接受的主路径仍是：**先消除 React 与 CodeMirror 的双全文状态，再拆分编辑器，再引入 Live 与 Widgets**。不得以“模型已建立”代替状态迁移完成；`DocumentSession`、版本令牌、按标签模式、版本化保存和展示投影均已落地，`App.tsx` 不再保存活动全文或 tab 正文副本。P5 不得重新引入该桥接状态。
@@ -29,8 +30,11 @@
 | P2 产品身份 | 完成 | `122071b` 至 `9495dd6`，mdtxt 标识、品牌隔离、updater 关闭 | 发布前再次扫描泄漏 |
 | P3 双语底座 | 完成 | `96a9931`，默认中文、双语键、硬编码门禁 | 新增文字必须双语 |
 | P4 文档会话 | 完成 | `8a087ec`、`a8c782c`、`36a2ac4` 至 `c748e70`；控制器、每标签 `EditorState`、版本化保存、展示投影与 metadata-only tabs；浏览器双标签/Reader/Source 回归无控制台告警 | P5 仅拆分编辑器模块，不改变会话边界 |
-| P5 编辑器模块拆分 | 完成 | `d68ec3d` 至 `c162371`；presentation、viewport、document session、completion、AI review、preferences、overlays、paste、host 与 controller 分层；`CodeEditor.tsx` 收缩为 30 行挂载容器；全量 38 测试文件/296 测试、构建与发布预检通过 | P6 先固化 round-trip、IME 和性能基线，再开启 Beta 开关 |
-| P6–P11 | 未开始 | 不提前实现 | 从 P6 按依赖进入 |
+| P5 编辑器模块拆分 | 完成 | `d68ec3d` 至 `c162371`；presentation、viewport、document session、completion、AI review、preferences、overlays、paste、host 与 controller 分层；`CodeEditor.tsx` 收缩为 30 行挂载容器；全量 38 测试文件/296 测试、构建与发布预检通过 | P6 以该稳定 host 为唯一接入点 |
+| P6 Live Beta | 进行中，未验收 | `9232178` 建立 fixture、round-trip、IME 清单和 1/10 MiB 基准方法；`39b4604` 以 Lezer `syntaxTree` + `StateField<DecorationSet>` 添加只样式化、源码不隐藏的最小展示；`752a41a` 以 Compartment 重配置且不重建 host | 完成显式 Beta 开关、焦点/IME/选择/撤销验证、受限 Live 与真实平台证据后才可退出 |
+| P7 复杂 Widgets | 未开始 | 不提前实现 | 依赖 P6 退出与焦点/降级协议 |
+| P8 文件安全、冲突与恢复 | 未开始，可独立推进 | 不提前实现 | 可在 P6 期间做不触及活动编辑器的 Rust/fixture 工作 |
+| P9–P11 | 未开始 | 不提前实现 | 依赖 P7、P8 的验收结果 |
 
 截至本次定稿，最低本地门禁已通过：`bun run release:check`、前端测试与构建、`cargo fmt --check`、Clippy 和 Rust 测试。后续每一个阶段都必须重新执行与该阶段相称的门禁，不能借用历史通过结果。
 
@@ -91,11 +95,21 @@ P4d 必须拆为下列可独立回滚的提交，不得合并跳过：
 
 退出条件：无循环依赖；`CodeEditor` 仅管理容器；已有 Source/Split/Reader 行为等价；模块测试覆盖迁出的协议；不得重新引入 React 全文状态。
 
-### P6：Live Beta（最小、可逆、非默认）
+### P6：Live Beta（最小、可逆、非默认，进行中）
 
-仅实现标题、强调、删除线、行内代码、链接、引用、列表、分隔线和任务列表。使用 Lezer、`StateField`、`ViewPlugin` 和 `Decoration`；焦点节点显示源码，非焦点节点仅隐藏已证明安全的标记。每项均需 Source fallback。先固定 Source/Live 逐字 round-trip fixture、中文 IME 手工脚本及 1 MiB/10 MiB 基准方法，再开启 Beta 开关。
+已完成的前置基线与最小实现不得被误记为 Beta 验收：round-trip fixture、中文 IME 手工清单、1 MiB/10 MiB 解析基准方法已经入库；首批结构识别使用 Lezer `syntaxTree`，以 `StateField<DecorationSet>`、transaction mapping 和 changed-range 局部更新添加**只样式化**装饰。该策略刻意不隐藏源码标记，因而在焦点、选择与 IME 期间始终保留可编辑原文；解析或装饰失败天然回退为 Source。
 
-退出条件：Source/Live/Split 正文逐字一致；IME、选择、undo/redo 无 P0；1 MiB 基准和方法入库；没有正则主解析、整篇重算或默认启用 Live。
+P6 剩余工作按以下顺序执行，任一项失败即保持 Beta 关闭或回退 Source：
+
+| 子关卡 | 范围 | 强制验收 |
+| --- | --- | --- |
+| P6a ✓ 基线与最小安全展示 | 标题、强调、删除线、行内代码、链接、引用、列表、分隔线、任务列表；不做 `Decoration.replace` | fixture 逐字保持、Lezer 结构测试、1 MiB/10 MiB 基准命令可复跑 |
+| P6b Beta 入口与会话契约 | 默认关闭的持久化设置；仅显式启用后显示 Live；禁用或旧会话恢复时退回 Source；同一 `EditorView` 通过 Compartment 切换 | 组件/会话测试证明入口隐藏、启用/禁用、每标签模式恢复与 host/undo history 不重建 |
+| P6c 焦点与输入安全 | 建立统一 `EditFocusResolver`，处理主光标、多选区、composition range、鼠标、查找命中；在此之前禁止隐藏标记 | 中文/日文 IME、选择、复制粘贴、undo/redo、模式/标签切换手工矩阵无 P0；每个平台未验证项如实记录 |
+| P6d 受限 Live 与性能 | 以字节数、行数、最长行和复杂节点量判定；初始阈值 5 MiB 或 100000 行，经基准调整；只保留低成本装饰并显示降级原因 | 1 MiB 输入 P95 与 10 MiB Source/受限 Live 打开目标有真实测量；不能静默改正文或永久改默认模式 |
+| P6e Beta 收口 | 补齐模式切换、可访问性、双语文本、需求追踪和 native-WebView 证据 | `bun run test`、`bun run build`、`bun run release:check` 及适用 Rust 门禁通过；追踪表将“未验证”与“通过”分开记录 |
+
+退出条件：Source/Live/Split 正文逐字一致；基础内联和块级语法、模式切换、undo/redo 与 round-trip 自动化通过；中文输入法无 P0；1 MiB 输入指标及 10 MiB 受限 Live/Source 实测已记录；可随时退回 Source；没有正则主解析、整篇重算、默认启用 Live 或未记录的平台假阳性。P6 退出只允许发布 **Live Beta**，绝不等同于 Live 默认资格。
 
 ### P7：复杂块 Widgets（逐项发布）
 
@@ -154,4 +168,12 @@ bun run tauri build --debug
 
 ## 7. 当前执行边界
 
-下一项工作固定为 **P6：Live Beta 的前置验收基线**。先固化逐字 round-trip fixture、中文 IME 手工脚本与 1 MiB/10 MiB 基准方法；这些基线通过前，不新增 Live 视觉行为或 Beta 开关。随后按单一、可回滚协议族实现最小 Live 节点，并保持 Source fallback。
+本计划定稿后的唯一当前阶段是 **P6b：Beta 入口与会话契约**，其后严格进入 P6c、P6d、P6e。已完成的 P6a 只证明最小装饰能够安全挂载，**不证明** IME、选择、撤销、大文件、平台或默认 Live 已通过。
+
+执行约束如下：
+
+1. 保持 Source 为默认模式；Live 入口只在用户明确开启 Beta 后出现，关闭开关和旧持久化值都必须回退 Source。
+2. P6c 之前不得添加隐藏源码标记、复杂 Widget 或独立 renderer 焦点逻辑；任何焦点/IME 回归均停止扩展并回退到只样式化模式。
+3. P6d 必须先交付可测的降级判定和用户可见状态，再处理复杂节点；10 MiB 的“完整 Live”不作为当前承诺。
+4. P7 不得提前开始；P8 仅可开展与活动编辑器状态隔离的文件安全、冲突与恢复工作。
+5. 每完成一个子关卡，更新 `docs/audits/p6-live-beta-tracking.md`，记录提交、命令、机器/平台、未覆盖原因和回滚点。
