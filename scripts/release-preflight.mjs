@@ -16,4 +16,5 @@ if (!changelog.includes(`## [${packageVersion}]`)) {
 
 execFileSync(process.execPath, ["scripts/check-product-identity.mjs"], { stdio: "inherit" });
 execFileSync(process.execPath, ["scripts/check-i18n.mjs"], { stdio: "inherit" });
+execFileSync(process.execPath, ["scripts/check-user-copy.mjs", "--enforce"], { stdio: "inherit" });
 console.log(`Release preflight passed for v${packageVersion}.`);

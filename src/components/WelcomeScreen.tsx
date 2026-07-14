@@ -173,7 +173,7 @@ export function WelcomeScreen({ onOpenFile, onNewFile, onOpenSettings, onFileDro
                         <button
                             onClick={onOpenSettings}
                             aria-label={t("Settings")}
-                            title="Settings (Ctrl+,)"
+                            title={t("Settings (Ctrl+,)")}
                             className="btn-press flex items-center justify-center w-10 h-10 rounded-[var(--radius-md)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] transition-all duration-200"
                         >
                             <span className="material-symbols-outlined text-[20px]">settings</span>
@@ -182,7 +182,7 @@ export function WelcomeScreen({ onOpenFile, onNewFile, onOpenSettings, onFileDro
                 </div>
 
                 <p className="text-xs text-[var(--text-muted)]">
-                    {locale === "zh-CN" ? "拖入 " : "drag a "}<code className="bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border)]">.md</code>{locale === "zh-CN" ? " 文件 · 按 " : " file · press "}<kbd className="px-1 py-0.5 font-mono rounded border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]">Ctrl+P</kbd>{locale === "zh-CN" ? " 打开命令 · 按 " : " for commands · "}<kbd className="px-1 py-0.5 font-mono rounded border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]">?</kbd>{locale === "zh-CN" ? " 查看快捷键" : " for shortcuts"}
+                    {t("Welcome drop prefix")}<code className="bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border)]">.md</code>{t("Welcome drop after file")}<kbd className="px-1 py-0.5 font-mono rounded border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]">Ctrl+P</kbd>{t("Welcome drop after palette")}<kbd className="px-1 py-0.5 font-mono rounded border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]">?</kbd>{t("Welcome drop suffix")}
                 </p>
 
                 {recents.length > 0 && onOpenRecent && (

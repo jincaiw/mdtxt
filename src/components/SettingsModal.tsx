@@ -365,11 +365,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 </div>
                                 <div className="flex items-start justify-between gap-3">
                                     <p className="text-sm text-[var(--text-secondary)]">
-                                        {locale === "zh-CN" ? "配置兼容 OpenAI 的端点，即可使用改写、缩短、扩写、续写和翻译等行内 AI 功能。在编辑器中可通过 " : "Configure an OpenAI-compatible endpoint to enable inline AI assist (Rewrite / Shorten / Expand / Continue / Translate). Open it in the editor with "}
+                                        {t("AI help prefix")}
                                         <kbd className="px-1 font-mono rounded border border-[var(--border)] bg-[var(--bg-input)]">{AI_SHORTCUT}</kbd>
-                                        {locale === "zh-CN" ? "、" : ", the "}
+                                        {t("AI help after shortcut")}
                                         <span className="material-symbols-outlined text-[14px] align-middle">auto_awesome</span>
-                                        {locale === "zh-CN" ? " 工具栏按钮或命令面板打开。" : " toolbar button, or the command palette."}
+                                        {t("AI help after icon")}
                                     </p>
                                     <span
                                         className={`shrink-0 px-2 py-0.5 rounded-[var(--radius-pill)] text-[11px] font-medium border ${aiEndpointInvalid
@@ -404,9 +404,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                             })}
                                         </div>
                                         <span className="block mt-1 text-[11px] text-[var(--text-muted)]">
-                                            {locale === "zh-CN"
-                                                ? "选择提供商会自动填写端点和模型，之后只需粘贴 API 密钥。也可在下方输入任何其他兼容 OpenAI 的端点。"
-                                                : "Pick a provider to fill in the endpoint and model; then just paste your API key. Any other OpenAI-compatible endpoint works too, entered below."}
+                                            {t("AI provider help")}
                                         </span>
                                     </div>
                                     <label className="block">
@@ -462,13 +460,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                             <span className="text-[12px] text-[var(--danger)] truncate" title={aiTest.msg}>{aiTest.msg}</span>
                                         )}
                                     </div>
-                                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                                        {locale === "zh-CN" ? <>
-                                            <strong>隐私：</strong>所选文本会以<strong>未加密</strong>形式发送到上方配置的端点。对于私密笔记，请使用本地服务（例如 <code>http://localhost:11434/v1/chat/completions</code> 上的 Ollama），确保数据不离开设备。API 密钥保存在操作系统钥匙串中，而非明文存储。
-                                        </> : <>
-                                            <strong>Privacy:</strong> your selected text is sent <strong>unencrypted</strong> to the endpoint you configure above. For private notes, use a local provider (e.g. Ollama at <code>http://localhost:11434/v1/chat/completions</code>) so nothing leaves your machine. The API key is stored in your operating system's keychain (Windows Credential Manager, macOS Keychain, or Linux Secret Service), not in plaintext.
-                                        </>}
-                                    </p>
+                                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{t("AI privacy notice")}</p>
                                 </div>
                             </>
                         )}
@@ -483,7 +475,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     </div>
                                 </div>
                                 <p>{t("Built with Tauri + React + TypeScript.")}</p>
-                                <p>{locale === "zh-CN" ? "按 " : "Press "}<kbd className="px-1 font-mono rounded border border-[var(--border)] bg-[var(--bg-input)]">?</kbd>{locale === "zh-CN" ? " 查看所有键盘快捷键。" : " to view all keyboard shortcuts."}</p>
+                                <p>{t("Keyboard shortcuts prefix")}<kbd className="px-1 font-mono rounded border border-[var(--border)] bg-[var(--bg-input)]">?</kbd>{t("Keyboard shortcuts suffix")}</p>
 
                                 {/* Replay the first-run tour. The mascot makes the row instantly
                                     recognizable as "that welcome thing". App.tsx listens for the event. */}

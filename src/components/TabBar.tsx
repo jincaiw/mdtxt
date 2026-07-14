@@ -171,7 +171,7 @@ function TabBarImpl({ tabs, activeId, onSelect, onClose, onNewTab, onReorder, on
             <button
                 onClick={onNewTab}
                 aria-label={t("New tab")}
-                title="New tab (Ctrl+N)"
+                title={t("New tab (Ctrl+N)")}
                 className="shrink-0 flex items-center justify-center w-9 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
                 <span className="material-symbols-outlined text-[18px]">add</span>

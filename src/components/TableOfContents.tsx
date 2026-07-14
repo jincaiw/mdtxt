@@ -25,7 +25,7 @@ export function TableOfContents({
     onClose,
     activeLine = 1,
 }: TableOfContentsProps) {
-    const { locale, t } = useLocale();
+    const { t } = useLocale();
     const panelRef = useRef<HTMLElement>(null);
     const [filter, setFilter] = useState("");
 
@@ -163,7 +163,7 @@ export function TableOfContents({
                     <div className="flex flex-col items-center justify-center py-8 text-[var(--text-secondary)] text-sm gap-2 px-4 text-center">
                         <img src={mascotReading} alt="" aria-hidden="true" draggable={false} className="w-20 h-20 object-contain select-none opacity-90" />
                         <span>{t("No headings yet.")}</span>
-                        <span className="text-[11px] text-[var(--text-muted)]">{locale === "zh-CN" ? "输入 " : "Type "}<code className="font-mono">#</code>{locale === "zh-CN" ? " 添加标题。" : " to add one."}</span>
+                        <span className="text-[11px] text-[var(--text-muted)]">{t("Heading hint prefix")}<code className="font-mono">#</code>{t("Heading hint suffix")}</span>
                     </div>
                 ) : visible.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 gap-2 text-[var(--text-secondary)] text-sm">

@@ -14,25 +14,38 @@ async function files(dir) {
   return nested.flat();
 }
 
-// This deliberately reports rather than fails by default. P1 establishes a
-// measurable baseline in a product with existing literal copy; P3 will migrate
-// those strings to semantic locale keys and turn `--enforce` into CI policy.
-const uiLiteralPatterns = [
-  /\b(?:aria-label|title|placeholder)=(["'])([^"']{2,})\1/g,
-  /<[^>]+>\s*([A-Za-z][^<{>\n]{1,})\s*<\//g,
-];
+// Material Symbols use text glyph names, not user-facing copy. URLs, product
+// names, shortcuts, and file-format labels are technical values rather than
+// translatable prose. Everything else visible or exposed to assistive
+// technology must go through the locale catalogue.
+const attributePattern = /\b(?:aria-label|title|placeholder)=(["'])([^"']{2,})\1/g;
+const textPattern = /<([^>]+)>\s*([A-Za-z][^<{>\n]{1,})\s*<\//g;
+
+function isNonCopy(text, openingTag = "") {
+  return text.includes("i18n-ignore")
+    || /material-symbols|aria-hidden/.test(openingTag)
+    || /^https?:\/\//.test(text)
+    || text === "mdtxt"
+    || text === "Aa"
+    || /^gpt-[\w.-]+,/.test(text)
+    || /^(?:HTML|PDF|Word \(\.docx\)|AI)$/.test(text)
+    || /^(?:Ctrl|Cmd|Alt|Shift|Enter|Esc|F\d+)(?:[+ ]|$)/.test(text);
+}
 
 const matches = [];
 for (const path of (await files(sourceDir)).filter((file) => /\.(?:ts|tsx)$/.test(file) && !/\.test\.(?:ts|tsx)$/.test(file))) {
   const source = await readFile(path, "utf8");
-  for (const pattern of uiLiteralPatterns) {
-    pattern.lastIndex = 0;
-    for (const match of source.matchAll(pattern)) {
-      const text = (match[2] ?? match[1] ?? "").trim();
-      if (!text || text.includes("i18n-ignore")) continue;
+  for (const match of source.matchAll(attributePattern)) {
+      const text = match[2].trim();
+      if (!text || isNonCopy(text)) continue;
       const line = source.slice(0, match.index).split("\n").length;
       matches.push(`${relative(root, path)}:${line}  ${JSON.stringify(text)}`);
-    }
+  }
+  for (const match of source.matchAll(textPattern)) {
+      const text = match[2].trim();
+      if (!text || isNonCopy(text, match[1])) continue;
+      const line = source.slice(0, match.index).split("\n").length;
+      matches.push(`${relative(root, path)}:${line}  ${JSON.stringify(text)}`);
   }
 }
 

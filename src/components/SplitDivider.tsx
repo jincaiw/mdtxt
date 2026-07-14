@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useLocale } from "../context/LocaleContext";
 
 interface SplitDividerProps {
     onDrag: (ratio: number) => void;
@@ -9,6 +10,7 @@ const MIN_RATIO = 0.2;
 const MAX_RATIO = 0.8;
 
 export function SplitDivider({ onDrag, containerRef }: SplitDividerProps) {
+    const { t } = useLocale();
     const draggingRef = useRef(false);
 
     const computeRatio = useCallback((clientX: number) => {
@@ -70,7 +72,7 @@ export function SplitDivider({ onDrag, containerRef }: SplitDividerProps) {
     return (
         <div
             role="separator"
-            aria-label="Resize editor and preview panes"
+            aria-label={t("Resize editor and preview panes")}
             aria-orientation="vertical"
             tabIndex={0}
             onPointerDown={onPointerDown}

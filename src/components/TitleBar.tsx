@@ -137,7 +137,7 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                                     onClick={onNewFile}
                                     aria-label={t("New file")}
                                     className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors text-xs"
-                                    title="New File (Ctrl+N)"
+                                    title={t("New File (Ctrl+N)")}
                                 >
                                     <span className="material-symbols-outlined text-[16px]">edit_note</span>
                                     <span className="hidden sm:inline">{t("New")}</span>
@@ -147,7 +147,7 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                                 onClick={onOpenFile}
                                 aria-label={t("Open file")}
                                 className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors text-xs"
-                                title="Open File (Ctrl+O)"
+                                title={t("Open File (Ctrl+O)")}
                             >
                                 <span className="material-symbols-outlined text-[16px]">folder_open</span>
                                 <span className="hidden sm:inline">{t("Open")}</span>

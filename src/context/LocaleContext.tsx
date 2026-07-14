@@ -7,9 +7,10 @@ const STORAGE_KEY = "mdtxt-locale";
 const LEGACY_STORAGE_KEY = "paperling-locale";
 const VALID_LOCALES: Locale[] = ["en", "zh-CN"];
 
-// English source strings are the keys on purpose: existing UI copy remains the
-// fallback and adding a new surface cannot render a missing-key identifier.
-const zhCN: Record<string, string> = {
+// P3 keeps existing call sites compatible while making the catalogue explicit
+// and type-checked. Semantic-key migration can therefore be gradual without a
+// locale silently losing a string.
+const zhCN = {
     "English": "English",
     "Simplified Chinese": "简体中文",
     "Language": "语言",
@@ -383,6 +384,61 @@ const zhCN: Record<string, string> = {
     "Wraps selection as link": "将所选内容包装为链接",
     "Converts to markdown": "转换为 Markdown",
     "Converts to GFM table": "转换为 GFM 表格",
+    "Send (Enter)": "发送（Enter）",
+    "Previous (Shift+Enter)": "上一个（Shift+Enter）",
+    "Next (Enter)": "下一个（Enter）",
+    "Close (Esc)": "关闭（Esc）",
+    "Reader (Ctrl+E)": "阅读（Ctrl+E）",
+    "Split view (Ctrl+\\)": "分栏视图（Ctrl+\\）",
+    "Code (Ctrl+E)": "源码（Ctrl+E）",
+    "Files (Ctrl+Shift+E)": "文件（Ctrl+Shift+E）",
+    "Table of Contents (Ctrl+Shift+O)": "目录（Ctrl+Shift+O）",
+    "New tab (Ctrl+N)": "新建标签页（Ctrl+N）",
+    "New File (Ctrl+N)": "新建文件（Ctrl+N）",
+    "Open File (Ctrl+O)": "打开文件（Ctrl+O）",
+    "Settings (Ctrl+,)": "设置（Ctrl+,）",
+    "Mermaid error": "Mermaid 图表错误",
+    "Rendering diagram…": "正在渲染图表…",
+    "Diagram failed to render": "图表渲染失败",
+    "Resize editor and preview panes": "调整编辑器和预览面板大小",
+    "AI privacy notice": "隐私：所选文本会以未加密形式发送到上方配置的端点。对于私密笔记，请使用本地服务，例如 Ollama，确保数据不离开设备。API 密钥保存在操作系统钥匙串中，而非明文存储。",
+    "AI help prefix": "配置兼容 OpenAI 的端点，即可使用改写、缩短、扩写、续写和翻译等行内 AI 功能。在编辑器中可通过 ",
+    "AI help after shortcut": "、",
+    "AI help after icon": " 工具栏按钮或命令面板打开。",
+    "AI provider help": "选择提供商会自动填写端点和模型，之后只需粘贴 API 密钥。也可在下方输入任何其他兼容 OpenAI 的端点。",
+    "Keyboard shortcuts prefix": "按 ",
+    "Keyboard shortcuts suffix": " 查看所有键盘快捷键。",
+    "Heading hint prefix": "输入 ",
+    "Heading hint suffix": " 添加标题。",
+    "Welcome drop prefix": "拖入 ",
+    "Welcome drop after file": " 文件 · 按 ",
+    "Welcome drop after palette": " 打开命令 · 按 ",
+    "Welcome drop suffix": " 查看快捷键",
+};
+
+export type TranslationKey = keyof typeof zhCN;
+type LocaleMessages = Record<TranslationKey, string>;
+
+const en: LocaleMessages = {
+    ...Object.fromEntries(Object.keys(zhCN).map((key) => [key, key])),
+    "AI privacy notice": "Privacy: your selected text is sent unencrypted to the endpoint you configure above. For private notes, use a local provider such as Ollama so nothing leaves your machine. The API key is stored in your operating system keychain, not in plaintext.",
+    "AI help prefix": "Configure an OpenAI-compatible endpoint to enable inline AI assist (Rewrite / Shorten / Expand / Continue / Translate). Open it in the editor with ",
+    "AI help after shortcut": ", the ",
+    "AI help after icon": " toolbar button, or the command palette.",
+    "AI provider help": "Pick a provider to fill in the endpoint and model; then just paste your API key. Any other OpenAI-compatible endpoint works too, entered below.",
+    "Keyboard shortcuts prefix": "Press ",
+    "Keyboard shortcuts suffix": " to view all keyboard shortcuts.",
+    "Heading hint prefix": "Type ",
+    "Heading hint suffix": " to add one.",
+    "Welcome drop prefix": "drag a ",
+    "Welcome drop after file": " file · press ",
+    "Welcome drop after palette": " for commands · ",
+    "Welcome drop suffix": " for shortcuts",
+} as LocaleMessages;
+
+export const messages: Record<Locale, LocaleMessages> = {
+    en,
+    "zh-CN": zhCN,
 };
 
 function interpolate(text: string, params?: TranslationParams): string {
@@ -391,7 +447,7 @@ function interpolate(text: string, params?: TranslationParams): string {
 }
 
 export function translate(locale: Locale, source: string, params?: TranslationParams): string {
-    const translated = locale === "zh-CN" ? (zhCN[source] ?? source) : source;
+    const translated = messages[locale][source as TranslationKey] ?? source;
     return interpolate(translated, params);
 }
 
@@ -399,23 +455,27 @@ interface LocaleContextValue {
     locale: Locale;
     setLocale: (locale: Locale) => void;
     t: (source: string, params?: TranslationParams) => string;
+    formatNumber: (value: number) => string;
+    formatDate: (value: Date | number) => string;
 }
 
 const defaultValue: LocaleContextValue = {
-    locale: "en",
+    locale: "zh-CN",
     setLocale: () => undefined,
     t: (source, params) => interpolate(source, params),
+    formatNumber: (value) => new Intl.NumberFormat("zh-CN").format(value),
+    formatDate: (value) => new Intl.DateTimeFormat("zh-CN").format(value),
 };
 
 const LocaleContext = createContext<LocaleContextValue>(defaultValue);
 
-function getInitialLocale(): Locale {
-    if (typeof localStorage === "undefined") return "en";
+export function getInitialLocale(): Locale {
+    if (typeof localStorage === "undefined") return "zh-CN";
     const stored = (localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY)) as Locale | null;
     if (stored && localStorage.getItem(STORAGE_KEY) === null) {
         localStorage.setItem(STORAGE_KEY, stored);
     }
-    return stored && VALID_LOCALES.includes(stored) ? stored : "en";
+    return stored && VALID_LOCALES.includes(stored) ? stored : "zh-CN";
 }
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
@@ -425,12 +485,14 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(STORAGE_KEY, next);
     }, []);
     const t = useCallback((source: string, params?: TranslationParams) => translate(locale, source, params), [locale]);
+    const formatNumber = useCallback((value: number) => new Intl.NumberFormat(locale).format(value), [locale]);
+    const formatDate = useCallback((value: Date | number) => new Intl.DateTimeFormat(locale).format(value), [locale]);
 
     useEffect(() => {
         document.documentElement.lang = locale === "zh-CN" ? "zh-CN" : "en";
     }, [locale]);
 
-    const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
+    const value = useMemo(() => ({ locale, setLocale, t, formatNumber, formatDate }), [locale, setLocale, t, formatNumber, formatDate]);
     return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
 }
 

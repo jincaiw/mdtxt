@@ -154,13 +154,13 @@ export function PreviewFindBar({ rootRef, onClose }: PreviewFindBarProps) {
             <span className="text-[11px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap min-w-[70px] text-right">
                 {totalLabel}
             </span>
-            <button onClick={prev} title="Previous (Shift+Enter)" aria-label={t("Previous match")} className="w-6 h-6 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] flex items-center justify-center">
+            <button onClick={prev} title={t("Previous (Shift+Enter)")} aria-label={t("Previous match")} className="w-6 h-6 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] flex items-center justify-center">
                 <span className="material-symbols-outlined text-[16px]">keyboard_arrow_up</span>
             </button>
-            <button onClick={next} title="Next (Enter)" aria-label={t("Next match")} className="w-6 h-6 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] flex items-center justify-center">
+            <button onClick={next} title={t("Next (Enter)")} aria-label={t("Next match")} className="w-6 h-6 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] flex items-center justify-center">
                 <span className="material-symbols-outlined text-[16px]">keyboard_arrow_down</span>
             </button>
-            <button onClick={onClose} title="Close (Esc)" aria-label={t("Close find")} className="w-6 h-6 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] flex items-center justify-center">
+            <button onClick={onClose} title={t("Close (Esc)")} aria-label={t("Close find")} className="w-6 h-6 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] flex items-center justify-center">
                 <span className="material-symbols-outlined text-[16px]">close</span>
             </button>
         </div>

@@ -25,7 +25,7 @@ export function ModeToggle({ mode, onSetMode, aiPanelOpen }: ModeToggleProps) {
                     onClick={() => onSetMode("preview")}
                     aria-label={t("Reader mode")}
                     aria-pressed={mode === "preview"}
-                    title="Reader (Ctrl+E)"
+                    title={t("Reader (Ctrl+E)")}
                     className={`${buttonBase} ${mode === "preview"
                         ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-md"
                         : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -39,7 +39,7 @@ export function ModeToggle({ mode, onSetMode, aiPanelOpen }: ModeToggleProps) {
                     onClick={() => onSetMode("split")}
                     aria-label={t("Split view")}
                     aria-pressed={mode === "split"}
-                    title="Split view (Ctrl+\\)"
+                    title={t("Split view (Ctrl+\\)")}
                     className={`${buttonBase} ${mode === "split"
                         ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-md"
                         : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -53,7 +53,7 @@ export function ModeToggle({ mode, onSetMode, aiPanelOpen }: ModeToggleProps) {
                     onClick={() => onSetMode("code")}
                     aria-label={t("Code editor")}
                     aria-pressed={mode === "code"}
-                    title="Code (Ctrl+E)"
+                    title={t("Code (Ctrl+E)")}
                     className={`${buttonBase} ${mode === "code"
                         ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-md"
                         : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"

@@ -260,7 +260,7 @@ export function AIPanel({ isOpen, onClose, note, fileName, selectionText, aiConf
                                 <span className="material-symbols-outlined text-[18px]">stop</span>
                             </button>
                         ) : (
-                            <button onClick={send} disabled={!input.trim()} title="Send (Enter)" aria-label={t("Send")} className="shrink-0 w-8 h-8 rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center enabled:hover:opacity-90 enabled:active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                            <button onClick={send} disabled={!input.trim()} title={t("Send (Enter)")} aria-label={t("Send")} className="shrink-0 w-8 h-8 rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--accent-text)] flex items-center justify-center enabled:hover:opacity-90 enabled:active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
                                 <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
                             </button>
                         )}
