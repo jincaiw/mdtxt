@@ -29,7 +29,8 @@
 | P2 产品身份 | 完成 | `122071b` 至 `9495dd6`，mdtxt 标识、品牌隔离、updater 关闭 | 发布前再次扫描泄漏 |
 | P3 双语底座 | 完成 | `96a9931`，默认中文、双语键、硬编码门禁 | 新增文字必须双语 |
 | P4 文档会话 | 完成 | `8a087ec`、`a8c782c`、`36a2ac4` 至 `c748e70`；控制器、每标签 `EditorState`、版本化保存、展示投影与 metadata-only tabs；浏览器双标签/Reader/Source 回归无控制台告警 | P5 仅拆分编辑器模块，不改变会话边界 |
-| P5–P11 | 未开始 | 不提前实现 | 从 P5 按依赖进入 |
+| P5 编辑器模块拆分 | 完成 | `d68ec3d` 至 `c162371`；presentation、viewport、document session、completion、AI review、preferences、overlays、paste、host 与 controller 分层；`CodeEditor.tsx` 收缩为 30 行挂载容器；全量 38 测试文件/296 测试、构建与发布预检通过 | P6 先固化 round-trip、IME 和性能基线，再开启 Beta 开关 |
+| P6–P11 | 未开始 | 不提前实现 | 从 P6 按依赖进入 |
 
 截至本次定稿，最低本地门禁已通过：`bun run release:check`、前端测试与构建、`cargo fmt --check`、Clippy 和 Rust 测试。后续每一个阶段都必须重新执行与该阶段相称的门禁，不能借用历史通过结果。
 
@@ -84,7 +85,7 @@ P4d 必须拆为下列可独立回滚的提交，不得合并跳过：
 | P4d-3 ✓ 展示投影 | 预览、大纲、统计、AI、导出只消费节流的版本化展示快照；该快照不能反向驱动编辑器 | 每次按键不触发全文 React 主状态；异步结果以版本拒绝过期写入 |
 | P4d-4 ✓ 删除遗留副本 | `TabState` 仅保留元数据，移除 `content`、`originalContent`、`liveRef` 等正文主状态桥接 | 静态审查和回归证明 React 中无正文、选择或 history 的主副本 |
 
-### P5：编辑器模块拆分（无新增 Live 能力）
+### P5：编辑器模块拆分（无新增 Live 能力，已完成）
 
 在 P4 完成后，将 `CodeEditor.tsx` 收缩为挂载容器。按低风险顺序提取 `editor/core`（host/controller）、`commands`、`extensions`、`interactions`、`bridge` 与针对性 tests；依次迁移基础 extension、命令/快捷键、查找替换、smart paste、表格、wikilink、AI merge、滚动同步和 locale reconfiguration。每次只迁移一类协议，并保持 Source/Split/Reader 行为不变。
 
@@ -153,4 +154,4 @@ bun run tauri build --debug
 
 ## 7. 当前执行边界
 
-下一项工作固定为 **P5：编辑器模块拆分**。先为 `CodeEditor` 的挂载/状态交换补定向测试，再依次提取基础 host/controller、扩展配置与命令协议；每个提交只迁移一个协议族，并重复验证双标签、Source/Split/Reader 和无 React 全文主状态。不得在 P5 引入 Live 或复杂 Widget。
+下一项工作固定为 **P6：Live Beta 的前置验收基线**。先固化逐字 round-trip fixture、中文 IME 手工脚本与 1 MiB/10 MiB 基准方法；这些基线通过前，不新增 Live 视觉行为或 Beta 开关。随后按单一、可回滚协议族实现最小 Live 节点，并保持 Source fallback。
