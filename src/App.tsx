@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useSyncExternalStore, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save, ask } from "@tauri-apps/plugin-dialog";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
@@ -116,9 +116,9 @@ import {
   createDocumentSession,
   markSessionSaved,
   replaceSessionContent,
-  setSessionViewMode,
   type DocumentSession,
 } from "./utils/documentSession";
+import { DocumentSessionController } from "./utils/documentSessionController";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
 import tutorialMarkdown from "./assets/tutorial.md?raw";
@@ -348,10 +348,20 @@ function AppContent() {
   const closedTabsRef = useRef<{ path: string; cursorLine?: number }[]>([]);
   const liveRef = useRef({ filePath, fileName, content, originalContent, fileSize });
   liveRef.current = { filePath, fileName, content, originalContent, fileSize };
-  // Compatibility bridge for P4: tabs still provide React snapshots while
-  // DocumentSession owns the revision token used by save and AI operations.
-  // P5 removes the duplicate active-buffer bridge when EditorState moves here.
-  const sessionsRef = useRef<Map<string, DocumentSession>>(new Map());
+  // P4b owns all session mutation behind a controller. The temporary tab/live
+  // bridge remains only until P4d, but it no longer owns a competing session Map.
+  const sessionControllerRef = useRef<DocumentSessionController | null>(null);
+  if (sessionControllerRef.current === null) sessionControllerRef.current = new DocumentSessionController();
+  const sessionController = sessionControllerRef.current;
+  const sessionSnapshot = useSyncExternalStore(
+    (listener) => sessionController.subscribe(listener),
+    () => sessionController.getSnapshot(),
+    () => sessionController.getSnapshot(),
+  );
+  const sessionSummaryById = useMemo(
+    () => new Map(sessionSnapshot.sessions.map((session) => [session.id, session])),
+    [sessionSnapshot.sessions],
+  );
   // The line we'd return to when this file is re-activated: the caret line while
   // editing, or the top-visible line in reader mode. TABS-02.
   const currentLineRef = useRef(1);
@@ -363,15 +373,16 @@ function AppContent() {
   }, []);
   const setActiveTab = useCallback((id: string | null) => {
     activeTabIdRef.current = id;
+    sessionController.activate(id);
     setActiveTabId(id);
-  }, []);
+  }, [sessionController]);
   const newTabId = useCallback(() => `tab-${++tabSeqRef.current}`, []);
 
   const activeSession = useCallback((): DocumentSession | null => {
     const id = activeTabIdRef.current;
     if (!id) return null;
     const live = liveRef.current;
-    const current = sessionsRef.current.get(id);
+    const current = sessionController.get(id);
     if (!current) {
       const created = createDocumentSession({
         id,
@@ -384,7 +395,7 @@ function AppContent() {
         viewMode: mode,
         cursorLine: currentLineRef.current,
       });
-      sessionsRef.current.set(id, created);
+      sessionController.replaceSession(created);
       return created;
     }
     if (current.content === live.content) return current;
@@ -392,19 +403,18 @@ function AppContent() {
     if (live.content === live.originalContent) {
       synced = markSessionSaved(synced, { documentId: id, version: synced.version, value: knownMtimeRef.current });
     }
-    sessionsRef.current.set(id, synced);
+    sessionController.replaceSession(synced);
     return synced;
-  }, [mode]);
+  }, [mode, sessionController]);
 
   const setMode = useCallback((next: ViewMode | ((previous: ViewMode) => ViewMode)) => {
     setModeState((previous) => {
       const resolved = typeof next === "function" ? next(previous) : next;
       const activeId = activeTabIdRef.current;
-      const session = activeId ? sessionsRef.current.get(activeId) : undefined;
-      if (session) sessionsRef.current.set(activeId!, setSessionViewMode(session, resolved));
+      if (activeId) sessionController.setViewMode(activeId, resolved);
       return resolved;
     });
-  }, [setModeState]);
+  }, [setModeState, sessionController]);
 
   // Every open tab that has unsaved changes, reading the ACTIVE tab from live
   // state (its stored snapshot lags until the next switch) and the rest from
@@ -443,14 +453,14 @@ function AppContent() {
     setOriginalContent(tab.originalContent);
     setFileSize(tab.fileSize);
     knownMtimeRef.current = tab.knownMtime;
-    let session = sessionsRef.current.get(tab.id);
+    let session = sessionController.get(tab.id);
     if (!session) {
       session = createDocumentSession({
         id: tab.id, path: tab.filePath, name: tab.fileName, content: tab.content,
         savedContent: tab.originalContent, diskRevision: tab.knownMtime,
         fileSize: tab.fileSize, viewMode: mode, cursorLine: tab.cursorLine,
       });
-      sessionsRef.current.set(tab.id, session);
+      sessionController.replaceSession(session);
     }
     setModeState(session.viewMode);
     if (tab.filePath) setLastFile(tab.filePath);
@@ -461,7 +471,7 @@ function AppContent() {
       if (line > 1) window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line } }));
       else window.dispatchEvent(new CustomEvent("mdtxt:scroll-top"));
     });
-  }, [bumpDocSwap, mode, setModeState]);
+  }, [bumpDocSwap, mode, setModeState, sessionController]);
 
   // Switch to an already-open tab, snapshotting the current one first.
   const activateTab = useCallback((id: string) => {
@@ -511,18 +521,18 @@ function AppContent() {
       const existing = findTabByPath(tabsRef.current, fileData.path);
       if (existing) {
         commitTabs(tabsRef.current.map((t) => (t.id === existing.id ? { ...t, ...loaded } : t)));
-        sessionsRef.current.set(existing.id, createDocumentSession({
+        sessionController.open({
           id: existing.id, path: loaded.filePath, name: loaded.fileName, content: loaded.content,
           diskRevision: loaded.knownMtime, fileSize: loaded.fileSize, viewMode: mode,
-        }));
+        }, false);
         setActiveTab(existing.id);
       } else {
         const id = newTabId();
         commitTabs([...tabsRef.current, { id, ...loaded }]);
-        sessionsRef.current.set(id, createDocumentSession({
+        sessionController.open({
           id, path: loaded.filePath, name: loaded.fileName, content: loaded.content,
           diskRevision: loaded.knownMtime, fileSize: loaded.fileSize, viewMode: mode,
-        }));
+        }, false);
         setActiveTab(id);
       }
       // Snap the new file to the top — but not on a same-path external reload,
@@ -698,6 +708,11 @@ function AppContent() {
 
       bumpDocSwap(); // restored document → editor starts with clean undo history
       commitTabs(loaded);
+      loaded.forEach((tab) => sessionController.open({
+        id: tab.id, path: tab.filePath, name: tab.fileName, content: tab.content,
+        savedContent: tab.originalContent, diskRevision: tab.knownMtime,
+        fileSize: tab.fileSize, viewMode: mode, cursorLine: tab.cursorLine,
+      }, false));
       setActiveTab(activeId);
       setFilePath(activeTabData.filePath);
       setFileName(activeTabData.fileName);
@@ -838,10 +853,10 @@ function AppContent() {
     // buffer written to disk may become the durable revision.
     if (!session || session.content !== saved) return;
     const marked = markSessionSaved(session, { documentId: session.id, version: session.version, value: mtime });
-    sessionsRef.current.set(session.id, marked);
+    sessionController.replaceSession(marked);
     knownMtimeRef.current = mtime;
     setOriginalContent(saved);
-  }, [activeSession]);
+  }, [activeSession, sessionController]);
   const handleAutosaveError = useCallback((msg: string) => showToast(msg, "error"), [showToast]);
   useAutosave({
     enabled: autoSaveEnabled,
@@ -878,11 +893,15 @@ function AppContent() {
                 : x
             )
           );
+          const session = sessionController.get(t.id);
+          if (session && session.content === t.content) {
+            sessionController.markSaved(t.id, { documentId: t.id, version: session.version, value: mtime });
+          }
         } catch {/* best-effort; the active-tab path surfaces disk errors */}
       }
     }, 1500);
     return () => window.clearTimeout(timer);
-  }, [tabs, autoSaveEnabled, commitTabs]);
+  }, [tabs, autoSaveEnabled, commitTabs, sessionController]);
 
   // External-change detection for BACKGROUND tabs. The active tab is handled by
   // useExternalChangeWatcher; on window focus we also stat every other open
@@ -899,11 +918,11 @@ function AppContent() {
           if (!(t.knownMtime > 0 && info.modified > t.knownMtime)) continue;
           if (t.content === t.originalContent) {
             const fd = await invoke<FileData>("read_file", { path: t.filePath! });
-            sessionsRef.current.set(t.id, createDocumentSession({
+            sessionController.open({
               id: t.id, path: fd.path, name: fd.name, content: fd.content,
               diskRevision: fd.modified ?? 0, fileSize: fd.size, viewMode: mode,
               cursorLine: t.cursorLine,
-            }));
+            }, false);
             commitTabs(
               tabsRef.current.map((x) =>
                 x.id === t.id
@@ -990,7 +1009,7 @@ function AppContent() {
     const isActive = id === activeTabIdRef.current;
     const nextId = nextActiveAfterClose(tabsRef.current, id);
     const remaining = tabsRef.current.filter((t) => t.id !== id);
-    sessionsRef.current.delete(id);
+    sessionController.remove(id);
     commitTabs(remaining);
     if (!isActive) return;
     const target = nextId ? remaining.find((t) => t.id === nextId) : undefined;
@@ -1010,7 +1029,7 @@ function AppContent() {
       knownMtimeRef.current = 0;
       setLastFile(null);
     }
-  }, [commitTabs, setActiveTab, applyTabToLive, bumpDocSwap]);
+  }, [commitTabs, setActiveTab, applyTabToLive, bumpDocSwap, sessionController]);
 
   // Close a tab. A clean tab closes immediately; a dirty one opens the
   // Save / Discard / Cancel dialog (TABS-05) rather than the old two-button
@@ -1220,6 +1239,7 @@ function AppContent() {
       id, filePath: null, fileName: name,
       content: "", originalContent: "", fileSize: 0, knownMtime: 0,
     }]);
+    sessionController.open({ id, path: null, name, content: "", fileSize: 0, viewMode: "code" }, false);
     setActiveTab(id);
     setProposedDoc(null);
     setFilePath(null);
@@ -1230,7 +1250,7 @@ function AppContent() {
     knownMtimeRef.current = 0;
     setLastFile(null);
     setMode("code");
-  }, [snapshotActiveTab, commitTabs, setActiveTab, newTabId, bumpDocSwap, activateTab]);
+  }, [snapshotActiveTab, commitTabs, setActiveTab, newTabId, bumpDocSwap, activateTab, sessionController]);
 
   // Open the interactive feature guide (offered at the end of the tour and from
   // the command palette). It opens as a real, editable document so users can
@@ -1263,6 +1283,9 @@ function AppContent() {
         ? tabsRef.current.map((t) => (t.id === id ? entry : t))
         : [...tabsRef.current, entry]
     );
+    sessionController.open({
+      id, path: null, name, content: tutorial, fileSize: bytes, viewMode: "split",
+    }, false);
     setActiveTab(id);
     setProposedDoc(null);
     setFilePath(null);
@@ -1273,7 +1296,7 @@ function AppContent() {
     knownMtimeRef.current = 0;
     setLastFile(null);
     setMode("split");
-  }, [locale, snapshotActiveTab, commitTabs, setActiveTab, newTabId, bumpDocSwap]);
+  }, [locale, snapshotActiveTab, commitTabs, setActiveTab, newTabId, bumpDocSwap, sessionController]);
 
   // "Replay the welcome tour" from Settings → About. The tour spotlights
   // editor chrome, so make sure a buffer exists before showing it.
@@ -1318,17 +1341,18 @@ function AppContent() {
       defaultPath: fileName ?? undefined,
     });
     if (!selected) return;
+    const name = selected.replace(/\\/g, "/").split("/").pop() || "Untitled";
     const session = activeSession();
     try {
       const mtime = await invoke<number>("save_file", { path: selected, content });
       if (session) {
-        const current = sessionsRef.current.get(session.id);
+        const current = sessionController.get(session.id);
         if (!current || current.version !== session.version || current.content !== content) return;
-        sessionsRef.current.set(session.id, markSessionSaved(current, { documentId: session.id, version: session.version, value: mtime }));
+        sessionController.markSaved(session.id, { documentId: session.id, version: session.version, value: mtime });
+        sessionController.updateFileMetadata(session.id, { path: selected, name, fileSize: content.length, diskRevision: mtime });
       }
       knownMtimeRef.current = mtime;
       setFilePath(selected);
-      const name = selected.replace(/\\/g, "/").split("/").pop() || "Untitled";
       setFileName(name);
       setOriginalContent(content);
       addRecentFile(selected, name);
@@ -1348,7 +1372,7 @@ function AppContent() {
       const msg = errMessage(err);
       showToast(msg || tr("Failed to save file"), "error");
     }
-  }, [content, fileName, showToast, commitTabs, tr, activeSession]);
+  }, [content, fileName, showToast, commitTabs, tr, activeSession, sessionController]);
 
   // Save file (Save As if no path yet)
   const handleSaveFile = useCallback(async () => {
@@ -1360,9 +1384,9 @@ function AppContent() {
     try {
       const mtime = await invoke<number>("save_file", { path: filePath, content });
       if (session) {
-        const current = sessionsRef.current.get(session.id);
+        const current = sessionController.get(session.id);
         if (!current || current.version !== session.version || current.content !== content) return;
-        sessionsRef.current.set(session.id, markSessionSaved(current, { documentId: session.id, version: session.version, value: mtime }));
+        sessionController.markSaved(session.id, { documentId: session.id, version: session.version, value: mtime });
       }
       knownMtimeRef.current = mtime;
       setOriginalContent(content);
@@ -1372,7 +1396,7 @@ function AppContent() {
       const msg = errMessage(err);
       showToast(msg || tr("Failed to save file"), "error");
     }
-  }, [filePath, content, showToast, handleSaveAs, tr, activeSession]);
+  }, [filePath, content, showToast, handleSaveAs, tr, activeSession, sessionController]);
 
   // Runtime file-open forwards. Cold-start CLI files are handled by the pull
   // in the boot effect above; this event now arrives only from the
@@ -1440,11 +1464,11 @@ function AppContent() {
     const review = proposedDoc;
     const session = activeSession();
     if (finalDoc != null && review && session && acceptsSessionResult(session, { documentId: review.documentId, version: review.version, value: review.content })) {
-      sessionsRef.current.set(session.id, replaceSessionContent(session, finalDoc));
+      sessionController.replaceContent(session.id, finalDoc);
       setContent(finalDoc);
     }
     setProposedDoc(null);
-  }, [activeSession, proposedDoc]);
+  }, [activeSession, proposedDoc, sessionController]);
 
   // Close all panels
   const closeAllPanels = useCallback(() => {
@@ -1463,9 +1487,9 @@ function AppContent() {
 // Handle content change
   const handleContentChange = useCallback((newContent: string) => {
     const session = activeSession();
-    if (session) sessionsRef.current.set(session.id, replaceSessionContent(session, newContent));
+    if (session) sessionController.replaceContent(session.id, newContent);
     setContent(newContent);
-  }, [activeSession]);
+  }, [activeSession, sessionController]);
 
   // Stable cursor + preview-line setters. Critical that these are useCallback
   // (not inline arrows): CodeEditor wires `onCursorChange` into a useEffect via
@@ -1895,11 +1919,12 @@ function AppContent() {
   const tabBarItems = useMemo<TabBarItem[]>(() => {
     const resolved = tabs.map((t) => {
       const active = t.id === activeTabId;
+      const summary = sessionSummaryById.get(t.id);
       return {
         id: t.id,
-        fileName: active ? (fileName ?? "Untitled.md") : t.fileName,
-        filePath: active ? filePath : t.filePath,
-        dirty: active ? isDirty : t.content !== t.originalContent,
+        fileName: summary?.name ?? (active ? (fileName ?? "Untitled.md") : t.fileName),
+        filePath: summary?.path ?? (active ? filePath : t.filePath),
+        dirty: summary?.dirty ?? (active ? isDirty : t.content !== t.originalContent),
       };
     });
     const labels = computeTabLabels(resolved);
@@ -1909,7 +1934,7 @@ function AppContent() {
       label: labels.get(t.id) ?? t.fileName,
       dirty: t.dirty,
     }));
-  }, [tabs, activeTabId, fileName, filePath, isDirty]);
+  }, [tabs, activeTabId, fileName, filePath, isDirty, sessionSummaryById]);
 
   // Drag-reorder: move a tab to a new index. TABS-10.
   const handleReorderTab = useCallback((fromIndex: number, toIndex: number) => {
