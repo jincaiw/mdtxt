@@ -861,6 +861,13 @@ function AppContent() {
           version: snapshot.version,
           value: result,
         });
+        // The replacement is real, but a post-rename directory sync warning
+        // cannot be safely surfaced after destroying the window. Keep this
+        // close attempt open so the user sees the actual durability boundary.
+        if (result.durabilityWarning) {
+          showToast(tr("File saved, but final disk durability could not be confirmed."), "error");
+          return;
+        }
       } catch (err) {
         const msg = errMessage(err);
         if (isDiskConflictMessage(msg)) {
@@ -1197,6 +1204,13 @@ function AppContent() {
         version: data.snapshot.version,
         value: result,
       });
+      // Do not remove the tab before its post-rename durability warning has a
+      // chance to be seen. The save is still accepted above; this only blocks
+      // automatic close, not the user's later explicit close decision.
+      if (result.durabilityWarning) {
+        showToast(tr("File saved, but final disk durability could not be confirmed."), "error");
+        return;
+      }
     } catch (err) {
       const msg = errMessage(err);
       if (isDiskConflictMessage(msg)) {
