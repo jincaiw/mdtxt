@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useState, memo } from "react";
+import { useRef, useCallback, useEffect, memo } from "react";
 import { EditorState as CMEditorState, Compartment, Prec } from "@codemirror/state";
 import {
     EditorView,
@@ -23,13 +23,7 @@ import {
     type EditorResult,
     type EditorState,
 } from "../utils/editorActions";
-import { FindReplaceBar } from "./FindReplaceBar";
-import { FormatToolbar } from "./FormatToolbar";
-import { SlashMenu, type SlashCommand } from "./SlashMenu";
-import { AIBubble } from "./AIBubble";
-import { TableToolbar } from "./TableToolbar";
 import { pasteUrlOnSelection, pasteUrlAutolink, pasteTsvAsTable, htmlToMarkdown } from "../utils/smartPaste";
-import { applyTableOp, findTableAt, locateCell, type Align } from "../utils/tableModel";
 import type { Scroller } from "../utils/scrollSync";
 import {
     applyEditorResult,
@@ -44,6 +38,7 @@ import { useAIAssistShortcut } from "../editor/interactions/useAIAssistShortcut"
 import { useEditorReview } from "../editor/interactions/useEditorReview";
 import { ReviewBanner } from "../editor/interactions/ReviewBanner";
 import { spellcheckAttributes, useEditorPreferences } from "../editor/extensions/useEditorPreferences";
+import { useEditorOverlays } from "../editor/interactions/EditorOverlays";
 
 interface CodeEditorProps {
     /** Stable owner used to restore this document's EditorState. */
@@ -99,15 +94,6 @@ function CodeEditorImpl({
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
 
-    const [findOpen, setFindOpen] = useState(false);
-    const [findMode, setFindMode] = useState<"find" | "replace">("find");
-    const [selStartForFind, setSelStartForFind] = useState(0);
-    const [slashState, setSlashState] = useState<{ from: number; pos: { x: number; y: number } } | null>(null);
-    const [slashQuery, setSlashQuery] = useState("");
-    const [aiBubble, setAIBubble] = useState<{ x: number; y: number; selStart: number; selEnd: number; text: string } | null>(null);
-    // Floating table toolbar: set when the caret is inside a markdown table.
-    const [tableUI, setTableUI] = useState<{ x: number; y: number; align: Align } | null>(null);
-
     // Latest props read by the once-created CodeMirror extensions, kept in refs so
     // the view never has to be torn down and rebuilt on a callback/flag change.
     const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
@@ -119,9 +105,7 @@ function CodeEditorImpl({
     const onErrorRef = useRef(onError); onErrorRef.current = onError;
     const onNoticeRef = useRef(onNotice); onNoticeRef.current = onNotice;
     const filePathRef = useRef(filePath); filePathRef.current = filePath;
-    const aiConfigRef = useRef(aiConfig); aiConfigRef.current = aiConfig;
     const typewriterRef = useRef(typewriterMode); typewriterRef.current = typewriterMode;
-    const slashStateRef = useRef(slashState); slashStateRef.current = slashState;
 
     // The last value WE emitted via onChange — lets the external-content sync
     // effect below skip the O(n) doc.toString() comparison on the common case
@@ -141,26 +125,24 @@ function CodeEditorImpl({
     const historyCompRef = useRef(new Compartment());
     // AI review (merge view) state.
     const mergeCompRef = useRef(new Compartment());
+    const openAIBubbleRef = useRef<() => void>(() => {});
+    const triggerAIBubble = useCallback(() => openAIBubbleRef.current(), []);
 
     const wikiCompletionSource = useWikilinkCompletion(filePath);
     const { reviewActive, reviewingRef, acceptAllChanges, rejectAllChanges } = useEditorReview({
         viewRef, mergeCompRef, lastEmittedRef, reviewDoc, onReviewResolve,
     });
-
-    const openAIBubble = useCallback(() => {
-        const view = viewRef.current;
-        if (!view) return;
-        if (!aiConfigRef.current?.endpoint) {
-            onNoticeRef.current?.("AI isn't set up yet — add an endpoint in Settings → AI to enable AI assist.");
-            return;
-        }
-        const sel = view.state.selection.main;
-        const coords = view.coordsAtPos(sel.head);
-        const rect = view.scrollDOM.getBoundingClientRect();
-        const x = coords ? coords.left : rect.left + 28;
-        const y = (coords ? coords.bottom : rect.top + 24) + 6;
-        setAIBubble({ x, y, selStart: sel.from, selEnd: sel.to, text: view.state.doc.sliceString(sel.from, sel.to) });
-    }, []);
+    const aiEnabled = useAIAssistShortcut(viewRef, triggerAIBubble);
+    const { detectSlash, detectTable, openAIBubble, openFind, toolbar, floatingOverlays } = useEditorOverlays({
+        viewRef,
+        aiConfig,
+        onNoticeRef,
+        reviewingRef,
+        showToolbar,
+        aiEnabled,
+        content,
+    });
+    openAIBubbleRef.current = openAIBubble;
 
     // === One-time CodeMirror setup ===
     useEffect(() => {
@@ -191,8 +173,8 @@ function CodeEditorImpl({
                     return true;
                 }
             },
-            { key: "Mod-f", run: (v) => { setSelStartForFind(v.state.selection.main.from); setFindMode("find"); setFindOpen(true); return true; } },
-            { key: "Mod-h", run: (v) => { setSelStartForFind(v.state.selection.main.from); setFindMode("replace"); setFindOpen(true); return true; } },
+            { key: "Mod-f", run: (v) => { openFind("find", v.state.selection.main.from); return true; } },
+            { key: "Mod-h", run: (v) => { openFind("replace", v.state.selection.main.from); return true; } },
             // NB: the AI shortcut (Alt+J / ⌘J) is handled at the App window level
             // so it fires regardless of editor focus — see App.tsx. The editor
             // opens the bubble via the mdtxt:ai-assist event listener below.
@@ -287,63 +269,6 @@ function CodeEditorImpl({
         return true;
     }
 
-    // Slash-command lifecycle, mirroring the previous textarea behaviour but
-    // reading only the current line (no full-doc scans).
-    function detectSlash(view: EditorView) {
-        const head = view.state.selection.main.head;
-        const doc = view.state.doc;
-        const cur = slashStateRef.current;
-        if (cur) {
-            if (head < cur.from + 1) { setSlashState(null); setSlashQuery(""); return; }
-            const between = doc.sliceString(cur.from + 1, head);
-            if (between.includes("\n") || between.includes(" ")) { setSlashState(null); setSlashQuery(""); return; }
-            setSlashQuery(between);
-            return;
-        }
-        if (head > 0 && doc.sliceString(head - 1, head) === "/") {
-            const line = doc.lineAt(head);
-            const lineHead = doc.sliceString(line.from, head - 1);
-            if (lineHead === "" || /^\s*$/.test(lineHead) || /\s$/.test(lineHead)) {
-                const coords = view.coordsAtPos(head - 1);
-                if (coords) {
-                    setSlashState({ from: head - 1, pos: { x: coords.left, y: coords.bottom + 4 } });
-                    setSlashQuery("");
-                }
-            }
-        }
-    }
-
-    // Show the floating table toolbar when the caret is inside a markdown table.
-    // Cheap guard first (current line has a pipe), then scan only the contiguous
-    // run of pipe-containing lines around the caret. The old version called
-    // doc.toString() here — a full-document copy on EVERY cursor move that
-    // landed on a pipe line, which is megabytes per keystroke on a huge doc.
-    function detectTable(view: EditorView) {
-        if (reviewingRef.current) { setTableUI(null); return; }
-        const head = view.state.selection.main.head;
-        const doc = view.state.doc;
-        const curLine = doc.lineAt(head);
-        if (!curLine.text.includes("|")) { setTableUI(null); return; }
-
-        // Expand to the surrounding block of pipe lines (capped — no real
-        // markdown table is anywhere near 500 rows).
-        const CAP = 500;
-        let first = curLine.number;
-        while (first > 1 && curLine.number - first < CAP && doc.line(first - 1).text.includes("|")) first--;
-        let last = curLine.number;
-        while (last < doc.lines && last - curLine.number < CAP && doc.line(last + 1).text.includes("|")) last++;
-
-        const sliceFrom = doc.line(first).from;
-        const slice = doc.sliceString(sliceFrom, doc.line(last).to);
-
-        const region = findTableAt(slice, head - sliceFrom);
-        if (!region) { setTableUI(null); return; }
-        const { colIndex } = locateCell(region, head - sliceFrom);
-        const coords = view.coordsAtPos(region.from + sliceFrom);
-        if (!coords) { setTableUI(null); return; }
-        setTableUI({ x: coords.left, y: coords.top, align: region.model.aligns[colIndex] ?? "none" });
-    }
-
     function handlePaste(event: ClipboardEvent, view: EditorView): boolean {
         const imageFile = getImageFromClipboard(event);
         if (imageFile) {
@@ -406,115 +331,13 @@ function CodeEditorImpl({
 
     useEditorViewportBridge({ viewRef, onScrollFractionRef, registerScroller });
 
-    const aiEnabled = useAIAssistShortcut(viewRef, openAIBubble);
-
-    // === Imperative helpers for child UI (toolbar, find/replace, slash, AI) ===
-    const getState = useCallback((): EditorState | null => {
-        const v = viewRef.current;
-        return v ? toEditorActionState(v) : null;
-    }, []);
-    const applyResult = useCallback((r: EditorResult) => {
-        const v = viewRef.current;
-        if (v) { applyEditorResult(v, r); v.focus(); }
-    }, []);
-    const insertAtCaret = useCallback((text: string) => {
-        const v = viewRef.current;
-        if (!v) return;
-        const sel = v.state.selection.main;
-        v.dispatch({ changes: { from: sel.from, to: sel.to, insert: text }, selection: { anchor: sel.from + text.length } });
-        v.focus();
-    }, []);
-
-    const handleFindJump = useCallback((start: number, end: number) => {
-        const v = viewRef.current;
-        if (!v) return;
-        // No v.focus() here: the find bar owns focus while open. Focusing the
-        // editor on every auto-jump meant the keystroke after the 100ms match
-        // debounce landed IN THE DOCUMENT, overwriting the matched text.
-        // drawSelection keeps the match visible while the editor is unfocused;
-        // onClose below hands focus back.
-        v.dispatch({ selection: { anchor: start, head: end }, scrollIntoView: true });
-    }, []);
-    const handleFindReplace = useCallback((newContent: string, newCursor: number) => {
-        const v = viewRef.current;
-        if (!v) return;
-        applyEditorResult(v, { text: newContent, selStart: newCursor, selEnd: newCursor });
-    }, []);
-
-    const handleSlashSelect = useCallback((cmd: SlashCommand) => {
-        const v = viewRef.current;
-        const cur = slashStateRef.current;
-        if (!v || !cur) return;
-        const head = v.state.selection.main.head;
-        const caretAt = cur.from + (cmd.caretOffset ?? cmd.snippet.length);
-        v.dispatch({ changes: { from: cur.from, to: head, insert: cmd.snippet }, selection: { anchor: caretAt } });
-        setSlashState(null);
-        setSlashQuery("");
-        v.focus();
-    }, []);
-
     return (
         <main className="flex-1 flex flex-col overflow-hidden relative">
             {reviewActive && <ReviewBanner onAccept={acceptAllChanges} onReject={rejectAllChanges} />}
-            {showToolbar && (
-                <FormatToolbar getState={getState} apply={applyResult} insert={insertAtCaret} onAIAssist={aiEnabled ? openAIBubble : undefined} />
-            )}
+            {toolbar}
             <div className="flex-1 overflow-hidden relative">
                 <div ref={containerRef} className="absolute inset-0 [&_.cm-editor]:h-full [&_.cm-editor]:outline-none" />
-
-                <FindReplaceBar
-                    isOpen={findOpen}
-                    initialMode={findMode}
-                    content={content}
-                    selectionStart={selStartForFind}
-                    onClose={() => { setFindOpen(false); viewRef.current?.focus(); }}
-                    onJumpTo={handleFindJump}
-                    onReplace={handleFindReplace}
-                />
-
-                <SlashMenu
-                    isOpen={!!slashState}
-                    position={slashState?.pos ?? null}
-                    query={slashQuery}
-                    onSelect={handleSlashSelect}
-                    onClose={() => { setSlashState(null); setSlashQuery(""); }}
-                />
-
-                {aiConfig && aiBubble && (
-                    <AIBubble
-                        anchor={{ x: aiBubble.x, y: aiBubble.y }}
-                        selectedText={aiBubble.text}
-                        config={aiConfig}
-                        onReplace={(out) => {
-                            const v = viewRef.current;
-                            if (v) v.dispatch({ changes: { from: aiBubble.selStart, to: aiBubble.selEnd, insert: out }, selection: { anchor: aiBubble.selStart + out.length } });
-                            setAIBubble(null);
-                            v?.focus();
-                        }}
-                        onInsert={(out) => {
-                            const v = viewRef.current;
-                            const ins = "\n\n" + out;
-                            if (v) v.dispatch({ changes: { from: aiBubble.selEnd, to: aiBubble.selEnd, insert: ins }, selection: { anchor: aiBubble.selEnd + ins.length } });
-                            setAIBubble(null);
-                            v?.focus();
-                        }}
-                        onClose={() => setAIBubble(null)}
-                    />
-                )}
-
-                {tableUI && (
-                    <TableToolbar
-                        anchor={{ x: tableUI.x, y: tableUI.y }}
-                        activeAlign={tableUI.align}
-                        onOp={(op) => {
-                            const v = viewRef.current;
-                            if (!v) return;
-                            const r = applyTableOp(toEditorActionState(v), op);
-                            if (r) applyEditorResult(v, r);
-                            v.focus();
-                        }}
-                    />
-                )}
+                {floatingOverlays}
             </div>
         </main>
     );
