@@ -427,8 +427,6 @@ function AppContent() {
       ...t,
       filePath: live.filePath,
       fileName: live.fileName ?? "Untitled.md",
-      content: live.content,
-      originalContent: live.originalContent,
       fileSize: live.fileSize,
       knownMtime: knownMtimeRef.current,
       cursorLine: currentLineRef.current,
@@ -440,18 +438,11 @@ function AppContent() {
     setProposedDoc(null); // an AI review belongs to the file we're leaving
     setFilePath(tab.filePath);
     setFileName(tab.fileName);
-    setContent(tab.content);
-    setOriginalContent(tab.originalContent);
     setFileSize(tab.fileSize);
     knownMtimeRef.current = tab.knownMtime;
     let session = sessionController.get(tab.id);
     if (!session) {
-      session = createDocumentSession({
-        id: tab.id, path: tab.filePath, name: tab.fileName, content: tab.content,
-        savedContent: tab.originalContent, diskRevision: tab.knownMtime,
-        fileSize: tab.fileSize, viewMode: mode, cursorLine: tab.cursorLine,
-      });
-      sessionController.replaceSession(session);
+      return;
     }
     setModeState(session.viewMode);
     if (tab.filePath) setLastFile(tab.filePath);
@@ -494,8 +485,6 @@ function AppContent() {
       const fileData = await invoke<FileData>("read_file", { path });
       setFilePath(fileData.path);
       setFileName(fileData.name);
-      setContent(fileData.content);
-      setOriginalContent(fileData.content);
       setFileSize(fileData.size);
       knownMtimeRef.current = fileData.modified ?? 0;
       // Track recents + last-opened for restore-on-launch
@@ -505,14 +494,13 @@ function AppContent() {
       // otherwise open a new one. Either way it becomes active. TABS-01.
       const loaded = {
         filePath: fileData.path, fileName: fileData.name,
-        content: fileData.content, originalContent: fileData.content,
         fileSize: fileData.size, knownMtime: fileData.modified ?? 0,
       };
       const existing = findTabByPath(tabsRef.current, fileData.path);
       if (existing) {
         commitTabs(tabsRef.current.map((t) => (t.id === existing.id ? { ...t, ...loaded } : t)));
         sessionController.open({
-          id: existing.id, path: loaded.filePath, name: loaded.fileName, content: loaded.content,
+          id: existing.id, path: loaded.filePath, name: loaded.fileName, content: fileData.content,
           diskRevision: loaded.knownMtime, fileSize: loaded.fileSize, viewMode: mode,
         }, false);
         setActiveTab(existing.id);
@@ -520,7 +508,7 @@ function AppContent() {
         const id = newTabId();
         commitTabs([...tabsRef.current, { id, ...loaded }]);
         sessionController.open({
-          id, path: loaded.filePath, name: loaded.fileName, content: loaded.content,
+          id, path: loaded.filePath, name: loaded.fileName, content: fileData.content,
           diskRevision: loaded.knownMtime, fileSize: loaded.fileSize, viewMode: mode,
         }, false);
         setActiveTab(id);
@@ -664,6 +652,7 @@ function AppContent() {
       // Read each file, skipping any that have gone missing / too large. The CLI
       // file's failure is always surfaced (the user explicitly asked for it).
       const loaded: TabState[] = [];
+      const loadedContentById = new Map<string, string>();
       let activeId: string | null = null;
       for (const p of paths) {
         try {
@@ -671,10 +660,10 @@ function AppContent() {
           const id = newTabId();
           loaded.push({
             id, filePath: fd.path, fileName: fd.name,
-            content: fd.content, originalContent: fd.content,
             fileSize: fd.size, knownMtime: fd.modified ?? 0,
             cursorLine: cursorByPath.get(p),
           });
+          loadedContentById.set(id, fd.content);
           if (p === activePath) activeId = id;
         } catch (err) {
           const msg = errMessage(err);
@@ -698,15 +687,13 @@ function AppContent() {
 
       commitTabs(loaded);
       loaded.forEach((tab) => sessionController.open({
-        id: tab.id, path: tab.filePath, name: tab.fileName, content: tab.content,
-        savedContent: tab.originalContent, diskRevision: tab.knownMtime,
+        id: tab.id, path: tab.filePath, name: tab.fileName, content: loadedContentById.get(tab.id) ?? "",
+        diskRevision: tab.knownMtime,
         fileSize: tab.fileSize, viewMode: mode, cursorLine: tab.cursorLine,
       }, false));
       setActiveTab(activeId);
       setFilePath(activeTabData.filePath);
       setFileName(activeTabData.fileName);
-      setContent(activeTabData.content);
-      setOriginalContent(activeTabData.content);
       setFileSize(activeTabData.fileSize);
       knownMtimeRef.current = activeTabData.knownMtime;
       addRecentFile(activeTabData.filePath!, activeTabData.fileName);
@@ -860,7 +847,6 @@ function AppContent() {
     })) return;
     sessionController.markSaved(snapshot.documentId, { documentId: snapshot.documentId, version: snapshot.version, value: mtime });
     knownMtimeRef.current = mtime;
-    if (snapshot.documentId === activeTabIdRef.current) setOriginalContent(snapshot.content);
   }, [sessionController]);
   const handleAutosaveError = useCallback((msg: string) => showToast(msg, "error"), [showToast]);
   useAutosave({
@@ -889,13 +875,7 @@ function AppContent() {
           if (!sessionController.acceptsResult(summary.id, snapshot)) continue;
           sessionController.markSaved(summary.id, { documentId: summary.id, version: snapshot.version, value: mtime });
           // Keep the temporary tab projection synchronized until P4d removes it.
-          commitTabs(
-            tabsRef.current.map((x) =>
-              x.id === summary.id && x.content === snapshot.value
-                ? { ...x, originalContent: snapshot.value, knownMtime: mtime }
-                : x
-            )
-          );
+          commitTabs(tabsRef.current.map((x) => x.id === summary.id ? { ...x, knownMtime: mtime } : x));
         } catch {/* best-effort; the active-tab path surfaces disk errors */}
       }
     }, 1500);
@@ -923,7 +903,7 @@ function AppContent() {
             commitTabs(
               tabsRef.current.map((x) =>
                 x.id === summary.id
-                  ? { ...x, content: fd.content, originalContent: fd.content, fileSize: fd.size, knownMtime: fd.modified ?? 0 }
+                  ? { ...x, fileSize: fd.size, knownMtime: fd.modified ?? 0 }
                   : x
               )
             );
@@ -1238,7 +1218,10 @@ function AppContent() {
     // edited active Untitled tab still looks empty in tabsRef and gets reused,
     // replacing its draft when the user asks for a second tab.
     snapshotActiveTab();
-    const reusable = findReusableUntitledTab(tabsRef.current);
+    const reusable = findReusableUntitledTab(tabsRef.current, (id) => {
+      const session = sessionController.get(id);
+      return !!session && session.version === session.savedVersion && session.content === "";
+    });
     if (reusable) {
       if (reusable.id !== activeTabIdRef.current) activateTab(reusable.id);
       setMode("code");
@@ -1247,8 +1230,7 @@ function AppContent() {
     const id = newTabId();
     const name = nextUntitledName(tabsRef.current);
     commitTabs([...tabsRef.current, {
-      id, filePath: null, fileName: name,
-      content: "", originalContent: "", fileSize: 0, knownMtime: 0,
+      id, filePath: null, fileName: name, fileSize: 0, knownMtime: 0,
     }]);
     sessionController.open({ id, path: null, name, content: "", fileSize: 0, viewMode: "code" }, false);
     setActiveTab(id);
@@ -1280,12 +1262,14 @@ function AppContent() {
     // synchronously, so the reuse lookup below sees the up-to-date list.
     snapshotActiveTab();
 
-    const reusable = findReusableUntitledTab(tabsRef.current);
+    const reusable = findReusableUntitledTab(tabsRef.current, (id) => {
+      const session = sessionController.get(id);
+      return !!session && session.version === session.savedVersion && session.content === "";
+    });
     const id = reusable ? reusable.id : newTabId();
 
     const entry: TabState = {
       id, filePath: null, fileName: name,
-      content: tutorial, originalContent: tutorial,
       fileSize: bytes, knownMtime: 0,
     };
     commitTabs(
@@ -1371,7 +1355,7 @@ function AppContent() {
       const activeId = activeTabIdRef.current;
       if (activeId) {
         commitTabs(tabsRef.current.map((t) => (t.id === activeId ? {
-          ...t, filePath: selected, fileName: name, content: snapshot.value, originalContent: snapshot.value,
+          ...t, filePath: selected, fileName: name,
           knownMtime: knownMtimeRef.current,
         } : t)));
       }
@@ -1938,7 +1922,7 @@ function AppContent() {
         id: t.id,
         fileName: summary?.name ?? (active ? (fileName ?? "Untitled.md") : t.fileName),
         filePath: summary?.path ?? (active ? filePath : t.filePath),
-        dirty: summary?.dirty ?? (active ? isDirty : t.content !== t.originalContent),
+        dirty: summary?.dirty ?? (active ? isDirty : false),
       };
     });
     const labels = computeTabLabels(resolved);

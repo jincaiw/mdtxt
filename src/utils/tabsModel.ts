@@ -1,7 +1,7 @@
 /**
- * Pure data model for the open-file tabs. The heavy state lives in App (the
- * "active" tab is the live editor); these helpers just manage the list so the
- * tricky bits (which tab to focus after a close) are unit-testable.
+ * Pure metadata model for open tabs. Document text, saved revisions and dirty
+ * state belong exclusively to DocumentSession; these helpers only manage tab
+ * ordering, identity and display metadata.
  */
 
 export interface TabState {
@@ -10,8 +10,6 @@ export interface TabState {
   /** null for an unsaved "Untitled" buffer. */
   filePath: string | null;
   fileName: string;
-  content: string;
-  originalContent: string;
   fileSize: number;
   /** Last-known on-disk mtime (ms), for external-change detection. */
   knownMtime: number;
@@ -20,57 +18,6 @@ export interface TabState {
   cursorLine?: number;
 }
 
-/** A tab is dirty when its buffer differs from what's on disk. */
-export function isTabDirty(tab: Pick<TabState, "content" | "originalContent">): boolean {
-  return tab.content !== tab.originalContent;
-}
-
-/** The live editor buffer for the ACTIVE tab. Its stored snapshot in the tabs
- *  array lags until the next switch, so dirty checks for the active tab must
- *  read these live values instead. `fileName` may be null for an Untitled buffer. */
-export interface LiveActiveTab {
-  filePath: string | null;
-  fileName: string | null;
-  content: string;
-  originalContent: string;
-}
-
-/** A tab that has unsaved changes, in the shape the window-close save loop needs. */
-export interface DirtyTab {
-  id: string;
-  filePath: string | null;
-  fileName: string;
-  content: string;
-}
-
-/**
- * Every open tab with unsaved changes. The ACTIVE tab is read from `live` (the
- * editor's current buffer) rather than its stored snapshot, which lags until the
- * next tab switch; every other tab is compared against its own saved
- * originalContent. This is what the window-close guard uses so a dirty
- * BACKGROUND tab can't be discarded silently when the active tab is clean.
- * TABS-04 / issue #88.
- */
-export function collectDirtyTabs(
-  tabs: TabState[],
-  activeId: string | null,
-  live: LiveActiveTab
-): DirtyTab[] {
-  const dirty: DirtyTab[] = [];
-  for (const t of tabs) {
-    const isActive = t.id === activeId;
-    const content = isActive ? live.content : t.content;
-    const originalContent = isActive ? live.originalContent : t.originalContent;
-    if (!isTabDirty({ content, originalContent })) continue;
-    dirty.push({
-      id: t.id,
-      filePath: isActive ? live.filePath : t.filePath,
-      fileName: isActive ? (live.fileName ?? "Untitled.md") : t.fileName,
-      content,
-    });
-  }
-  return dirty;
-}
 
 /** Find an open tab by file path (null paths never match). */
 export function findTabByPath(tabs: TabState[], path: string | null): TabState | undefined {
@@ -111,8 +58,11 @@ export function nextUntitledName(tabs: TabState[]): string {
  * worth reusing on "New file" instead of stacking another identical blank tab.
  * TABS-08.
  */
-export function findReusableUntitledTab(tabs: TabState[]): TabState | undefined {
-  return tabs.find((t) => t.filePath === null && t.content === "" && t.originalContent === "");
+export function findReusableUntitledTab(
+  tabs: TabState[],
+  isPristineEmpty: (id: string) => boolean,
+): TabState | undefined {
+  return tabs.find((t) => t.filePath === null && isPristineEmpty(t.id));
 }
 
 /** Folder segments of a path in natural (root → parent) order. `a/b/c/x.md` →

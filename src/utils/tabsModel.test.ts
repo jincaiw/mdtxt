@@ -1,83 +1,17 @@
 import { describe, it, expect } from "vitest";
 import {
   findTabByPath,
-  isTabDirty,
-  collectDirtyTabs,
   nextActiveAfterClose,
   nextUntitledName,
   findReusableUntitledTab,
   computeTabLabels,
   moveTab,
-  type LiveActiveTab,
   type TabState,
 } from "./tabsModel";
 
-const tab = (id: string, filePath: string | null, content = "x", originalContent = "x"): TabState => ({
+const tab = (id: string, filePath: string | null): TabState => ({
   id, filePath, fileName: filePath?.replace(/\\/g, "/").split("/").pop() ?? "Untitled.md",
-  content, originalContent, fileSize: 0, knownMtime: 0,
-});
-
-describe("isTabDirty", () => {
-  it("is dirty only when content diverges from the saved original", () => {
-    expect(isTabDirty({ content: "a", originalContent: "a" })).toBe(false);
-    expect(isTabDirty({ content: "a", originalContent: "b" })).toBe(true);
-  });
-});
-
-describe("collectDirtyTabs", () => {
-  // Live buffer for the active tab, defaulting to a clean matching pair.
-  const live = (over: Partial<LiveActiveTab> = {}): LiveActiveTab => ({
-    filePath: "/active.md", fileName: "active.md", content: "x", originalContent: "x", ...over,
-  });
-
-  it("returns nothing when every tab is clean", () => {
-    const tabs = [tab("1", "/a.md"), tab("2", "/b.md")];
-    expect(collectDirtyTabs(tabs, "1", live({ filePath: "/a.md", fileName: "a.md" }))).toEqual([]);
-  });
-
-  it("flags a dirty BACKGROUND tab even when the active tab is clean (issue #88)", () => {
-    const tabs = [
-      tab("1", "/a.md"), // active, clean
-      tab("2", "/b.md", "edited", "saved"), // background, dirty
-    ];
-    const dirty = collectDirtyTabs(tabs, "1", live({ filePath: "/a.md", fileName: "a.md" }));
-    expect(dirty.map((t) => t.id)).toEqual(["2"]);
-    expect(dirty[0]).toMatchObject({ filePath: "/b.md", fileName: "b.md", content: "edited" });
-  });
-
-  it("uses the LIVE buffer for the active tab, not its stale snapshot", () => {
-    // The active tab's stored snapshot still reads clean, but the live editor
-    // buffer has unsaved edits — the live values must win.
-    const tabs = [tab("1", "/a.md", "x", "x")];
-    const dirty = collectDirtyTabs(tabs, "1", live({ filePath: "/a.md", fileName: "a.md", content: "typed", originalContent: "x" }));
-    expect(dirty.map((t) => t.id)).toEqual(["1"]);
-    expect(dirty[0].content).toBe("typed");
-  });
-
-  it("treats the active tab as clean via live values even if its snapshot looks dirty", () => {
-    // Snapshot diverges (lags behind the last save) but the live buffer is clean.
-    const tabs = [tab("1", "/a.md", "stale", "saved")];
-    expect(collectDirtyTabs(tabs, "1", live({ filePath: "/a.md", fileName: "a.md", content: "same", originalContent: "same" }))).toEqual([]);
-  });
-
-  it("names an unsaved active Untitled buffer 'Untitled.md'", () => {
-    const untitled: TabState = {
-      id: "1", filePath: null, fileName: "Untitled-1.md",
-      content: "hi", originalContent: "", fileSize: 0, knownMtime: 0,
-    };
-    const dirty = collectDirtyTabs([untitled], "1", live({ filePath: null, fileName: null, content: "hi", originalContent: "" }));
-    expect(dirty[0]).toMatchObject({ filePath: null, fileName: "Untitled.md", content: "hi" });
-  });
-
-  it("collects every dirty tab across active and background", () => {
-    const tabs = [
-      tab("1", "/a.md", "x", "x"), // active, dirty via live below
-      tab("2", "/b.md", "edited", "saved"), // background, dirty
-      tab("3", "/c.md"), // background, clean
-    ];
-    const dirty = collectDirtyTabs(tabs, "1", live({ filePath: "/a.md", fileName: "a.md", content: "typed", originalContent: "x" }));
-    expect(dirty.map((t) => t.id)).toEqual(["1", "2"]);
-  });
+  fileSize: 0, knownMtime: 0,
 });
 
 describe("findTabByPath", () => {
@@ -115,7 +49,7 @@ describe("nextActiveAfterClose", () => {
 
 describe("nextUntitledName", () => {
   const untitled = (id: string, name: string): TabState => ({
-    id, filePath: null, fileName: name, content: "", originalContent: "", fileSize: 0, knownMtime: 0,
+    id, filePath: null, fileName: name, fileSize: 0, knownMtime: 0,
   });
   it("starts at Untitled-1.md", () => {
     expect(nextUntitledName([])).toBe("Untitled-1.md");
@@ -133,15 +67,14 @@ describe("nextUntitledName", () => {
 
 describe("findReusableUntitledTab", () => {
   it("finds a pristine empty untitled buffer", () => {
-    const tabs = [tab("1", "/a.md"), { ...tab("2", null), content: "", originalContent: "" }];
-    expect(findReusableUntitledTab(tabs)?.id).toBe("2");
+    const tabs = [tab("1", "/a.md"), tab("2", null)];
+    expect(findReusableUntitledTab(tabs, (id) => id === "2")?.id).toBe("2");
   });
   it("ignores an untitled buffer that has content", () => {
-    const tabs = [{ ...tab("2", null), content: "hi", originalContent: "" }];
-    expect(findReusableUntitledTab(tabs)).toBeUndefined();
+    expect(findReusableUntitledTab([tab("2", null)], () => false)).toBeUndefined();
   });
   it("ignores saved files", () => {
-    expect(findReusableUntitledTab([tab("1", "/a.md")])).toBeUndefined();
+    expect(findReusableUntitledTab([tab("1", "/a.md")], () => true)).toBeUndefined();
   });
 });
 
