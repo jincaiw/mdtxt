@@ -14,7 +14,7 @@ accepted.**
 | Overlapping saves do not share a temporary path | `save_temp_path` combines sibling directory, basename, process id, and an atomic process-local sequence | Implemented; unit test proves distinct paths in one process |
 | Save-format fidelity | Existing EOL/BOM/trailing-newline tests in `commands.rs` | Existing coverage remains green; byte-level preservation of all supported formats is not yet complete |
 | External modification conflict choice | `useExternalChangeWatcher` does not advance a dirty document's revision; `FileConflictDialog` offers an on-demand read-only side-by-side comparison plus explicit keep-local, reload-disk and save-as choices. A later hash conflict from any save path reopens the same choice point | Active and background dirty tabs use the same non-destructive flow. A background change persists as a localized warning marker on its tab; selecting it opens the decision dialog. Reload or a successful save-as clears only that marker |
-| Crash recovery | `src-tauri/src/recovery.rs` writes app-data recovery entries atomically with SHA-256 validation and seven-day retention; startup lists verified entries in `RecoveryDialog`; new tab IDs include a per-launch UUID | Restore creates a new unsaved tab and cannot overwrite the disk path or collide with a prior launch's recovery key; discard stays visible for retry if native deletion fails, while a failed post-restore cleanup is reported as a possible next-launch repeat. macOS Debug crash/relaunch smoke passed |
+| Crash recovery | `src-tauri/src/recovery.rs` writes app-data recovery entries atomically with SHA-256 validation and seven-day retention; startup lists verified entries in `RecoveryDialog`; new tab IDs include a per-launch UUID | Restore creates a new unsaved tab and cannot overwrite the disk path or collide with a prior launch's recovery key; discard stays visible for retry if native deletion fails, while a failed post-restore cleanup is reported as a possible next-launch repeat. macOS Debug crash/relaunch smoke passed for one draft; AC-007 session-level recovery of two tabs, active tab and approximate position remains unimplemented/unverified |
 
 ## Automated evidence for the atomic-save slice
 
@@ -36,8 +36,9 @@ accepted.**
 
 ## Remaining P8 gates
 
-1. Record the equivalent Windows and Linux recovery behavior before release.
-2. Record Windows and Linux behavior for symbolic links, long paths, UNC paths,
+1. Add and verify AC-007 session-level recovery: two drafts, their content, active tab and approximate cursor/scroll position after forced termination; record it separately from recovery-entry integrity.
+2. Record the equivalent Windows and Linux recovery behavior before release.
+3. Record Windows and Linux behavior for symbolic links, long paths, UNC paths,
    locks, directory synchronization, and replacement semantics; record macOS
    lock behavior separately because POSIX advisory locks are not automatically
    enforced by rename.
