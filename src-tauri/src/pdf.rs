@@ -35,7 +35,11 @@ pub async fn export_pdf(app: tauri::AppHandle, html: String, path: String) -> Re
     // once images are inlined as base64, so stage the HTML in a temp file and
     // load that instead (macOS follows the same route for symmetry).
     let mut temp = std::env::temp_dir();
-    temp.push(format!("paperling-export-{}-{}.html", std::process::id(), seq));
+    temp.push(format!(
+        "paperling-export-{}-{}.html",
+        std::process::id(),
+        seq
+    ));
     std::fs::write(&temp, &html).map_err(|e| format!("Failed to stage export HTML: {e}"))?;
 
     let url = tauri::Url::from_file_path(&temp)
@@ -150,7 +154,9 @@ unsafe fn print_to_pdf(
     platform: tauri::webview::PlatformWebview,
     path: &str,
 ) -> Result<(), String> {
-    use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2PrintSettings, ICoreWebView2_7};
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2PrintSettings, ICoreWebView2_7,
+    };
     use webview2_com::PrintToPdfCompletedHandler;
     use windows::core::{Interface, HSTRING, PCWSTR};
 

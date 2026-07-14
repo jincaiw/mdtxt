@@ -35,7 +35,7 @@ export const config = {
     framework: "mocha",
     mochaOpts: { ui: "bdd", timeout: 60_000 },
     onPrepare: () => {
-        const result = spawnSync("npm", ["run", "tauri", "--", "build", "--debug", "--no-bundle"], {
+        const result = spawnSync("bun", ["run", "tauri", "--", "build", "--debug", "--no-bundle"], {
             cwd: root,
             stdio: "inherit",
             shell: process.platform === "win32",

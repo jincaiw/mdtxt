@@ -2,9 +2,12 @@ mod ai;
 mod commands;
 mod pdf;
 
-use commands::{read_file, save_file, get_file_info, list_directory_files, search_files, save_image, read_image_file, get_ai_key, set_ai_key};
-use tauri::{Manager, Emitter};
+use commands::{
+    get_ai_key, get_file_info, list_directory_files, read_file, read_image_file, save_file,
+    save_image, search_files, set_ai_key,
+};
 use std::sync::Mutex;
+use tauri::{Emitter, Manager};
 
 /// File path passed on the command line (double-clicking a .md in the OS).
 /// Held until the frontend asks for it via `get_cli_file`.
@@ -57,7 +60,8 @@ pub fn run() {
             // instead of in the unconditional plugin chain above.
             #[cfg(desktop)]
             {
-                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
                 app.handle().plugin(tauri_plugin_process::init())?;
             }
             // UI-automation bridge for the Tauri MCP server. Debug builds
@@ -104,8 +108,14 @@ mod tests {
 
     #[test]
     fn md_arg_skips_argv0_and_finds_markdown() {
-        assert_eq!(md_arg(&v(&["paperling.exe", "C:\\notes\\a.md"])), Some("C:\\notes\\a.md".into()));
-        assert_eq!(md_arg(&v(&["paperling.exe", "C:\\notes\\b.markdown"])), Some("C:\\notes\\b.markdown".into()));
+        assert_eq!(
+            md_arg(&v(&["paperling.exe", "C:\\notes\\a.md"])),
+            Some("C:\\notes\\a.md".into())
+        );
+        assert_eq!(
+            md_arg(&v(&["paperling.exe", "C:\\notes\\b.markdown"])),
+            Some("C:\\notes\\b.markdown".into())
+        );
     }
 
     #[test]

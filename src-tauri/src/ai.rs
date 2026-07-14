@@ -189,7 +189,10 @@ mod tests {
         // bytes. The partial byte must stay buffered (no lossy replacement)
         // until its line completes.
         let mut buf = b"line one\n\xC3".to_vec();
-        assert_eq!(take_complete_lines(&mut buf), Some("line one\n".to_string()));
+        assert_eq!(
+            take_complete_lines(&mut buf),
+            Some("line one\n".to_string())
+        );
         assert_eq!(buf, b"\xC3");
 
         buf.extend_from_slice(b"\xA9 end\n");
