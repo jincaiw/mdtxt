@@ -1,6 +1,7 @@
 mod ai;
 mod commands;
 mod pdf;
+mod recovery;
 
 use commands::{
     get_ai_key, get_file_info, list_directory_files, read_file, read_image_file, save_file,
@@ -83,7 +84,10 @@ pub fn run() {
             get_cli_file,
             pdf::export_pdf,
             ai::ai_request,
-            ai::ai_cancel
+            ai::ai_cancel,
+            recovery::write_recovery,
+            recovery::list_recoveries,
+            recovery::discard_recovery
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

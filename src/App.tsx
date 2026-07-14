@@ -888,6 +888,32 @@ function AppContent() {
     onError: handleAutosaveError,
   });
 
+  // Crash recovery is independent of the optional document autosave setting:
+  // a dirty controller-owned snapshot is copied to the native app-data store
+  // after a short quiet period. Clean sessions clear their matching recovery
+  // entry, so a successful save never prompts to restore already-durable text.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      for (const summary of sessionSnapshot.sessions) {
+        if (summary.dirty) {
+          const snapshot = sessionController.read(summary.id);
+          const session = sessionController.get(summary.id);
+          if (!snapshot || !session) continue;
+          void invoke("write_recovery", {
+            documentId: session.id,
+            path: session.path,
+            name: session.name,
+            content: snapshot.value,
+            version: snapshot.version,
+          }).catch(() => { /* recovery is best-effort; editor buffer remains authoritative */ });
+        } else {
+          void invoke("discard_recovery", { documentId: summary.id }).catch(() => {});
+        }
+      }
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [sessionController, sessionSnapshot]);
+
   // Autosave dirty BACKGROUND tabs from their versioned sessions. `tabs` still
   // carries transitional UI metadata, but never supplies the text written here.
   useEffect(() => {
