@@ -31,7 +31,6 @@ import { TableToolbar } from "./TableToolbar";
 import { pasteUrlOnSelection, pasteUrlAutolink, pasteTsvAsTable, htmlToMarkdown } from "../utils/smartPaste";
 import { applyTableOp, findTableAt, locateCell, type Align } from "../utils/tableModel";
 import type { Scroller } from "../utils/scrollSync";
-import { useLocale } from "../context/LocaleContext";
 import {
     applyEditorResult,
     editorTheme,
@@ -43,6 +42,7 @@ import { useEditorDocumentSession } from "../editor/core/useEditorDocumentSessio
 import { useWikilinkCompletion } from "../editor/interactions/useWikilinkCompletion";
 import { useAIAssistShortcut } from "../editor/interactions/useAIAssistShortcut";
 import { useEditorReview } from "../editor/interactions/useEditorReview";
+import { ReviewBanner } from "../editor/interactions/ReviewBanner";
 import { spellcheckAttributes, useEditorPreferences } from "../editor/extensions/useEditorPreferences";
 
 interface CodeEditorProps {
@@ -96,7 +96,6 @@ function CodeEditorImpl({
     reviewDoc,
     onReviewResolve,
 }: CodeEditorProps) {
-    const { t: tr } = useLocale();
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
 
@@ -456,17 +455,7 @@ function CodeEditorImpl({
 
     return (
         <main className="flex-1 flex flex-col overflow-hidden relative">
-            {reviewActive && (
-                <div className="flex items-center gap-2 px-3 h-9 shrink-0 bg-[var(--bg-secondary)] border-b border-[var(--accent)] text-xs no-select">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
-                    <span className="text-[var(--text-primary)] font-medium">{tr("AI suggested changes")}</span>
-                    <span className="text-[var(--text-muted)] hidden sm:inline">{tr("accept or reject each below, or all at once:")}</span>
-                    <div className="ml-auto flex items-center gap-1.5">
-                        <button onClick={rejectAllChanges} className="px-2.5 py-1 rounded-[var(--radius-sm)] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors">{tr("Reject all")}</button>
-                        <button onClick={acceptAllChanges} className="px-2.5 py-1 rounded-[var(--radius-sm)] font-medium bg-[var(--accent)] text-[var(--accent-text)] hover:opacity-90 transition-colors">{tr("Accept all")}</button>
-                    </div>
-                </div>
-            )}
+            {reviewActive && <ReviewBanner onAccept={acceptAllChanges} onReject={rejectAllChanges} />}
             {showToolbar && (
                 <FormatToolbar getState={getState} apply={applyResult} insert={insertAtCaret} onAIAssist={aiEnabled ? openAIBubble : undefined} />
             )}
