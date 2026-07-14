@@ -50,6 +50,8 @@ export interface SessionResult<T> {
 export interface DiskSaveResult {
     modified: number;
     hash: string;
+    /** Rename succeeded, but the containing directory could not be synced. */
+    durabilityWarning?: boolean;
 }
 
 export const DEFAULT_FORMAT: DocumentFormat = {

@@ -921,7 +921,8 @@ function AppContent() {
     })) return;
     sessionController.markSaved(snapshot.documentId, { documentId: snapshot.documentId, version: snapshot.version, value: result });
     knownMtimeRef.current = result.modified;
-  }, [sessionController]);
+    if (result.durabilityWarning) showToast(tr("File saved, but final disk durability could not be confirmed."), "error");
+  }, [sessionController, showToast, tr]);
   const handleAutosaveError = useCallback((msg: string, snapshot: NonNullable<Parameters<typeof useAutosave>[0]["snapshot"]>) => {
     if (isDiskConflictMessage(msg) && snapshot.filePath) {
       rememberFileConflict({ documentId: snapshot.documentId, path: snapshot.filePath, name: sessionController.get(snapshot.documentId)?.name ?? "Untitled.md" });
@@ -1512,7 +1513,7 @@ function AppContent() {
           knownMtime: knownMtimeRef.current,
         } : t)));
       }
-      showToast(tr("File saved"), "success");
+      showToast(tr(result.durabilityWarning ? "File saved, but final disk durability could not be confirmed." : "File saved"), result.durabilityWarning ? "error" : "success");
     } catch (err) {
       console.error("Failed to save file:", err);
       const msg = errMessage(err);
@@ -1552,7 +1553,7 @@ function AppContent() {
       if (!sessionController.acceptsResult(snapshot!.documentId, snapshot!)) return;
       sessionController.markSaved(snapshot!.documentId, { documentId: snapshot!.documentId, version: snapshot!.version, value: result });
       knownMtimeRef.current = result.modified;
-      showToast(tr("File saved"), "success");
+      showToast(tr(result.durabilityWarning ? "File saved, but final disk durability could not be confirmed." : "File saved"), result.durabilityWarning ? "error" : "success");
     } catch (err) {
       console.error("Failed to save file:", err);
       const msg = errMessage(err);

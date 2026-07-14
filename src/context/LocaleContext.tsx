@@ -164,6 +164,7 @@ const zhCN = {
     "Reject all": "全部拒绝",
     "Accept all": "全部接受",
     "File saved": "文件已保存",
+    "File saved, but final disk durability could not be confirmed.": "文件已保存，但无法确认最终已持久写入磁盘。",
     "Failed to save file": "保存文件失败",
     "Failed to open file": "打开文件失败",
     "Could not create note": "无法创建笔记",

@@ -70,6 +70,8 @@ pub struct FileData {
 pub struct SaveResult {
     pub modified: u64,
     pub hash: String,
+    #[serde(rename = "durabilityWarning")]
+    pub durability_warning: bool,
 }
 
 /// Test-only fault points for the atomic save boundary. Kept private and passed
@@ -374,7 +376,11 @@ async fn save_file_impl(
         return Err(CommandError::WriteError(e.to_string()));
     }
 
-    sync_parent_directory(&target, fault).await?;
+    // A directory sync happens after the atomic rename. At that point the
+    // replacement is already visible and rolling it back could lose data, so
+    // return the real on-disk result with an explicit durability warning rather
+    // than falsely reporting a failed save whose buffer stays dirty.
+    let durability_warning = sync_parent_directory(&target, fault).await.is_err();
 
     let metadata = tokio::fs::metadata(&target)
         .await
@@ -385,6 +391,7 @@ async fn save_file_impl(
     Ok(SaveResult {
         modified: mtime_ms(&metadata),
         hash: content_hash(&bytes),
+        durability_warning,
     })
 }
 
@@ -1087,7 +1094,8 @@ mod tests {
             )
             .await;
 
-            assert!(matches!(result, Err(CommandError::WriteError(_))));
+            let result = result.unwrap();
+            assert!(result.durability_warning);
             // The rename has already succeeded: pretending the original survived
             // would be false. The caller keeps its buffer and is told the save's
             // durability could not be confirmed.
