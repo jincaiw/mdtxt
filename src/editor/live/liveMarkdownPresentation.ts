@@ -1,7 +1,8 @@
 import { useEffect, type RefObject } from "react";
 import { RangeSetBuilder, StateField, type Compartment, type EditorState, type Extension, type Range, type Transaction } from "@codemirror/state";
-import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
+import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
+import { resolveEditFocus } from "./editFocusResolver";
 
 const marks: Record<string, Decoration> = {
     ATXHeading1: Decoration.mark({ class: "cm-live-heading-1" }),
@@ -102,7 +103,39 @@ export const liveMarkdownTheme = EditorView.baseTheme({
     ".cm-live-rule": { color: "var(--border)", fontWeight: "700" },
 });
 
-export const liveMarkdownPresentation: Extension = [liveMarkdownDecorations, liveMarkdownTheme];
+/**
+ * Tracks the focus contract at the view boundary. It deliberately does not
+ * mutate source or decorations: P6 uses styled source only. The data classes
+ * make composition/multi-selection state explicit for a future renderer that
+ * wants to collapse markers and must first consult `resolveEditFocus`.
+ */
+const liveEditFocusPlugin = ViewPlugin.fromClass(class {
+    constructor(private readonly view: EditorView) {
+        this.sync();
+    }
+
+    update(update: ViewUpdate) {
+        if (update.selectionSet || update.docChanged || update.focusChanged) this.sync();
+    }
+
+    destroy() {
+        // The view owns this class list; remove it when the extension is
+        // compartment-reconfigured off without touching application state.
+        this.view.dom.classList.remove("cm-live-composing", "cm-live-multi-selection");
+    }
+
+    private sync() {
+        const view = this.view;
+        const focus = resolveEditFocus({
+            selections: view.state.selection.ranges.map((range) => ({ from: range.from, to: range.to })),
+            compositionStarted: view.compositionStarted,
+        });
+        view.dom.classList.toggle("cm-live-composing", focus.keepAllSource);
+        view.dom.classList.toggle("cm-live-multi-selection", view.state.selection.ranges.length > 1);
+    }
+});
+
+export const liveMarkdownPresentation: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
 
 /** Reconfigures the isolated Live compartment without rebuilding EditorView. */
 export function useLiveMarkdownPresentation({
