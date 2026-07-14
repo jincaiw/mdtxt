@@ -14,7 +14,6 @@ import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { getOriginalDoc } from "@codemirror/merge";
-import { getImageFromClipboard, saveImageToFile, createMarkdownImage } from "../utils/imageUtils";
 import {
     handleTab,
     handleEnter,
@@ -23,7 +22,6 @@ import {
     type EditorResult,
     type EditorState,
 } from "../utils/editorActions";
-import { pasteUrlOnSelection, pasteUrlAutolink, pasteTsvAsTable, htmlToMarkdown } from "../utils/smartPaste";
 import type { Scroller } from "../utils/scrollSync";
 import {
     applyEditorResult,
@@ -39,6 +37,7 @@ import { useEditorReview } from "../editor/interactions/useEditorReview";
 import { ReviewBanner } from "../editor/interactions/ReviewBanner";
 import { spellcheckAttributes, useEditorPreferences } from "../editor/extensions/useEditorPreferences";
 import { useEditorOverlays } from "../editor/interactions/EditorOverlays";
+import { createEditorPasteHandler } from "../editor/interactions/editorPaste";
 
 interface CodeEditorProps {
     /** Stable owner used to restore this document's EditorState. */
@@ -143,6 +142,7 @@ function CodeEditorImpl({
         content,
     });
     openAIBubbleRef.current = openAIBubble;
+    const handlePaste = createEditorPasteHandler({ filePathRef, onImagePasteRef, onErrorRef });
 
     // === One-time CodeMirror setup ===
     useEffect(() => {
@@ -267,52 +267,6 @@ function CodeEditorImpl({
         if (!r) return false;
         applyEditorResult(view, r);
         return true;
-    }
-
-    function handlePaste(event: ClipboardEvent, view: EditorView): boolean {
-        const imageFile = getImageFromClipboard(event);
-        if (imageFile) {
-            event.preventDefault();
-            if (!filePathRef.current) { onErrorRef.current?.("Please save your file first before pasting images."); return true; }
-            (async () => {
-                try {
-                    const imagePath = await saveImageToFile(imageFile, filePathRef.current!);
-                    const md = createMarkdownImage(imagePath, `image-${Date.now()}`);
-                    const sel = view.state.selection.main;
-                    view.dispatch({ changes: { from: sel.from, to: sel.to, insert: md }, selection: { anchor: sel.from + md.length } });
-                    onImagePasteRef.current?.();
-                } catch (error) {
-                    const msg = typeof error === "string" ? error : (error as { message?: string })?.message;
-                    onErrorRef.current?.(msg || "Failed to save image. Please try again.");
-                }
-            })();
-            return true;
-        }
-        const cd = event.clipboardData;
-        if (!cd) return false;
-        const html = cd.getData("text/html");
-        const text = cd.getData("text/plain");
-        const state = toEditorActionState(view);
-
-        const urlOnSel = pasteUrlOnSelection(state, text);
-        if (urlOnSel) { event.preventDefault(); applyEditorResult(view, urlOnSel); return true; }
-        const autolink = pasteUrlAutolink(state, text);
-        if (autolink) { event.preventDefault(); applyEditorResult(view, autolink); return true; }
-        if (!html) {
-            const tsv = pasteTsvAsTable(state, text);
-            if (tsv) { event.preventDefault(); applyEditorResult(view, tsv); return true; }
-        }
-        if (html && /<\w+/.test(html)) {
-            event.preventDefault();
-            (async () => {
-                let insert = text;
-                try { const md = (await htmlToMarkdown(html)).trim(); if (md) insert = md; } catch {/* fall back to plain text */ }
-                const sel = view.state.selection.main;
-                view.dispatch({ changes: { from: sel.from, to: sel.to, insert }, selection: { anchor: sel.from + insert.length } });
-            })();
-            return true;
-        }
-        return false; // let CodeMirror insert plain text
     }
 
     useEditorDocumentSession({
