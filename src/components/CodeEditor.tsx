@@ -42,6 +42,7 @@ import {
     markdownPresentationExtensions,
     toEditorActionState,
 } from "../editor/core/editorPresentation";
+import { useEditorViewportBridge } from "../editor/bridge/useEditorViewportBridge";
 
 interface CodeEditorProps {
     /** Stable owner used to restore this document's EditorState. */
@@ -549,74 +550,7 @@ function CodeEditorImpl({
         onReviewResolve?.(orig);
     }, [onReviewResolve]);
 
-    // Scroll-fraction sync (rAF-throttled — PREVIEW-04) + imperative scroller.
-    const scrollRafRef = useRef(0);
-    useEffect(() => {
-        const view = viewRef.current;
-        if (!view) return;
-        const scroller = view.scrollDOM;
-        const onScroll = () => {
-            if (scrollRafRef.current) return;
-            scrollRafRef.current = requestAnimationFrame(() => {
-                scrollRafRef.current = 0;
-                const max = scroller.scrollHeight - scroller.clientHeight;
-                onScrollFractionRef.current?.(max > 0 ? scroller.scrollTop / max : 0);
-            });
-        };
-        scroller.addEventListener("scroll", onScroll, { passive: true });
-        return () => {
-            scroller.removeEventListener("scroll", onScroll);
-            if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!registerScroller) return;
-        registerScroller({
-            setFraction: (f: number) => {
-                const view = viewRef.current;
-                if (!view) return;
-                const s = view.scrollDOM;
-                const max = s.scrollHeight - s.clientHeight;
-                if (max > 0) s.scrollTop = max * f;
-            },
-        });
-        return () => registerScroller(null);
-    }, [registerScroller]);
-
-    // Jump-to-line requests from the TOC / command palette (NAV-01). The editor
-    // moves its caret and scrolls the line to the top; in preview-only mode this
-    // pane is display:none so the scroll is a harmless no-op.
-    useEffect(() => {
-        const handler = (e: Event) => {
-            const line = Number((e as CustomEvent).detail?.line);
-            const v = viewRef.current;
-            if (!v || !Number.isFinite(line) || line < 1) return;
-            const docLine = v.state.doc.line(Math.min(Math.floor(line), v.state.doc.lines));
-            v.dispatch({
-                selection: { anchor: docLine.from },
-                effects: EditorView.scrollIntoView(docLine.from, { y: "start", yMargin: 8 }),
-            });
-        };
-        window.addEventListener("mdtxt:goto-line", handler);
-        return () => window.removeEventListener("mdtxt:goto-line", handler);
-    }, []);
-
-    // Snap the caret and viewport to the start when a different file opens, so
-    // you don't begin a new file at the previous file's cursor/scroll. NAV-04.
-    useEffect(() => {
-        const toTop = () => {
-            const v = viewRef.current;
-            if (!v) return;
-            v.dispatch({
-                selection: { anchor: 0 },
-                effects: EditorView.scrollIntoView(0, { y: "start" }),
-            });
-            v.scrollDOM.scrollTop = 0;
-        };
-        window.addEventListener("mdtxt:scroll-top", toTop);
-        return () => window.removeEventListener("mdtxt:scroll-top", toTop);
-    }, []);
+    useEditorViewportBridge({ viewRef, onScrollFractionRef, registerScroller });
 
     // Alt+J (and the command palette's "AI assist") is selection-aware, matching
     // the docs: with text selected it opens the inline selection-assist bubble;
