@@ -9,6 +9,7 @@ import {
     type DocumentSession,
     type DocumentSessionInput,
     type DocumentViewMode,
+    type DiskSaveResult,
     type SessionResult,
 } from "./documentSession";
 
@@ -24,6 +25,7 @@ export interface DocumentSessionSummary {
     version: number;
     savedVersion: number;
     diskRevision: number;
+    diskHash: string;
     fileSize: number;
     viewMode: DocumentViewMode;
     cursorLine: number;
@@ -41,6 +43,7 @@ export interface DocumentSessionFileMetadata {
     name: string;
     fileSize?: number;
     diskRevision?: number;
+    diskHash?: string;
 }
 
 /** Immutable content read for work that may complete asynchronously. */
@@ -51,6 +54,7 @@ export interface DirtyDocumentSessionSnapshot extends DocumentSessionContentSnap
     path: string | null;
     name: string;
     diskRevision: number;
+    diskHash: string;
 }
 
 type SnapshotListener = () => void;
@@ -105,6 +109,7 @@ export class DocumentSessionController {
             path: session.path,
             name: session.name,
             diskRevision: session.diskRevision,
+            diskHash: session.diskHash,
             dirty: isSessionDirty(session),
         }))
             .filter((snapshot) => snapshot.dirty)
@@ -173,15 +178,16 @@ export class DocumentSessionController {
             name: metadata.name,
             fileSize: metadata.fileSize ?? session.fileSize,
             diskRevision: metadata.diskRevision ?? session.diskRevision,
+            diskHash: metadata.diskHash ?? session.diskHash,
         }));
     }
 
-    markSaved(id: string, result: SessionResult<number>): DocumentSession | null {
+    markSaved(id: string, result: SessionResult<DiskSaveResult>): DocumentSession | null {
         return this.replace(id, (session) => markSessionSaved(session, result));
     }
 
-    applyExternalContent(id: string, content: string, diskRevision: number): DocumentSession | null {
-        return this.replace(id, (session) => applyExternalSessionContent(session, content, diskRevision));
+    applyExternalContent(id: string, content: string, diskRevision: number, diskHash: string): DocumentSession | null {
+        return this.replace(id, (session) => applyExternalSessionContent(session, content, diskRevision, diskHash));
     }
 
     acceptsResult<T>(id: string, result: SessionResult<T>): boolean {

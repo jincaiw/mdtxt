@@ -7,6 +7,7 @@ const input = (id: string, content = "first") => ({
     name: `${id}.md`,
     content,
     diskRevision: 10,
+    diskHash: "original-hash",
 });
 
 describe("DocumentSessionController", () => {
@@ -58,6 +59,7 @@ describe("DocumentSessionController", () => {
                 path: "/notes/dirty.md",
                 name: "dirty.md",
                 diskRevision: 10,
+                diskHash: "original-hash",
             },
         ]);
     });
@@ -79,7 +81,7 @@ describe("DocumentSessionController", () => {
         const controller = new DocumentSessionController();
         controller.open(input("a"));
         controller.replaceContent("a", "second");
-        const stale = { documentId: "a", version: 0, value: 11 };
+        const stale = { documentId: "a", version: 0, value: { modified: 11, hash: "stale-hash" } };
 
         controller.markSaved("a", stale);
         expect(controller.get("a")).toMatchObject({ version: 1, savedVersion: 0 });
@@ -90,8 +92,8 @@ describe("DocumentSessionController", () => {
     it("handles external content, active removal, and missing sessions explicitly", () => {
         const controller = new DocumentSessionController();
         controller.open(input("a"));
-        controller.applyExternalContent("a", "disk", 22);
-        expect(controller.get("a")).toMatchObject({ content: "disk", version: 1, savedVersion: 1, diskRevision: 22 });
+        controller.applyExternalContent("a", "disk", 22, "disk-hash");
+        expect(controller.get("a")).toMatchObject({ content: "disk", version: 1, savedVersion: 1, diskRevision: 22, diskHash: "disk-hash" });
         expect(controller.remove("a")).toBe(true);
         expect(controller.getSnapshot()).toEqual({ activeId: null, sessions: [] });
         expect(controller.remove("missing")).toBe(false);
@@ -101,10 +103,10 @@ describe("DocumentSessionController", () => {
     it("updates a saved document's metadata without changing its revision", () => {
         const controller = new DocumentSessionController();
         controller.open({ ...input("a"), path: null, name: "Untitled.md" });
-        controller.updateFileMetadata("a", { path: "/notes/saved.md", name: "saved.md", fileSize: 10, diskRevision: 30 });
+        controller.updateFileMetadata("a", { path: "/notes/saved.md", name: "saved.md", fileSize: 10, diskRevision: 30, diskHash: "saved-hash" });
 
         expect(controller.get("a")).toMatchObject({
-            path: "/notes/saved.md", name: "saved.md", fileSize: 10, diskRevision: 30, version: 0,
+            path: "/notes/saved.md", name: "saved.md", fileSize: 10, diskRevision: 30, diskHash: "saved-hash", version: 0,
         });
     });
 });

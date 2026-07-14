@@ -122,6 +122,7 @@ import {
   acceptsSessionResult,
   resolveLiveBetaViewMode,
   type DocumentSession,
+  type DiskSaveResult,
 } from "./utils/documentSession";
 import { DocumentSessionController } from "./utils/documentSessionController";
 import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
@@ -139,6 +140,8 @@ interface FileData {
   line_count: number;
   /** Last-modified time (ms since epoch) — used to detect external edits. */
   modified: number;
+  /** SHA-256 of the original bytes; pairs with modified for stale-save guards. */
+  hash: string;
 }
 
 interface ProposedDocument {
@@ -380,6 +383,7 @@ function AppContent() {
       version: active.version,
       filePath: active.path,
       diskRevision: active.diskRevision,
+      diskHash: active.diskHash,
       content: active.content,
       dirty: active.version !== active.savedVersion,
     };
@@ -511,7 +515,7 @@ function AppContent() {
         commitTabs(tabsRef.current.map((t) => (t.id === existing.id ? { ...t, ...loaded } : t)));
         sessionController.open({
           id: existing.id, path: loaded.filePath, name: loaded.fileName, content: fileData.content,
-          diskRevision: loaded.knownMtime, fileSize: loaded.fileSize, viewMode: mode,
+          diskRevision: loaded.knownMtime, diskHash: fileData.hash, fileSize: loaded.fileSize, viewMode: mode,
         }, false);
         setActiveTab(existing.id);
       } else {
@@ -519,7 +523,7 @@ function AppContent() {
         commitTabs([...tabsRef.current, { id, ...loaded }]);
         sessionController.open({
           id, path: loaded.filePath, name: loaded.fileName, content: fileData.content,
-          diskRevision: loaded.knownMtime, fileSize: loaded.fileSize, viewMode: mode,
+          diskRevision: loaded.knownMtime, diskHash: fileData.hash, fileSize: loaded.fileSize, viewMode: mode,
         }, false);
         setActiveTab(id);
       }
@@ -679,7 +683,7 @@ function AppContent() {
       // Read each file, skipping any that have gone missing / too large. The CLI
       // file's failure is always surfaced (the user explicitly asked for it).
       const loaded: TabState[] = [];
-      const loadedContentById = new Map<string, string>();
+      const loadedFileDataById = new Map<string, FileData>();
       let activeId: string | null = null;
       for (const p of paths) {
         try {
@@ -690,7 +694,7 @@ function AppContent() {
             fileSize: fd.size, knownMtime: fd.modified ?? 0,
             cursorLine: cursorByPath.get(p),
           });
-          loadedContentById.set(id, fd.content);
+          loadedFileDataById.set(id, fd);
           if (p === activePath) activeId = id;
         } catch (err) {
           const msg = errMessage(err);
@@ -713,11 +717,14 @@ function AppContent() {
       const activeTabData = loaded.find((t) => t.id === activeId)!;
 
       commitTabs(loaded);
-      loaded.forEach((tab) => sessionController.open({
-        id: tab.id, path: tab.filePath, name: tab.fileName, content: loadedContentById.get(tab.id) ?? "",
-        diskRevision: tab.knownMtime,
-        fileSize: tab.fileSize, viewMode: mode, cursorLine: tab.cursorLine,
-      }, false));
+      loaded.forEach((tab) => {
+        const fileData = loadedFileDataById.get(tab.id);
+        sessionController.open({
+          id: tab.id, path: tab.filePath, name: tab.fileName, content: fileData?.content ?? "",
+          diskRevision: tab.knownMtime, diskHash: fileData?.hash ?? "",
+          fileSize: tab.fileSize, viewMode: mode, cursorLine: tab.cursorLine,
+        }, false);
+      });
       setActiveTab(activeId);
       setFilePath(activeTabData.filePath);
       setFileName(activeTabData.fileName);
@@ -804,10 +811,11 @@ function AppContent() {
         path = selected;
       }
       try {
-        const mtime = await invoke<number>("save_file", {
+        const result = await invoke<DiskSaveResult>("save_file", {
           path,
           content: snapshot.value,
           expectedRevision: snapshot.path ? snapshot.diskRevision || undefined : undefined,
+          expectedHash: snapshot.path ? snapshot.diskHash || undefined : undefined,
         });
         if (!sessionController.acceptsResult(snapshot.documentId, snapshot)) {
           showToast(tr("The document changed while saving. Please save again."), "error");
@@ -817,13 +825,14 @@ function AppContent() {
           sessionController.updateFileMetadata(snapshot.documentId, {
             path,
             name: path.split(/[\\/]/).pop() ?? snapshot.name,
-            diskRevision: mtime,
+            diskRevision: result.modified,
+            diskHash: result.hash,
           });
         }
         sessionController.markSaved(snapshot.documentId, {
           documentId: snapshot.documentId,
           version: snapshot.version,
-          value: mtime,
+          value: result,
         });
       } catch (err) {
         const msg = errMessage(err);
@@ -874,14 +883,14 @@ function AppContent() {
   // Autosave 1.5s after the last edit. See useAutosave for the throttling and
   // the AI-review guard (AI-01). Callbacks are memoised so the debounce timer
   // isn't reset on every unrelated re-render.
-  const handleAutosaved = useCallback((mtime: number, snapshot: NonNullable<Parameters<typeof useAutosave>[0]["snapshot"]>) => {
+  const handleAutosaved = useCallback((result: DiskSaveResult, snapshot: NonNullable<Parameters<typeof useAutosave>[0]["snapshot"]>) => {
     // A debounce can finish after a new edit or a tab switch. Only the exact
     // session revision written to disk may become durable.
     if (!sessionController.acceptsResult(snapshot.documentId, {
       documentId: snapshot.documentId, version: snapshot.version, value: snapshot.content,
     })) return;
-    sessionController.markSaved(snapshot.documentId, { documentId: snapshot.documentId, version: snapshot.version, value: mtime });
-    knownMtimeRef.current = mtime;
+    sessionController.markSaved(snapshot.documentId, { documentId: snapshot.documentId, version: snapshot.version, value: result });
+    knownMtimeRef.current = result.modified;
   }, [sessionController]);
   const handleAutosaveError = useCallback((msg: string) => showToast(msg, "error"), [showToast]);
   useAutosave({
@@ -935,15 +944,16 @@ function AppContent() {
         const snapshot = sessionController.read(summary.id);
         if (!snapshot || !summary.path) continue;
         try {
-          const mtime = await invoke<number>("save_file", {
+          const result = await invoke<DiskSaveResult>("save_file", {
             path: summary.path,
             content: snapshot.value,
             expectedRevision: summary.diskRevision || undefined,
+            expectedHash: summary.diskHash || undefined,
           });
           if (!sessionController.acceptsResult(summary.id, snapshot)) continue;
-          sessionController.markSaved(summary.id, { documentId: summary.id, version: snapshot.version, value: mtime });
+          sessionController.markSaved(summary.id, { documentId: summary.id, version: snapshot.version, value: result });
           // Keep the temporary tab projection synchronized until P4d removes it.
-          commitTabs(tabsRef.current.map((x) => x.id === summary.id ? { ...x, knownMtime: mtime } : x));
+          commitTabs(tabsRef.current.map((x) => x.id === summary.id ? { ...x, knownMtime: result.modified } : x));
         } catch {/* best-effort; the active-tab path surfaces disk errors */}
       }
     }, 1500);
@@ -967,7 +977,7 @@ function AppContent() {
           if (!(summary.diskRevision > 0 && info.modified > summary.diskRevision)) continue;
           if (!summary.dirty) {
             const fd = await invoke<FileData>("read_file", { path: summary.path });
-            sessionController.applyExternalContent(summary.id, fd.content, fd.modified ?? 0);
+            sessionController.applyExternalContent(summary.id, fd.content, fd.modified ?? 0, fd.hash);
             commitTabs(
               tabsRef.current.map((x) =>
                 x.id === summary.id
@@ -1097,6 +1107,7 @@ function AppContent() {
       filePath: session.path,
       fileName: session.name,
       diskRevision: session.diskRevision,
+      diskHash: session.diskHash,
       snapshot,
     };
   }, [sessionController]);
@@ -1118,10 +1129,11 @@ function AppContent() {
       path = selected;
     }
     try {
-      const mtime = await invoke<number>("save_file", {
+      const result = await invoke<DiskSaveResult>("save_file", {
         path,
         content: data.snapshot.value,
         expectedRevision: data.filePath ? data.diskRevision || undefined : undefined,
+        expectedHash: data.filePath ? data.diskHash || undefined : undefined,
       });
       if (!sessionController.acceptsResult(prompt.id, data.snapshot)) {
         showToast(tr("The document changed while saving. Please save again."), "error");
@@ -1131,13 +1143,14 @@ function AppContent() {
         sessionController.updateFileMetadata(prompt.id, {
           path,
           name: path.split(/[\\/]/).pop() ?? data.fileName,
-          diskRevision: mtime,
+          diskRevision: result.modified,
+          diskHash: result.hash,
         });
       }
       sessionController.markSaved(prompt.id, {
         documentId: prompt.id,
         version: data.snapshot.version,
-        value: mtime,
+        value: result,
       });
     } catch (err) {
       const msg = errMessage(err);
@@ -1192,7 +1205,7 @@ function AppContent() {
     });
     if (!confirmed) return;
     try {
-      await invoke<number>("save_file", { path, content: "" });
+      await invoke<DiskSaveResult>("save_file", { path, content: "" });
       await loadFile(path);
     } catch (err) {
       const msg = errMessage(err);
@@ -1429,12 +1442,15 @@ function AppContent() {
     const snapshot = sessionController.readActive();
     if (!snapshot) return;
     try {
-      const mtime = await invoke<number>("save_file", { path: selected, content: snapshot.value });
+      const result = await invoke<DiskSaveResult>("save_file", { path: selected, content: snapshot.value });
       const current = sessionController.get(snapshot.documentId);
       if (!current || !sessionController.acceptsResult(snapshot.documentId, snapshot)) return;
-      sessionController.markSaved(snapshot.documentId, { documentId: snapshot.documentId, version: snapshot.version, value: mtime });
-      sessionController.updateFileMetadata(snapshot.documentId, { path: selected, name, fileSize: snapshot.value.length, diskRevision: mtime });
-      knownMtimeRef.current = mtime;
+      sessionController.markSaved(snapshot.documentId, { documentId: snapshot.documentId, version: snapshot.version, value: result });
+      sessionController.updateFileMetadata(snapshot.documentId, {
+        path: selected, name, fileSize: snapshot.value.length,
+        diskRevision: result.modified, diskHash: result.hash,
+      });
+      knownMtimeRef.current = result.modified;
       setFilePath(selected);
       setFileName(name);
       addRecentFile(selected, name);
@@ -1470,14 +1486,15 @@ function AppContent() {
       return;
     }
     try {
-      const mtime = await invoke<number>("save_file", {
+      const result = await invoke<DiskSaveResult>("save_file", {
         path,
         content: snapshot!.value,
         expectedRevision: sessionController.get(snapshot!.documentId)?.diskRevision || undefined,
+        expectedHash: sessionController.get(snapshot!.documentId)?.diskHash || undefined,
       });
       if (!sessionController.acceptsResult(snapshot!.documentId, snapshot!)) return;
-      sessionController.markSaved(snapshot!.documentId, { documentId: snapshot!.documentId, version: snapshot!.version, value: mtime });
-      knownMtimeRef.current = mtime;
+      sessionController.markSaved(snapshot!.documentId, { documentId: snapshot!.documentId, version: snapshot!.version, value: result });
+      knownMtimeRef.current = result.modified;
       showToast(tr("File saved"), "success");
     } catch (err) {
       console.error("Failed to save file:", err);

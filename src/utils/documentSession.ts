@@ -17,6 +17,8 @@ export interface DocumentSession {
     version: number;
     savedVersion: number;
     diskRevision: number;
+    /** SHA-256 of the exact durable bytes associated with diskRevision. */
+    diskHash: string;
     fileSize: number;
     format: DocumentFormat;
     viewMode: DocumentViewMode;
@@ -32,6 +34,7 @@ export interface DocumentSessionInput {
     /** Content currently known to be durable. Defaults to `content`. */
     savedContent?: string;
     diskRevision?: number;
+    diskHash?: string;
     fileSize?: number;
     viewMode?: DocumentViewMode;
     cursorLine?: number;
@@ -41,6 +44,12 @@ export interface SessionResult<T> {
     documentId: string;
     version: number;
     value: T;
+}
+
+/** Actual durable metadata returned by the native atomic-save command. */
+export interface DiskSaveResult {
+    modified: number;
+    hash: string;
 }
 
 export const DEFAULT_FORMAT: DocumentFormat = {
@@ -70,6 +79,7 @@ export function createDocumentSession(input: DocumentSessionInput): DocumentSess
         version: dirty ? 1 : 0,
         savedVersion: 0,
         diskRevision: input.diskRevision ?? 0,
+        diskHash: input.diskHash ?? "",
         fileSize: input.fileSize ?? input.content.length,
         format: inferDocumentFormat(input.content),
         viewMode: input.viewMode ?? "code",
@@ -108,9 +118,15 @@ export function resolveLiveBetaViewMode(viewMode: DocumentViewMode, liveBetaEnab
 }
 
 /** Applies a successful save only when the request still describes this exact revision. */
-export function markSessionSaved(session: DocumentSession, result: SessionResult<number>): DocumentSession {
+export function markSessionSaved(session: DocumentSession, result: SessionResult<DiskSaveResult>): DocumentSession {
     if (result.documentId !== session.id || result.version !== session.version) return session;
-    return { ...session, savedVersion: session.version, diskRevision: result.value, recoveryPending: false };
+    return {
+        ...session,
+        savedVersion: session.version,
+        diskRevision: result.value.modified,
+        diskHash: result.value.hash,
+        recoveryPending: false,
+    };
 }
 
 /** Rejects stale preview/AI/export completions after a tab switch or a new edit. */
@@ -122,6 +138,7 @@ export function applyExternalSessionContent(
     session: DocumentSession,
     content: string,
     diskRevision: number,
+    diskHash: string,
 ): DocumentSession {
     return {
         ...session,
@@ -129,6 +146,7 @@ export function applyExternalSessionContent(
         version: session.version + 1,
         savedVersion: session.version + 1,
         diskRevision,
+        diskHash,
         fileSize: content.length,
         format: inferDocumentFormat(content),
         recoveryPending: false,

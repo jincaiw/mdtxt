@@ -66,6 +66,12 @@ pub struct FileData {
     pub hash: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SaveResult {
+    pub modified: u64,
+    pub hash: String,
+}
+
 /// Line-ending convention of a file.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Eol {
@@ -220,8 +226,8 @@ pub async fn read_file(path: String) -> Result<FileData, CommandError> {
     })
 }
 
-/// Save content to a file. Returns the new last-modified time (ms since epoch)
-/// so the frontend can track external changes without a second stat call.
+/// Save content to a file. Returns the actual durable mtime and byte hash so
+/// the frontend can make the next save conflict-aware without a second read.
 ///
 /// The write is ATOMIC: content goes to a temp file in the same directory,
 /// which is then renamed over the target. A crash or power loss mid-write can
@@ -234,7 +240,7 @@ pub async fn save_file(
     content: String,
     expected_revision: Option<u64>,
     expected_hash: Option<String>,
-) -> Result<u64, CommandError> {
+) -> Result<SaveResult, CommandError> {
     // Mirror the read-side limit. Refusing to write a >50 MB markdown file
     // protects the user from accidentally truncating something pasted from
     // another tool, and matches what `read_file` would refuse to load back.
@@ -325,7 +331,13 @@ pub async fn save_file(
     let metadata = tokio::fs::metadata(&target)
         .await
         .map_err(|e| CommandError::ReadError(e.to_string()))?;
-    Ok(mtime_ms(&metadata))
+    let bytes = tokio::fs::read(&target)
+        .await
+        .map_err(|error| CommandError::ReadError(error.to_string()))?;
+    Ok(SaveResult {
+        modified: mtime_ms(&metadata),
+        hash: content_hash(&bytes),
+    })
 }
 
 /// Get just the file info without content (for status bar)
@@ -863,7 +875,7 @@ mod tests {
     }
 
     #[test]
-    fn save_file_writes_atomically_and_returns_mtime() {
+    fn save_file_writes_atomically_and_returns_durable_metadata() {
         // Plain current-thread runtime: tokio's "fs" feature doesn't include
         // the macros feature, so no #[tokio::test] here.
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -875,17 +887,24 @@ mod tests {
             std::fs::create_dir_all(&dir).unwrap();
             let path = dir.join("doc.md").to_string_lossy().to_string();
 
-            let mtime = save_file(path.clone(), "hello".into(), None, None)
+            let first = save_file(path.clone(), "hello".into(), None, None)
                 .await
                 .unwrap();
-            assert!(mtime > 0);
+            assert!(first.modified > 0);
+            assert_eq!(first.hash, content_hash(b"hello"));
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
 
             // Overwrite must replace the existing file (rename-over semantics).
-            let mtime2 = save_file(path.clone(), "world".into(), Some(mtime), None)
-                .await
-                .unwrap();
-            assert!(mtime2 >= mtime);
+            let second = save_file(
+                path.clone(),
+                "world".into(),
+                Some(first.modified),
+                Some(first.hash),
+            )
+            .await
+            .unwrap();
+            assert!(second.modified >= first.modified);
+            assert_eq!(second.hash, content_hash(b"world"));
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "world");
 
             // No temp file left behind.

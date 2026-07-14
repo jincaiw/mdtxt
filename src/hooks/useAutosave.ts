@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import type { DiskSaveResult } from "../utils/documentSession";
 
 export interface UseAutosaveOptions {
   /** Master toggle (Settings → Editor). */
@@ -11,6 +12,7 @@ export interface UseAutosaveOptions {
     filePath: string | null;
     /** Disk revision read when this document revision was selected. */
     diskRevision: number;
+    diskHash: string;
     content: string;
     dirty: boolean;
   } | null;
@@ -21,7 +23,7 @@ export interface UseAutosaveOptions {
    */
   isReviewActive: boolean;
   /** Called after a successful write with the exact version that was written. */
-  onSaved: (mtime: number, snapshot: NonNullable<UseAutosaveOptions["snapshot"]>) => void;
+  onSaved: (result: DiskSaveResult, snapshot: NonNullable<UseAutosaveOptions["snapshot"]>) => void;
   /** Called when a write fails (already throttled to at most once per 30s). */
   onError: (message: string) => void;
 }
@@ -54,12 +56,13 @@ export function useAutosave({
     if (!enabled || !snapshot?.filePath || !snapshot.dirty || isReviewActive) return;
     const id = window.setTimeout(async () => {
       try {
-        const mtime = await invoke<number>("save_file", {
+        const result = await invoke<DiskSaveResult>("save_file", {
           path: snapshot.filePath,
           content: snapshot.content,
           expectedRevision: snapshot.diskRevision || undefined,
+          expectedHash: snapshot.diskHash || undefined,
         });
-        onSaved(mtime, snapshot);
+        onSaved(result, snapshot);
         lastErrorRef.current = 0;
       } catch (err) {
         const now = Date.now();
