@@ -14,7 +14,7 @@ accepted.**
 | Overlapping saves do not share a temporary path | `save_temp_path` combines sibling directory, basename, process id, and an atomic process-local sequence | Implemented; unit test proves distinct paths in one process |
 | Save-format fidelity | Existing EOL/BOM/trailing-newline tests in `commands.rs` | Existing coverage remains green; byte-level preservation of all supported formats is not yet complete |
 | External modification conflict choice | `useExternalChangeWatcher` does not advance a dirty document's revision; `FileConflictDialog` offers reload-disk or save-as for the active document | Active-document choice is implemented without overwriting either version; a side-by-side comparison and per-background-tab entry remain pending |
-| Crash recovery | `src-tauri/src/recovery.rs` writes app-data recovery entries atomically with SHA-256 validation and seven-day retention; startup lists verified entries in `RecoveryDialog` | Restore creates a new unsaved tab and cannot overwrite the disk path; discard only deletes the recovery entry. Native crash/relaunch smoke remains pending |
+| Crash recovery | `src-tauri/src/recovery.rs` writes app-data recovery entries atomically with SHA-256 validation and seven-day retention; startup lists verified entries in `RecoveryDialog` | Restore creates a new unsaved tab and cannot overwrite the disk path; discard only deletes the recovery entry. macOS Debug crash/relaunch smoke passed |
 
 ## Automated evidence for the atomic-save slice
 
@@ -23,8 +23,9 @@ accepted.**
 | Rust formatting and static analysis | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` and `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Passed |
 | Rust persistence tests | `cargo test --manifest-path src-tauri/Cargo.toml` | Passed: 23 tests; includes atomic write, cleanup, CRLF preservation, temporary-path uniqueness, stale-revision rejection and Unix permission preservation |
 | Revision-aware save paths | `bun run test -- src/hooks/useExternalChangeWatcher.test.ts src/hooks/useAutosave.test.ts src/utils/documentSessionController.test.ts src/utils/documentSession.test.ts` | Passed: 4 files / 29 tests; active, background, autosave and close-time paths carry the known revision |
-| Frontend release gates | `bun run release:check` and `bun run build` | Passed: 420 Chinese keys / 96 source files; production build passed |
+| Frontend release gates | `bun run release:check` and `bun run build` | Passed: 426 Chinese keys / 97 source files; production build passed |
 | Recovery store | `cargo test --manifest-path src-tauri/Cargo.toml recovery::tests` | Passed: checksum validation, tamper cleanup, atomic write/read and clear |
+| macOS recovery smoke | Debug `mdtxt.app`, Apple M4 / Darwin 25.5.0 / WKWebView | Edited an Untitled draft, waited for recovery debounce, terminated/relaunched the Debug app, observed `RecoveryDialog`, restored into `已恢复 — Untitled-1.md`, and verified the original text remained editable as an unsaved tab |
 
 ## Remaining P8 gates
 
@@ -32,7 +33,7 @@ accepted.**
    their platform/file-system collision limitations.
 2. Provide a visible, non-destructive conflict flow: compare, reload disk,
    keep local, and save-as. No choice may silently overwrite either version.
-3. Verify a native crash/relaunch path end to end for the recovery UI.
+3. Record the equivalent Windows and Linux recovery behavior before release.
 4. Add failure-injection tests for write, sync, rename and directory-sync
    errors; verify the original bytes and editable buffer survive each error.
 5. Record macOS, Windows, and Linux behavior for symbolic links, long paths,

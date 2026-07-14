@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager};
 pub const RECOVERY_RETENTION_SECS: u64 = 7 * 24 * 60 * 60;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct RecoveryEntry {
     pub document_id: String,
     pub path: Option<String>,

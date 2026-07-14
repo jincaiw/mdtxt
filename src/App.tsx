@@ -909,14 +909,17 @@ function AppContent() {
             name: session.name,
             content: snapshot.value,
             version: snapshot.version,
-          }).catch(() => { /* recovery is best-effort; editor buffer remains authoritative */ });
+          }).catch((error) => {
+            console.warn("Failed to write recovery snapshot:", error);
+            showToast(tr("Could not create recovery backup"), "error");
+          });
         } else {
-          void invoke("discard_recovery", { documentId: summary.id }).catch(() => {});
+          void invoke("discard_recovery", { documentId: summary.id }).catch((error) => console.warn("Failed to discard recovery snapshot:", error));
         }
       }
     }, 2000);
     return () => window.clearTimeout(timer);
-  }, [sessionController, sessionSnapshot]);
+  }, [sessionController, sessionSnapshot, showToast, tr]);
 
   // Autosave dirty BACKGROUND tabs from their versioned sessions. `tabs` still
   // carries transitional UI metadata, but never supplies the text written here.

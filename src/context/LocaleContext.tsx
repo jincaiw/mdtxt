@@ -178,6 +178,7 @@ const zhCN = {
     "Discard": "丢弃",
     "Restore": "恢复",
     "Recovered": "已恢复",
+    "Could not create recovery backup": "无法创建恢复备份",
     "This file changed on disk. Saving is blocked until you reload or save a copy.": "磁盘文件已更改；请重新载入或另存副本后再保存。",
     "The document changed while saving. Please save again.": "文档在保存期间发生了变化，请重新保存。",
     "{file} changed on disk in a background tab. Saving is blocked until you reload or save a copy.": "后台标签中的 {file} 已在磁盘上更改；请重新载入或另存副本后再保存。",
