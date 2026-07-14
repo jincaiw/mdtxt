@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::ipc::Response;
@@ -60,6 +61,9 @@ pub struct FileData {
     /// Last-modified time, ms since the Unix epoch. Lets the frontend detect
     /// external edits (file changed on disk while open) on window focus.
     pub modified: u64,
+    /// SHA-256 of the original on-disk UTF-8 bytes, used with mtime to guard
+    /// against coarse timestamp resolution during a save conflict check.
+    pub hash: String,
 }
 
 /// Line-ending convention of a file.
@@ -118,6 +122,10 @@ fn mtime_ms(metadata: &std::fs::Metadata) -> u64 {
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
+}
+
+fn content_hash(content: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(content))
 }
 
 fn save_temp_path(path: &Path) -> Result<PathBuf, CommandError> {
@@ -180,9 +188,11 @@ pub async fn read_file(path: String) -> Result<FileData, CommandError> {
         )));
     }
 
-    let raw = tokio::fs::read_to_string(&file_path)
+    let raw_bytes = tokio::fs::read(&file_path)
         .await
         .map_err(|e| CommandError::ReadError(e.to_string()))?;
+    let raw =
+        String::from_utf8(raw_bytes.clone()).map_err(|e| CommandError::ReadError(e.to_string()))?;
 
     // Hand the frontend LF-only content. CodeMirror normalises every line
     // break to `\n` anyway, so serving CRLF verbatim made the editor's first
@@ -206,6 +216,7 @@ pub async fn read_file(path: String) -> Result<FileData, CommandError> {
         size: metadata.len(),
         line_count,
         modified: mtime_ms(&metadata),
+        hash: content_hash(&raw_bytes),
     })
 }
 
@@ -222,6 +233,7 @@ pub async fn save_file(
     path: String,
     content: String,
     expected_revision: Option<u64>,
+    expected_hash: Option<String>,
 ) -> Result<u64, CommandError> {
     // Mirror the read-side limit. Refusing to write a >50 MB markdown file
     // protects the user from accidentally truncating something pasted from
@@ -245,6 +257,14 @@ pub async fn save_file(
             if let Some(expected) = expected_revision.filter(|revision| *revision > 0) {
                 let actual = mtime_ms(&metadata);
                 if actual != expected {
+                    return Err(CommandError::Conflict(path));
+                }
+            }
+            if let Some(expected) = expected_hash.filter(|hash| !hash.is_empty()) {
+                let bytes = tokio::fs::read(&target)
+                    .await
+                    .map_err(|error| CommandError::WriteError(error.to_string()))?;
+                if content_hash(&bytes) != expected {
                     return Err(CommandError::Conflict(path));
                 }
             }
@@ -791,8 +811,8 @@ pub fn set_ai_key(key: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_eol, read_file, sanitize_image_name, save_file, save_temp_path, search_markdown_tree,
-        validate_rel_path, CommandError, Eol,
+        apply_eol, content_hash, read_file, sanitize_image_name, save_file, save_temp_path,
+        search_markdown_tree, validate_rel_path, CommandError, Eol,
     };
     use std::path::{Path, PathBuf};
 
@@ -855,12 +875,14 @@ mod tests {
             std::fs::create_dir_all(&dir).unwrap();
             let path = dir.join("doc.md").to_string_lossy().to_string();
 
-            let mtime = save_file(path.clone(), "hello".into(), None).await.unwrap();
+            let mtime = save_file(path.clone(), "hello".into(), None, None)
+                .await
+                .unwrap();
             assert!(mtime > 0);
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
 
             // Overwrite must replace the existing file (rename-over semantics).
-            let mtime2 = save_file(path.clone(), "world".into(), Some(mtime))
+            let mtime2 = save_file(path.clone(), "world".into(), Some(mtime), None)
                 .await
                 .unwrap();
             assert!(mtime2 >= mtime);
@@ -903,9 +925,35 @@ mod tests {
                 path.to_string_lossy().to_string(),
                 "local version".into(),
                 Some(1),
+                None,
             )
             .await;
 
+            assert!(matches!(result, Err(CommandError::Conflict(_))));
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), "disk version");
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
+    #[test]
+    fn save_file_rejects_a_stale_hash_without_overwriting() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let dir =
+                std::env::temp_dir().join(format!("mdtxt-hash-conflict-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("doc.md");
+            std::fs::write(&path, "disk version").unwrap();
+            let result = save_file(
+                path.to_string_lossy().to_string(),
+                "local version".into(),
+                None,
+                Some(content_hash(b"older version")),
+            )
+            .await;
             assert!(matches!(result, Err(CommandError::Conflict(_))));
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "disk version");
             std::fs::remove_dir_all(&dir).ok();
@@ -929,7 +977,7 @@ mod tests {
             std::fs::write(&path, "old").unwrap();
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
 
-            save_file(path.to_string_lossy().to_string(), "new".into(), None)
+            save_file(path.to_string_lossy().to_string(), "new".into(), None, None)
                 .await
                 .unwrap();
 
@@ -989,7 +1037,7 @@ mod tests {
             // Seed a CRLF file, then "edit" it with LF-only content (as the editor
             // would hand us) and confirm the CRLF convention survives the save.
             std::fs::write(&path, "one\r\ntwo\r\n").unwrap();
-            save_file(path.clone(), "one\ntwo\nthree".into(), None)
+            save_file(path.clone(), "one\ntwo\nthree".into(), None, None)
                 .await
                 .unwrap();
             assert_eq!(
@@ -999,7 +1047,7 @@ mod tests {
 
             // A brand-new file keeps the editor's LF.
             let lf_path = dir.join("new.md").to_string_lossy().to_string();
-            save_file(lf_path.clone(), "a\nb".into(), None)
+            save_file(lf_path.clone(), "a\nb".into(), None, None)
                 .await
                 .unwrap();
             assert_eq!(std::fs::read_to_string(&lf_path).unwrap(), "a\nb");
@@ -1024,7 +1072,9 @@ mod tests {
 
             let opened = read_file(path.clone()).await.unwrap();
             assert_eq!(opened.content, "\u{feff}# title\n\n::: custom {x}\n");
-            save_file(path.clone(), opened.content, None).await.unwrap();
+            save_file(path.clone(), opened.content, None, None)
+                .await
+                .unwrap();
 
             assert_eq!(std::fs::read(&path).unwrap(), original);
             std::fs::remove_dir_all(&dir).ok();
