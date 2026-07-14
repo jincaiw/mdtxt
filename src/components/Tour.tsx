@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import mascotWave from "../assets/mascot/mascot-wave.png";
 import iconPalette from "../assets/mascot/icon-command-palette.png";
 import iconFolder from "../assets/mascot/icon-folder.png";
 import iconBook from "../assets/mascot/icon-book.png";
-import mascotRocket from "../assets/mascot/mascot-rocket.png";
 import { useLocale } from "../context/LocaleContext";
 
 interface TourProps {
@@ -31,11 +29,11 @@ const STEPS: Step[] = [
     {
         id: "welcome",
         placement: "center",
-        image: mascotWave,
-        imageAlt: "Paperling mascot waving hello",
-        imageClass: "h-32",
-        title: "Hey, welcome to Paperling!",
-        body: "I'm the paperling this app is named after. Want a quick look around? It takes about 15 seconds, and you can replay it anytime from the command palette.",
+        image: iconPalette,
+        imageAlt: "Command palette illustration",
+        imageClass: "h-24",
+        title: "Hey, welcome to mdtxt!",
+        body: "Welcome to mdtxt. Want a quick look around? It takes about 15 seconds, and you can replay it anytime from the command palette.",
     },
     {
         id: "explorer",
@@ -45,7 +43,7 @@ const STEPS: Step[] = [
         imageAlt: "A folder of paper files",
         imageClass: "h-20",
         title: "Your folder, one click away",
-        body: "This opens the file explorer. It lists every markdown file next to the one you're editing, so you can jump between notes without leaving Paperling. (Ctrl+Shift+E)",
+        body: "This opens the file explorer. It lists every markdown file next to the one you're editing, so you can jump between notes without leaving mdtxt. (Ctrl+Shift+E)",
     },
     {
         id: "toc",
@@ -69,9 +67,9 @@ const STEPS: Step[] = [
     {
         id: "done",
         placement: "center",
-        image: mascotRocket,
-        imageAlt: "Paperling mascot on a rocket",
-        imageClass: "h-32",
+        image: iconBook,
+        imageAlt: "An open document illustration",
+        imageClass: "h-20",
         title: "That's it, you're ready!",
         body: "Want to see it all in action? Open the interactive guide: a real document with live math, diagrams, tables and more, all ready for you to poke at. You can also replay this tour anytime from the command palette.",
     },

@@ -28,8 +28,8 @@ describe("generateHTML", () => {
     });
 
     it("includes the export footer by default and omits it when disabled", () => {
-        expect(generateHTML("<p>x</p>", "t", "dark", "inter", "medium")).toContain("Exported from Paperling");
-        expect(generateHTML("<p>x</p>", "t", "dark", "inter", "medium", false)).not.toContain("Exported from Paperling");
+        expect(generateHTML("<p>x</p>", "t", "dark", "inter", "medium")).toContain("Exported from mdtxt");
+        expect(generateHTML("<p>x</p>", "t", "dark", "inter", "medium", false)).not.toContain("Exported from mdtxt");
     });
 
     it("applies theme-specific colors", () => {

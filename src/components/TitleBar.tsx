@@ -109,7 +109,7 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                 {/* Left: Icon & Title */}
                 <div className="flex items-center gap-3 no-drag">
                     <div className="flex items-center justify-center w-5 h-5">
-                        <img src="/icon.svg" alt="Paperling" className="w-full h-full" />
+                        <img src="/icon.svg" alt="mdtxt" className="w-full h-full" />
                     </div>
                     <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] min-w-0">
                         {parentFolder && (
@@ -118,7 +118,7 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                             </>
                         )}
                         <span className="text-[var(--text-primary)] font-semibold tracking-tight truncate max-w-[28vw]">
-                            {fileName || "Paperling"}
+                            {fileName || "mdtxt"}
                         </span>
                         {!fileName && (
                             <span className="text-[var(--text-muted)] text-xs ml-1 hidden sm:inline">— {t("drop a .md file or Ctrl+O")}</span>

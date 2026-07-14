@@ -435,7 +435,7 @@ export function generateHTML(
     });
 
     const footer = includeFooter
-        ? `<footer class="export-footer">Exported from Paperling on ${date}</footer>`
+        ? `<footer class="export-footer">Exported from mdtxt on ${date}</footer>`
         : '';
 
     return `<!DOCTYPE html>
@@ -443,7 +443,7 @@ export function generateHTML(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="generator" content="Paperling">
+    <meta name="generator" content="mdtxt">
     <meta name="date" content="${new Date().toISOString()}">
     <title>${safeTitle}</title>
     <style>${css}</style>
@@ -498,7 +498,7 @@ export async function exportToHTML(
 // isolated off-screen iframe and drives the webview's own print pipeline.
 // ---------------------------------------------------------------------------
 
-const PRINT_FRAME_ID = '__paperling_print_frame';
+const PRINT_FRAME_ID = '__mdtxt_print_frame';
 
 // Resolve once every <img> has finished loading (or failed) so the print job
 // never captures half-decoded images. Sources are inlined as data: URIs by

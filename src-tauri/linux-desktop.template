@@ -2,7 +2,7 @@
 Categories=Utility;TextEditor;
 Comment={{comment}}
 Exec={{exec}} %f
-StartupWMClass=paperling
+StartupWMClass=mdtxt
 Icon={{icon}}
 Name={{name}}
 Terminal=false

@@ -3,7 +3,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 export type Locale = "en" | "zh-CN";
 export type TranslationParams = Record<string, string | number>;
 
-const STORAGE_KEY = "paperling-locale";
+const STORAGE_KEY = "mdtxt-locale";
+const LEGACY_STORAGE_KEY = "paperling-locale";
 const VALID_LOCALES: Locale[] = ["en", "zh-CN"];
 
 // English source strings are the keys on purpose: existing UI copy remains the
@@ -313,10 +314,10 @@ const zhCN: Record<string, string> = {
     "Close {file}": "关闭 {file}",
     "Unsaved changes — click to close": "有未保存的更改，点击关闭",
     "Welcome tour": "欢迎引导",
-    "Hey, welcome to Paperling!": "你好，欢迎使用 Paperling！",
-    "I'm the paperling this app is named after. Want a quick look around? It takes about 15 seconds, and you can replay it anytime from the command palette.": "我是这款应用名字里的小纸灵。想快速参观一下吗？大约只需 15 秒，之后也能随时从命令面板重新播放。",
+    "Hey, welcome to mdtxt!": "你好，欢迎使用 mdtxt！",
+    "Welcome to mdtxt. Want a quick look around? It takes about 15 seconds, and you can replay it anytime from the command palette.": "欢迎使用 mdtxt。想快速参观一下吗？大约只需 15 秒，之后也能随时从命令面板重新播放。",
     "Your folder, one click away": "一键打开文件夹",
-    "This opens the file explorer. It lists every markdown file next to the one you're editing, so you can jump between notes without leaving Paperling. (Ctrl+Shift+E)": "这里会打开文件浏览器，列出当前笔记旁的所有 Markdown 文件，让你无需离开 Paperling 即可切换笔记。（Ctrl+Shift+E）",
+    "This opens the file explorer. It lists every markdown file next to the one you're editing, so you can jump between notes without leaving mdtxt. (Ctrl+Shift+E)": "这里会打开文件浏览器，列出当前笔记旁的所有 Markdown 文件，让你无需离开 mdtxt 即可切换笔记。（Ctrl+Shift+E）",
     "Outline of your doc": "文档大纲",
     "This is the table of contents. Every heading you write shows up here, and it tracks where you are as you scroll. Click any heading to jump straight to it. (Ctrl+Shift+O)": "这里是目录。你写下的每个标题都会显示在这里，并随滚动追踪当前位置。点击标题即可跳转。（Ctrl+Shift+O）",
     "One box for everything": "一个入口，完成所有操作",
@@ -348,7 +349,7 @@ const zhCN: Record<string, string> = {
     "Copy": "复制",
     "+ add": "+ 添加",
     "Close image": "关闭图片",
-    "Paperling encountered an unexpected error. Your file data should be safe.": "Paperling 遇到了意外错误，你的文件数据应该仍然安全。",
+    "mdtxt encountered an unexpected error. Your file data should be safe.": "mdtxt 遇到了意外错误，你的文件数据应该仍然安全。",
     "Try Again": "重试",
     "Tabs": "标签页",
     "Editor — Formatting": "编辑器 — 格式",
@@ -410,7 +411,10 @@ const LocaleContext = createContext<LocaleContextValue>(defaultValue);
 
 function getInitialLocale(): Locale {
     if (typeof localStorage === "undefined") return "en";
-    const stored = localStorage.getItem(STORAGE_KEY) as Locale | null;
+    const stored = (localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY)) as Locale | null;
+    if (stored && localStorage.getItem(STORAGE_KEY) === null) {
+        localStorage.setItem(STORAGE_KEY, stored);
+    }
     return stored && VALID_LOCALES.includes(stored) ? stored : "en";
 }
 

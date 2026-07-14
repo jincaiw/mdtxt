@@ -172,7 +172,7 @@ pub async fn read_file(path: String) -> Result<FileData, CommandError> {
 /// The write is ATOMIC: content goes to a temp file in the same directory,
 /// which is then renamed over the target. A crash or power loss mid-write can
 /// no longer truncate the user's document — the worst case is a leftover
-/// `.paperling-tmp` file. (std/tokio rename replaces the target on Windows
+/// `.mdtxt-tmp` file. (std/tokio rename replaces the target on Windows
 /// via MoveFileEx + MOVEFILE_REPLACE_EXISTING, and is atomic on POSIX.)
 #[tauri::command]
 pub async fn save_file(path: String, content: String) -> Result<u64, CommandError> {
@@ -201,7 +201,7 @@ pub async fn save_file(path: String, content: String) -> Result<u64, CommandErro
 
     // Same directory as the target so the rename never crosses a filesystem
     // boundary (cross-device renames aren't atomic and can fail outright).
-    let tmp = format!("{}.{}.paperling-tmp", path, std::process::id());
+    let tmp = format!("{}.{}.mdtxt-tmp", path, std::process::id());
 
     // Write, then fsync BEFORE the rename. Without the sync, a crash right after
     // the rename can leave the (renamed) file present but empty/partial on disk,
@@ -687,10 +687,7 @@ pub async fn read_image_file(base_dir: String, rel_path: String) -> Result<Respo
 // only the key through these commands, with a localStorage fallback on the JS
 // side when no keychain is available (e.g. a headless Linux box).
 //
-// NOTE: the service name stays "marklite" (the app's pre-rename name) on
-// purpose — changing it would orphan every existing user's stored API key.
-// Same reasoning as the bundle identifier in tauri.conf.json.
-const AI_KEY_SERVICE: &str = "marklite";
+const AI_KEY_SERVICE: &str = "app.mdtxt.desktop";
 const AI_KEY_ACCOUNT: &str = "ai-api-key";
 
 #[tauri::command]
@@ -797,7 +794,7 @@ mod tests {
             let leftovers: Vec<_> = std::fs::read_dir(&dir)
                 .unwrap()
                 .filter_map(|e| e.ok())
-                .filter(|e| e.file_name().to_string_lossy().contains("paperling-tmp"))
+                .filter(|e| e.file_name().to_string_lossy().contains("mdtxt-tmp"))
                 .collect();
             assert!(leftovers.is_empty());
 

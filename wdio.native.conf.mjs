@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
-const binary = process.env.PAPERLING_E2E_BINARY
-    ?? resolve(root, "src-tauri", "target", "debug", process.platform === "win32" ? "paperling.exe" : "paperling");
+const binary = process.env.MDTXT_E2E_BINARY
+    ?? resolve(root, "src-tauri", "target", "debug", process.platform === "win32" ? "mdtxt.exe" : "mdtxt");
 const tauriDriver = process.env.TAURI_DRIVER ?? resolve(homedir(), ".cargo", "bin", process.platform === "win32" ? "tauri-driver.exe" : "tauri-driver");
 let driver;
 let shuttingDown = false;

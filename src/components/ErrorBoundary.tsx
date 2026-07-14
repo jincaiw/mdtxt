@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error("Paperling crashed:", error, errorInfo);
+        console.error("mdtxt crashed:", error, errorInfo);
         // A crash during App's mount means its reveal effect never ran and the
         // window (created hidden) would stay invisible. Show it here so the user
         // actually sees this fallback UI instead of a running-but-hidden app.
@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
                         </span>
                         <h1 className="text-xl font-bold">{t("Something went wrong")}</h1>
                         <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                            {t("Paperling encountered an unexpected error. Your file data should be safe.")}
+                            {t("mdtxt encountered an unexpected error. Your file data should be safe.")}
                         </p>
                         {this.state.error && (
                             <pre className="w-full text-left text-xs bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg p-4 overflow-auto max-h-32 text-[var(--text-secondary)]">

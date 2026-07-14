@@ -20,7 +20,7 @@ export function MascotIdle({ className }: MascotIdleProps) {
     return (
         <img
             src={hovered ? blinkClosed : blinkOpen}
-            alt="Paperling mascot"
+            alt="mdtxt mascot"
             draggable={false}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}

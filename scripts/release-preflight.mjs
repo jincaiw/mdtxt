@@ -14,5 +14,6 @@ if (!changelog.includes(`## [${packageVersion}]`)) {
     throw new Error(`CHANGELOG.md is missing the ${packageVersion} release section.`);
 }
 
+execFileSync(process.execPath, ["scripts/check-product-identity.mjs"], { stdio: "inherit" });
 execFileSync(process.execPath, ["scripts/check-i18n.mjs"], { stdio: "inherit" });
 console.log(`Release preflight passed for v${packageVersion}.`);

@@ -4,31 +4,33 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 
-// One-time migration from the app's pre-rename key prefix. The bundle
-// identifier (and therefore the WebView2 storage location) is unchanged, so
-// existing users still have their old "marklite:*" entries — copy each to its
-// "paperling:*" name once, then drop the original. Runs at module load,
-// before any getter seeds React state. Exported for tests.
+// One-time migration from the app's historical storage prefixes. We copy rather
+// than delete: mdtxt must coexist with Paperling, and a failed migration must
+// leave the user's old app fully usable. Runs before any getter seeds React
+// state. Exported for tests.
 export function migrateLegacyKeys(): void {
     try {
         for (let i = localStorage.length - 1; i >= 0; i--) {
             const key = localStorage.key(i);
-            if (!key || !key.startsWith("marklite:")) continue;
-            const renamed = "paperling:" + key.slice("marklite:".length);
+            if (!key) continue;
+            const prefix = key.startsWith("paperling:") ? "paperling:"
+                : key.startsWith("marklite:") ? "marklite:"
+                    : null;
+            if (!prefix) continue;
+            const renamed = "mdtxt:" + key.slice(prefix.length);
             const value = localStorage.getItem(key);
             if (value !== null && localStorage.getItem(renamed) === null) {
                 localStorage.setItem(renamed, value);
             }
-            localStorage.removeItem(key);
         }
     } catch { /* storage unavailable — nothing to migrate */ }
 }
 migrateLegacyKeys();
 
-const KEY_RECENT_FILES = "paperling:recentFiles";
-const KEY_LAST_FILE = "paperling:lastFile";
-const KEY_VIEW_MODE = "paperling:viewMode";
-const KEY_SPLIT_RATIO = "paperling:splitRatio";
+const KEY_RECENT_FILES = "mdtxt:recentFiles";
+const KEY_LAST_FILE = "mdtxt:lastFile";
+const KEY_VIEW_MODE = "mdtxt:viewMode";
+const KEY_SPLIT_RATIO = "mdtxt:splitRatio";
 
 // Multi-file/tab workflows make 10 feel tight; 25 keeps the palette's recents
 // useful without unbounded growth.
@@ -80,7 +82,7 @@ export const setLastFile = (path: string | null): void => safeSet(KEY_LAST_FILE,
 // just the single last file. Only files with a path are stored (untitled
 // buffers have no content persisted here); `activeIndex` points into `tabs`.
 // getLastFile stays as a migration fallback for sessions saved before this. TABS-07.
-const KEY_SESSION = "paperling:session";
+const KEY_SESSION = "mdtxt:session";
 export interface SessionTab {
     path: string;
     /** 1-based caret/scroll line to restore. */
@@ -111,14 +113,14 @@ export const getSplitRatio = (): number => {
 };
 export const setSplitRatio = (r: number): void => safeSet(KEY_SPLIT_RATIO, r);
 
-const KEY_TOUR_DONE = "paperling:tourDone";
+const KEY_TOUR_DONE = "mdtxt:tourDone";
 export const getTourDone = (): boolean => safeGet<boolean>(KEY_TOUR_DONE, false);
 export const setTourDone = (v: boolean): void => safeSet(KEY_TOUR_DONE, v);
 
-const KEY_TYPEWRITER_MODE = "paperling:typewriterMode";
-const KEY_TOOLBAR = "paperling:toolbar";
-const KEY_WORD_WRAP = "paperling:wordWrap";
-const KEY_SPELL_CHECK = "paperling:spellCheck";
+const KEY_TYPEWRITER_MODE = "mdtxt:typewriterMode";
+const KEY_TOOLBAR = "mdtxt:toolbar";
+const KEY_WORD_WRAP = "mdtxt:wordWrap";
+const KEY_SPELL_CHECK = "mdtxt:spellCheck";
 export const getTypewriterMode = (): boolean => safeGet<boolean>(KEY_TYPEWRITER_MODE, false);
 export const setTypewriterMode = (v: boolean): void => safeSet(KEY_TYPEWRITER_MODE, v);
 export const getToolbarEnabled = (): boolean => safeGet<boolean>(KEY_TOOLBAR, false);
@@ -128,34 +130,26 @@ export const setWordWrap = (v: boolean): void => safeSet(KEY_WORD_WRAP, v);
 export const getSpellCheck = (): boolean => safeGet<boolean>(KEY_SPELL_CHECK, false);
 export const setSpellCheck = (v: boolean): void => safeSet(KEY_SPELL_CHECK, v);
 
-const KEY_AUTO_SAVE = "paperling:autoSave";
+const KEY_AUTO_SAVE = "mdtxt:autoSave";
 export const getAutoSave = (): boolean => safeGet<boolean>(KEY_AUTO_SAVE, false);
 export const setAutoSave = (v: boolean): void => safeSet(KEY_AUTO_SAVE, v);
 
 // "Always open files in reader": every file open switches to preview mode,
 // for the read-mostly audience. New files still open in code mode, and the
 // flag is read live at each open (no cached state to keep in sync). READ-01.
-const KEY_OPEN_IN_READER = "paperling:openInReader";
+const KEY_OPEN_IN_READER = "mdtxt:openInReader";
 export const getOpenInReader = (): boolean => safeGet<boolean>(KEY_OPEN_IN_READER, false);
 export const setOpenInReader = (v: boolean): void => safeSet(KEY_OPEN_IN_READER, v);
 
 // Master switch for every AI surface (title-bar button, side panel, toolbar
 // sparkle, Alt+J, command palette entry). On by default; flipped in Settings.
-const KEY_AI_ENABLED = "paperling:aiEnabled";
+const KEY_AI_ENABLED = "mdtxt:aiEnabled";
 export const getAIEnabled = (): boolean => safeGet<boolean>(KEY_AI_ENABLED, true);
 export const setAIEnabled = (v: boolean): void => safeSet(KEY_AI_ENABLED, v);
 
-// Version the user chose to skip in the update popup, so we don't nag about
-// it on every launch. A newer release has a different version string and
-// prompts again.
-const KEY_SKIPPED_UPDATE = "paperling:skippedUpdateVersion";
-export const getSkippedUpdateVersion = (): string | null =>
-    safeGet<string | null>(KEY_SKIPPED_UPDATE, null);
-export const setSkippedUpdateVersion = (v: string): void => safeSet(KEY_SKIPPED_UPDATE, v);
-
-const KEY_AI_ENDPOINT = "paperling:aiEndpoint";
-const KEY_AI_MODEL = "paperling:aiModel";
-const KEY_AI_API_KEY = "paperling:aiApiKey";
+const KEY_AI_ENDPOINT = "mdtxt:aiEndpoint";
+const KEY_AI_MODEL = "mdtxt:aiModel";
+const KEY_AI_API_KEY = "mdtxt:aiApiKey";
 
 // AI API key now lives in the OS keychain (SECURITY-01), accessed via the
 // get_ai_key / set_ai_key Tauri commands. To keep getAIConfig() synchronous (it

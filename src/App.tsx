@@ -64,11 +64,6 @@ const UnsavedChangesDialog = lazy(() =>
 const AIPanel = lazy(() =>
     import("./components/AIPanel").then((m) => ({ default: m.AIPanel }))
 );
-// Update popup — mounts on every launch, renders nothing unless a newer
-// signed release is found on GitHub (and the user hasn't skipped it).
-const UpdateDialog = lazy(() =>
-    import("./components/UpdateDialog").then((m) => ({ default: m.UpdateDialog }))
-);
 import { getRecentFiles } from "./utils/persistence";
 import {
   addRecentFile,
@@ -253,11 +248,11 @@ function AppContent() {
   const hasFile = filePath !== null || fileName !== null;
 
   // Keep the native window title (taskbar / Alt-Tab) in step with the active
-  // file and its dirty state, so two Paperling windows are distinguishable and
+  // file and its dirty state, so two mdtxt windows are distinguishable and
   // a leading bullet flags unsaved work. Keyed on the dirty BOOLEAN (not raw
   // content) so it doesn't fire an IPC call on every keystroke. TITLE-01.
   useEffect(() => {
-    const title = fileName ? `${isDirty ? "• " : ""}${fileName} — Paperling` : "Paperling";
+    const title = fileName ? `${isDirty ? "• " : ""}${fileName} — mdtxt` : "mdtxt";
     try {
       Window.getCurrent().setTitle(title).catch(() => {/* browser dev mode */});
     } catch {
@@ -1159,7 +1154,7 @@ function AppContent() {
   const handleOpenTutorial = useCallback(() => {
     const isChinese = locale === "zh-CN";
     const tutorial = isChinese ? tutorialMarkdownZhCN : tutorialMarkdown;
-    const name = isChinese ? "欢迎使用 Paperling.md" : "Welcome to Paperling.md";
+    const name = isChinese ? "欢迎使用 mdtxt.md" : "Welcome to mdtxt.md";
     const bytes = new TextEncoder().encode(tutorial).length;
 
     // Snapshot first so the active tab's latest edits are preserved even when we
@@ -1281,7 +1276,7 @@ function AppContent() {
   // Runtime file-open forwards. Cold-start CLI files are handled by the pull
   // in the boot effect above; this event now arrives only from the
   // single-instance plugin, when the user double-clicks another .md while
-  // Paperling is already running and the second launch hands us its path.
+  // mdtxt is already running and the second launch hands us its path.
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) return;
     let mounted = true;
@@ -1880,11 +1875,6 @@ function AppContent() {
           onContextMenu={handleTabContextMenu}
         />
       )}
-
-      {/* Startup update check; invisible unless an update is actually available. */}
-      <Suspense fallback={null}>
-        <UpdateDialog />
-      </Suspense>
 
       {!hasFile ? (
         booting ? (

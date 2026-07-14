@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { clearRecentFiles, getRecentFiles, removeRecentFile, type RecentFile } from "../utils/persistence";
-import { MascotIdle } from "./MascotIdle";
 import { useLocale } from "../context/LocaleContext";
 
 interface WelcomeScreenProps {
@@ -140,13 +139,13 @@ export function WelcomeScreen({ onOpenFile, onNewFile, onOpenSettings, onFileDro
             aria-dropeffect="copy"
         >
             <div className="flex flex-col items-center gap-8 max-w-md w-full text-center animate-fade-in-up">
-                <div className="flex items-center justify-center w-28 h-28">
-                    <MascotIdle className="w-full h-full" />
+                <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--accent)]">
+                    <span className="material-symbols-outlined text-[40px]" aria-hidden="true">description</span>
                 </div>
 
                 <div className="flex flex-col gap-2">
                     <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
-                        Paperling
+                        mdtxt
                     </h1>
                     <p className="text-sm text-[var(--text-secondary)]">
                         {t("A minimal markdown editor")}

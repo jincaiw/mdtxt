@@ -1,11 +1,18 @@
 # Changelog
 
-All notable changes to Paperling will be documented in this file.
+All notable changes to mdtxt will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-07-15
+
+### Changed
+
+- Established mdtxt as an independent desktop identity with isolated data and
+  disabled the inherited updater until a mdtxt-owned signed update channel is ready.
 
 ## [1.0.50] - 2026-07-13
 

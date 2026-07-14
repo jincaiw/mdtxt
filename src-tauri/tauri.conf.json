@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Paperling",
-  "version": "1.0.50",
-  "identifier": "com.mujizi.paperling",
+  "productName": "mdtxt",
+  "version": "0.1.0",
+  "identifier": "app.mdtxt.desktop",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "Paperling",
+        "title": "mdtxt",
         "width": 1000,
         "height": 700,
         "minWidth": 600,
@@ -34,18 +34,10 @@
       }
     }
   },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFDMkE1MzlCOTdCRTJFRjMKUldUekxyNlhtMU1xSFBvMllOV3FRamZsNTdyL0FaVEx3MitTczA0QjhnZFBLa3JKV3c4TThMQWUK",
-      "endpoints": [
-        "https://github.com/jincaiw/Paperling/releases/latest/download/latest.json"
-      ]
-    }
-  },
   "bundle": {
     "active": true,
     "targets": "all",
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

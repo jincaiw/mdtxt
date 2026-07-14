@@ -7,11 +7,11 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Paperling</title>
+    <title>mdtxt</title>
     <!-- Render-blocking: paint the correct theme background BEFORE first paint.
          The window is created hidden and revealed once React mounts, but this
          still matters as a safety net (and for any early reload) so the webview
-         never flashes white. Must mirror ThemeContext: same 'paperling-theme'
+         never flashes white. Must mirror ThemeContext: same 'mdtxt-theme'
          key, same valid themes, same OS-preference fallback. Colors are the
          --bg-primary values from index.css. -->
     <script>
@@ -23,7 +23,7 @@
             paper: "#f5f0e6",
             dracula: "#282a36",
           };
-          var stored = localStorage.getItem("paperling-theme");
+          var stored = localStorage.getItem("mdtxt-theme") || localStorage.getItem("paperling-theme");
           var theme = THEME_BG[stored]
             ? stored
             : window.matchMedia &&
@@ -49,4 +49,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

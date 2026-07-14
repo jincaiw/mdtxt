@@ -39,7 +39,7 @@ pub fn run() {
 
     tauri::Builder::default()
         // Must be the first plugin so it wins the instance lock race.
-        // A second launch (double-clicking another .md while Paperling runs)
+        // A second launch (double-clicking another .md while mdtxt runs)
         // forwards its argv here and exits; we surface the window and hand
         // the path to the existing frontend listener.
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
@@ -55,15 +55,6 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            // Updater (GitHub latest.json) + process (relaunch after install)
-            // are desktop-only plugins, hence registered here behind cfg
-            // instead of in the unconditional plugin chain above.
-            #[cfg(desktop)]
-            {
-                app.handle()
-                    .plugin(tauri_plugin_updater::Builder::new().build())?;
-                app.handle().plugin(tauri_plugin_process::init())?;
-            }
             // UI-automation bridge for the Tauri MCP server. Debug builds
             // only; bound to localhost so nothing on the network can drive
             // the app.
@@ -109,19 +100,19 @@ mod tests {
     #[test]
     fn md_arg_skips_argv0_and_finds_markdown() {
         assert_eq!(
-            md_arg(&v(&["paperling.exe", "C:\\notes\\a.md"])),
+            md_arg(&v(&["mdtxt.exe", "C:\\notes\\a.md"])),
             Some("C:\\notes\\a.md".into())
         );
         assert_eq!(
-            md_arg(&v(&["paperling.exe", "C:\\notes\\b.markdown"])),
+            md_arg(&v(&["mdtxt.exe", "C:\\notes\\b.markdown"])),
             Some("C:\\notes\\b.markdown".into())
         );
     }
 
     #[test]
     fn md_arg_ignores_non_markdown_and_flags() {
-        assert_eq!(md_arg(&v(&["paperling.exe"])), None);
-        assert_eq!(md_arg(&v(&["paperling.exe", "--flag", "notes.txt"])), None);
+        assert_eq!(md_arg(&v(&["mdtxt.exe"])), None);
+        assert_eq!(md_arg(&v(&["mdtxt.exe", "--flag", "notes.txt"])), None);
         // argv[0] itself never matches, even if the exe path looked odd
         assert_eq!(md_arg(&v(&["weird.md"])), None);
     }
@@ -129,7 +120,7 @@ mod tests {
     #[test]
     fn md_arg_takes_first_markdown_among_args() {
         assert_eq!(
-            md_arg(&v(&["paperling.exe", "--verbose", "x.md", "y.md"])),
+            md_arg(&v(&["mdtxt.exe", "--verbose", "x.md", "y.md"])),
             Some("x.md".into())
         );
     }

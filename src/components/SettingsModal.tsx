@@ -13,7 +13,6 @@ import {
 import { AI_PROVIDERS, matchProvider, type AIProvider } from "../utils/aiProviders";
 import { attachFocusTrap } from "../utils/focusTrap";
 import { isValidEndpoint, runAIAction } from "../utils/aiAssist";
-import mascotWave from "../assets/mascot/mascot-wave.png";
 import { useLocale } from "../context/LocaleContext";
 
 // Platform-aware AI shortcut hint (Windows/Linux: Alt+J; macOS: ⌘J). Windows
@@ -477,9 +476,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         {section === "about" && (
                             <div className="text-sm text-[var(--text-secondary)] space-y-2">
                                 <div className="flex items-center gap-3">
-                                    <img src="/icon.svg" alt="Paperling" className="w-10 h-10" />
+                                    <img src="/icon.svg" alt="mdtxt" className="w-10 h-10" />
                                     <div>
-                                        <div className="text-[var(--text-primary)] font-semibold">Paperling</div>
+                                        <div className="text-[var(--text-primary)] font-semibold">mdtxt</div>
                                         <div className="text-[11px]">{t("A minimal markdown editor")}</div>
                                     </div>
                                 </div>
@@ -496,7 +495,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     }}
                                     className="btn-press mt-3 w-full flex items-center gap-3 px-3.5 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
                                 >
-                                    <img src={mascotWave} alt="" aria-hidden="true" draggable={false} className="w-10 h-10 object-contain select-none shrink-0" />
+                                    <span className="material-symbols-outlined w-10 text-center text-[28px] text-[var(--accent)]" aria-hidden="true">description</span>
                                     <span className="flex flex-col items-start min-w-0">
                                         <span className="text-sm font-medium text-[var(--text-primary)]">{t("Replay the welcome tour")}</span>
                                         <span className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("A 30-second walkthrough of the editor, views, and shortcuts")}</span>

@@ -53,7 +53,7 @@ export async function exportToDocx(
     const convert = ((mod as { default?: HtmlToDocx }).default ?? (mod as unknown as HtmlToDocx)) as HtmlToDocx;
     const out = await convert(docHtml, null, {
         title,
-        creator: "Paperling",
+        creator: "mdtxt",
         footer: false,
         pageNumber: false,
         font: "Calibri",

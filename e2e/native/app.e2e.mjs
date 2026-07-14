@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 
-describe("Paperling native Tauri smoke", () => {
+describe("mdtxt native Tauri smoke", () => {
     it("launches the packaged WebView and renders the welcome screen", async () => {
-        const title = await $("h1=Paperling");
+        const title = await $("h1=mdtxt");
         await title.waitForDisplayed();
-        assert.equal(await title.getText(), "Paperling");
+        assert.equal(await title.getText(), "mdtxt");
         await $("button=Open File").waitForDisplayed();
     });
 

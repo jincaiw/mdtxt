@@ -16,9 +16,27 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_STORAGE_KEY = 'paperling-theme';
-const FONT_STORAGE_KEY = 'paperling-font';
-const FONT_SIZE_STORAGE_KEY = 'paperling-font-size';
+const THEME_STORAGE_KEY = 'mdtxt-theme';
+const FONT_STORAGE_KEY = 'mdtxt-font';
+const FONT_SIZE_STORAGE_KEY = 'mdtxt-font-size';
+const LEGACY_STORAGE_KEYS: Array<[string, string]> = [
+    ['paperling-theme', THEME_STORAGE_KEY],
+    ['paperling-font', FONT_STORAGE_KEY],
+    ['paperling-font-size', FONT_SIZE_STORAGE_KEY],
+];
+
+function migrateLegacyThemeKeys(): void {
+    try {
+        for (const [legacy, current] of LEGACY_STORAGE_KEYS) {
+            if (localStorage.getItem(current) === null) {
+                const value = localStorage.getItem(legacy);
+                if (value !== null) localStorage.setItem(current, value);
+            }
+        }
+    } catch { /* storage unavailable: defaults remain safe */ }
+}
+
+migrateLegacyThemeKeys();
 
 // Valid values for validation against corrupted localStorage
 const VALID_THEMES: Theme[] = ['dark', 'light', 'paper', 'dracula'];
