@@ -13,7 +13,7 @@ import {
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
-import { unifiedMergeView, getChunks, getOriginalDoc } from "@codemirror/merge";
+import { getOriginalDoc } from "@codemirror/merge";
 import { getImageFromClipboard, saveImageToFile, createMarkdownImage } from "../utils/imageUtils";
 import {
     handleTab,
@@ -42,6 +42,7 @@ import { useEditorViewportBridge } from "../editor/bridge/useEditorViewportBridg
 import { useEditorDocumentSession } from "../editor/core/useEditorDocumentSession";
 import { useWikilinkCompletion } from "../editor/interactions/useWikilinkCompletion";
 import { useAIAssistShortcut } from "../editor/interactions/useAIAssistShortcut";
+import { useEditorReview } from "../editor/interactions/useEditorReview";
 
 interface CodeEditorProps {
     /** Stable owner used to restore this document's EditorState. */
@@ -104,7 +105,6 @@ function CodeEditorImpl({
     const [slashState, setSlashState] = useState<{ from: number; pos: { x: number; y: number } } | null>(null);
     const [slashQuery, setSlashQuery] = useState("");
     const [aiBubble, setAIBubble] = useState<{ x: number; y: number; selStart: number; selEnd: number; text: string } | null>(null);
-    const [reviewActive, setReviewActive] = useState(false);
     // Floating table toolbar: set when the caret is inside a markdown table.
     const [tableUI, setTableUI] = useState<{ x: number; y: number; align: Align } | null>(null);
 
@@ -141,11 +141,11 @@ function CodeEditorImpl({
     const historyCompRef = useRef(new Compartment());
     // AI review (merge view) state.
     const mergeCompRef = useRef(new Compartment());
-    const reviewingRef = useRef(false);
-    const reviewOriginalRef = useRef("");
-    const lastReviewRef = useRef<string | null>(null);
 
     const wikiCompletionSource = useWikilinkCompletion(filePath);
+    const { reviewActive, reviewingRef, acceptAllChanges, rejectAllChanges } = useEditorReview({
+        viewRef, mergeCompRef, lastEmittedRef, reviewDoc, onReviewResolve,
+    });
 
     const openAIBubble = useCallback(() => {
         const view = viewRef.current;
@@ -409,71 +409,6 @@ function CodeEditorImpl({
     useEffect(() => {
         viewRef.current?.dispatch({ effects: spellCompRef.current.reconfigure(EditorView.contentAttributes.of(spellAttrs(spellCheck))) });
     }, [spellCheck]);
-
-    // Enter / refresh / exit the AI review (CodeMirror unified merge view). The
-    // original side is the document as it was BEFORE the proposal; the editor doc
-    // becomes the proposed text, and the merge view shows per-change ✓/✗ controls.
-    useEffect(() => {
-        const view = viewRef.current;
-        if (!view) return;
-        if (reviewDoc != null) {
-            if (reviewingRef.current && reviewDoc === lastReviewRef.current) return;
-            if (!reviewingRef.current) reviewOriginalRef.current = view.state.doc.toString();
-            reviewingRef.current = true;
-            lastReviewRef.current = reviewDoc;
-            setReviewActive(true);
-            view.dispatch({
-                changes: { from: 0, to: view.state.doc.length, insert: reviewDoc },
-                effects: mergeCompRef.current.reconfigure(unifiedMergeView({ original: reviewOriginalRef.current })),
-            });
-            // Bring the first proposed change into view so the user sees the diff
-            // immediately instead of having to hunt for it (the change may be far
-            // down a long document). Runs after the merge field computes chunks.
-            requestAnimationFrame(() => {
-                const v = viewRef.current;
-                if (!v) return;
-                const chunks = getChunks(v.state)?.chunks;
-                if (chunks && chunks.length) {
-                    v.dispatch({ effects: EditorView.scrollIntoView(chunks[0].fromB, { y: "center" }) });
-                }
-            });
-        } else if (reviewingRef.current) {
-            reviewingRef.current = false;
-            lastReviewRef.current = null;
-            setReviewActive(false);
-            view.dispatch({ effects: mergeCompRef.current.reconfigure([]) });
-        }
-    }, [reviewDoc]);
-
-    const acceptAllChanges = useCallback(() => {
-        const view = viewRef.current;
-        if (!view) return;
-        const final = view.state.doc.toString();
-        reviewingRef.current = false;
-        lastReviewRef.current = null;
-        setReviewActive(false);
-        view.dispatch({ effects: mergeCompRef.current.reconfigure([]) });
-        lastEmittedRef.current = final; // keep the App content-sync from re-dispatching
-        onReviewResolve?.(final);
-    }, [onReviewResolve]);
-
-    const rejectAllChanges = useCallback(() => {
-        const view = viewRef.current;
-        if (!view) return;
-        const orig = reviewOriginalRef.current;
-        reviewingRef.current = false;
-        lastReviewRef.current = null;
-        setReviewActive(false);
-        view.dispatch({
-            changes: { from: 0, to: view.state.doc.length, insert: orig },
-            effects: mergeCompRef.current.reconfigure([]),
-        });
-        lastEmittedRef.current = orig;
-        // Pass the original explicitly (not null): the preview was live-tracking the
-        // accepted-so-far document during review, so we must reset it all the way
-        // back, not leave it on a partially-accepted state.
-        onReviewResolve?.(orig);
-    }, [onReviewResolve]);
 
     useEditorViewportBridge({ viewRef, onScrollFractionRef, registerScroller });
 
