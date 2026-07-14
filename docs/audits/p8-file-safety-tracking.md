@@ -40,6 +40,16 @@ accepted.**
    lock behavior separately because POSIX advisory locks are not automatically
    enforced by rename.
 
+### Non-creditable Linux attempt
+
+On 2026-07-15, a local Docker Linux/aarch64 Debian Bookworm container with
+Rust 1.96.1 attempted `cargo test save_file_`. Compilation stopped before any
+mdtxt test ran because `gdk-sys` and `pango-sys` could not find their system
+development packages. A follow-up transient dependency installation did not
+complete (`dpkg` reported a missing downloaded package). This is neither an
+Ubuntu LTS desktop environment nor a passing application test, so every Linux
+cell remains **Pending** in the platform matrix.
+
 The required platform-by-platform evidence is maintained in
 [`docs/testing/p8-file-system-matrix.md`](../testing/p8-file-system-matrix.md).
 
