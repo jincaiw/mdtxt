@@ -1,94 +1,14 @@
 ---
 import "@fontsource-variable/inter";
 import "@fontsource/instrument-serif/400.css";
-import "@fontsource/instrument-serif/400-italic.css";
 import "@fontsource/jetbrains-mono/400.css";
-import "@fontsource/jetbrains-mono/500.css";
 import "../styles/global.css";
 
-interface Props {
-  title?: string;
-  description?: string;
-}
-
-const {
-  title = "Paperling：本地优先的 Markdown 编辑器",
-  description = "本地优先、开箱即用的 Markdown 编辑器，支持实时预览、分屏、KaTeX、化学公式、Mermaid 图表和可选 AI 助手。",
-} = Astro.props;
-
+interface Props { title?: string; description?: string; }
+const { title = "mdtxt：本地优先的 Markdown 编辑器", description = "mdtxt 是一个默认简体中文、完整支持英语的跨平台 Markdown 编辑器。" } = Astro.props;
 const base = import.meta.env.BASE_URL;
-const ogImage = new URL(`${base}og.png`, Astro.site).href;
-const canonical = new URL(base, Astro.site).href;
-const version = "1.0.0";
+const canonical = new URL(base, Astro.site ?? Astro.url).href;
 ---
 
 <!doctype html>
-<html lang="zh-CN" class="no-js">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <!-- Hide-until-revealed only when JS is present; set before first paint
-         so no-JS users and crawlers never see hidden content. -->
-    <script is:inline>
-      document.documentElement.classList.remove("no-js");
-      document.documentElement.classList.add("js");
-    </script>
-
-    <title>{title}</title>
-    <meta name="description" content={description} />
-    <meta
-      name="keywords"
-      content="markdown editor, open source markdown editor, free markdown editor, lightweight markdown editor, tauri markdown editor, markdown editor windows, markdown editor linux, markdown editor with live preview, markdown editor with AI, markdown editor chemistry equations, KaTeX, Mermaid, Paperling"
-    />
-    <meta name="author" content="jincaiw" />
-    <meta name="theme-color" content="#f7f1e5" />
-    <meta name="color-scheme" content="light" />
-    <link rel="canonical" href={canonical} />
-    <link rel="icon" type="image/svg+xml" href={`${base}icon.svg`} />
-
-    <!-- Open Graph -->
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Paperling" />
-    <meta property="og:title" content="Paperling：本地优先的 Markdown 编辑器" />
-    <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonical} />
-    <meta property="og:image" content={ogImage} />
-    <meta property="og:image:width" content="1920" />
-    <meta property="og:image:height" content="1030" />
-
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Paperling：本地优先的 Markdown 编辑器" />
-    <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content={ogImage} />
-
-    <!-- Structured data, only facts we can stand behind, no fabricated ratings. -->
-    <script type="application/ld+json" set:html={JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      name: "Paperling",
-      applicationCategory: "DeveloperApplication",
-      applicationSubCategory: "Markdown Editor",
-      operatingSystem: "Windows, Linux",
-      softwareVersion: version,
-      description:
-        "A fast, no-setup, open-source Markdown editor with live preview, split view, syntax highlighting, KaTeX math, chemistry equations, Mermaid diagrams, slash commands, wikilinks, and an optional AI assistant. Built with Tauri, Rust, and React.",
-      url: canonical,
-      downloadUrl: "https://github.com/jincaiw/Paperling/releases/latest",
-      softwareHelp: "https://paper.mujizi.com/guide/",
-      image: ogImage,
-      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-      author: { "@type": "Person", name: "jincaiw", url: "https://github.com/jincaiw" },
-    })} />
-  </head>
-
-  <body class="grain">
-    <slot />
-
-    <script>
-      import { initMotion } from "../scripts/motion";
-      initMotion();
-    </script>
-  </body>
-</html>
+<html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>{title}</title><meta name="description" content={description} /><meta name="keywords" content="mdtxt, markdown editor, markdown 编辑器, 本地优先, Tauri" /><meta name="theme-color" content="#f7f1e5" /><link rel="canonical" href={canonical} /><link rel="icon" type="image/svg+xml" href={`${base}icon.svg`} /><meta property="og:type" content="website" /><meta property="og:site_name" content="mdtxt" /><meta property="og:title" content={title} /><meta property="og:description" content={description} /></head><body class="grain"><slot /></body></html>

@@ -1,20 +1,21 @@
-# Paperling 中文化与发布流程
+# mdtxt 发布流程
 
-## 中文化
+## v0.1.0 预发布原则
 
-1. 所有新用户可见文本通过 `t()` 或 `tr()` 进入 `LocaleContext`。
-2. 同步补充简体中文翻译；教程、对话框、空状态和错误信息都属于用户可见文本。
-3. 运行 `npm run check:i18n`。CI 会阻止缺少中文翻译键的改动。
-4. 在中文界面手工检查至少一个欢迎页、设置页和新增功能流程。
+mdtxt v0.1.0 不配置公开下载地址、自动更新端点或包管理器分发。构建产物
+仅可在获授权的内部测试渠道中分发；不要复用上游项目的发布仓库、签名密钥、
+安装包 URL、域名或更新清单。
 
-## 发布
+## 发布前检查
 
-1. 完成 `npm test`、`npm run build`、`npm run release:check`，并在 `src-tauri` 运行 `cargo test --locked`。
-2. 将 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` 更新为同一版本号。
-3. 在 `CHANGELOG.md` 添加对应版本的小节和面向用户的变更说明。
-4. 合并到 `main` 后创建并推送带注释的标签：`git tag -a vX.Y.Z -m "Paperling vX.Y.Z" && git push origin vX.Y.Z`。
-5. GitHub Actions 发布 Windows MSI/NSIS/Portable、macOS DMG、Linux DEB/RPM/AppImage，并生成更新元数据。
-6. 在 Release 页面逐个下载检查产物；确认 `latest.json`、签名文件、Windows Portable 和三个系统的安装包均存在。
-7. 确认 Pages 构建完成、`https://paper.mujizi.com/guide/` 可访问，README 的教程链接正常。
+1. 固定工具链：Bun 1.3.14、Node 24.18 与 Rust 1.96。
+2. 执行 `bun run release:check`，确认产品标识、中文文案与配置均通过。
+3. 执行 `bun run test`、`bun run build`、`cargo test --manifest-path src-tauri/Cargo.toml`。
+4. 执行 `bun run tauri build --debug --no-bundle`，确认桌面程序可构建。
+5. 执行 `bun run --cwd docs build`，检查静态站点不含旧品牌、旧域名或上游下载链接。
 
-签名私钥仅存放于仓库 Secrets：`TAURI_SIGNING_PRIVATE_KEY` 与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。不要将私钥、密码或临时签名文件提交到仓库。
+## 未来公开发布
+
+在产品所有者明确批准渠道、发布仓库、签名策略和安装包托管位置之前，不得创建
+公开标签、更新清单、winget/Scoop 清单或下载按钮。批准后，先补齐可复现的发布
+工件与验收记录，再将文档中的“预发布”状态改为实际的发布信息。
