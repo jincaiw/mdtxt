@@ -40,6 +40,10 @@ import { useLocale } from "../context/LocaleContext";
 import { minimalTextChange } from "../utils/minimalTextChange";
 
 interface CodeEditorProps {
+    /** Stable owner used to restore this document's EditorState. */
+    documentId: string;
+    sessionState?: CMEditorState | null;
+    onStateChange?: (documentId: string, state: CMEditorState) => void;
     content: string;
     onChange: (content: string) => void;
     onCursorChange?: (line: number, column: number) => void;
@@ -61,11 +65,6 @@ interface CodeEditorProps {
     /** Called when the user finishes a review: the final document (accept) or
      *  null (rejected everything — keep the original). */
     onReviewResolve?: (finalDoc: string | null) => void;
-    /** Bumped by App on every genuine document SWAP (tab switch, file open, new
-     *  file) — as opposed to an in-document edit. On each bump the editor clears
-     *  its undo history so Ctrl+Z can't reach back into the previous document (a
-     *  data-loss bug: undo used to "un-swap" the file). TABS-03. */
-    docSwapId?: number;
 }
 
 const EDITOR_FONT_FAMILY =
@@ -154,6 +153,9 @@ function applyResultToView(view: EditorView, r: EditorResult) {
 }
 
 function CodeEditorImpl({
+    documentId,
+    sessionState,
+    onStateChange,
     content,
     onChange,
     onCursorChange,
@@ -171,7 +173,6 @@ function CodeEditorImpl({
     aiConfig,
     reviewDoc,
     onReviewResolve,
-    docSwapId,
 }: CodeEditorProps) {
     const { t: tr } = useLocale();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -190,6 +191,7 @@ function CodeEditorImpl({
     // Latest props read by the once-created CodeMirror extensions, kept in refs so
     // the view never has to be torn down and rebuilt on a callback/flag change.
     const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
+    const onStateChangeRef = useRef(onStateChange); onStateChangeRef.current = onStateChange;
     const onCursorChangeRef = useRef(onCursorChange); onCursorChangeRef.current = onCursorChange;
     const onSelectionChangeRef = useRef(onSelectionChange); onSelectionChangeRef.current = onSelectionChange;
     const onScrollFractionRef = useRef(onScrollFraction); onScrollFractionRef.current = onScrollFraction;
@@ -208,10 +210,11 @@ function CodeEditorImpl({
     // effect below skip the O(n) doc.toString() comparison on the common case
     // (the prop change is just our own keystroke echoing back through App state).
     const lastEmittedRef = useRef(content);
-    // Live mirror of the `content` prop, read by the doc-swap effect without
-    // making `content` one of its deps (it must fire ONLY on docSwapId).
+    // Live mirror used when a newly activated document has no retained state.
     const contentPropRef = useRef(content);
     contentPropRef.current = content;
+    const createStateRef = useRef<((doc: string) => CMEditorState) | null>(null);
+    const loadedDocumentIdRef = useRef<string | null>(null);
 
     // Reconfigurable extensions.
     const wrapCompRef = useRef(new Compartment());
@@ -350,6 +353,7 @@ function CodeEditorImpl({
                 onChangeRef.current?.(value);
             }
             if (update.selectionSet || update.docChanged) {
+                onStateChangeRef.current?.(loadedDocumentIdRef.current ?? documentId, update.state);
                 const head = update.state.selection.main.head;
                 const line = update.state.doc.lineAt(head);
                 onCursorChangeRef.current?.(line.number, head - line.from + 1);
@@ -374,40 +378,36 @@ function CodeEditorImpl({
             paste: (event, view) => handlePaste(event, view),
         });
 
+        const createState = (doc: string) => CMEditorState.create({
+            doc,
+            extensions: [
+                lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(),
+                historyComp.of(history()), drawSelection(), dropCursor(), closeBrackets(),
+                autocompletion({ override: [wikiCompletionSource], icons: false, aboveCursor: false }),
+                markdown(), syntaxHighlighting(markdownHighlight), editorTheme,
+                wrapComp.of(wordWrap ? EditorView.lineWrapping : []),
+                spellComp.of(EditorView.contentAttributes.of(spellAttrs(spellCheck))),
+                mergeComp.of([]), editingKeymap,
+                keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
+                updateListener, pasteHandler, EditorView.theme({ "&": { outline: "none" } }),
+            ],
+        });
+        createStateRef.current = createState;
+
         const view = new EditorView({
             parent: containerRef.current,
-            state: CMEditorState.create({
-                doc: content,
-                extensions: [
-                    lineNumbers(),
-                    highlightActiveLineGutter(),
-                    highlightActiveLine(),
-                    historyComp.of(history()),
-                    drawSelection(),
-                    dropCursor(),
-                    closeBrackets(),
-                    autocompletion({ override: [wikiCompletionSource], icons: false, aboveCursor: false }),
-                    markdown(),
-                    syntaxHighlighting(markdownHighlight),
-                    editorTheme,
-                    wrapComp.of(wordWrap ? EditorView.lineWrapping : []),
-                    spellComp.of(EditorView.contentAttributes.of(spellAttrs(spellCheck))),
-                    mergeComp.of([]),
-                    editingKeymap,
-                    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
-                    updateListener,
-                    pasteHandler,
-                    EditorView.theme({ "&": { outline: "none" } }),
-                ],
-            }),
+            state: sessionState ?? createState(content),
         });
         viewRef.current = view;
+        loadedDocumentIdRef.current = documentId;
         lastEmittedRef.current = content;
+        onStateChangeRef.current?.(documentId, view.state);
         view.focus();
 
         return () => {
             view.destroy();
             viewRef.current = null;
+            createStateRef.current = null;
         };
         // Created once; prop changes flow in via the effects + refs below.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -530,6 +530,7 @@ function CodeEditorImpl({
     // P4 removes this React bridge, preserve unaffected ranges rather than
     // recording every external update as a full-document replacement.
     useEffect(() => {
+        if (loadedDocumentIdRef.current !== documentId) return;
         if (content === lastEmittedRef.current) return;
         const view = viewRef.current;
         if (!view) return;
@@ -538,31 +539,22 @@ function CodeEditorImpl({
             view.dispatch({ changes: change });
         }
         lastEmittedRef.current = content;
-    }, [content]);
+    }, [content, documentId]);
 
-    // Reset undo history whenever App swaps the whole document for a different
-    // file (tab switch, file open, new file). Without this, Ctrl+Z would undo
-    // the swap itself and restore the PREVIOUS file's text into the current tab —
-    // which autosave could then write to the wrong path. In-document edits
-    // (checkbox toggles, AI, frontmatter) don't bump docSwapId, so they stay
-    // undoable. Robust to effect order: if the content-sync effect above ran
-    // first it recorded the swap in the OLD history, which we then discard; if it
-    // hasn't run yet, `content` already equals the new doc so we set it here.
-    // TABS-03.
+    // One EditorView serves the window. Switching documents swaps a retained
+    // EditorState (selection + history included); a first visit gets one fresh
+    // state rather than a history-clearing whole-text replacement.
     useEffect(() => {
         const view = viewRef.current;
-        if (!view) return;
-        const doc = contentPropRef.current;
-        if (doc !== view.state.doc.toString()) {
-            view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } });
-        }
-        lastEmittedRef.current = doc;
-        // Reconfigure the history compartment to a fresh instance — this is the
-        // documented way to clear CodeMirror's undo/redo stacks.
-        view.dispatch({ effects: historyCompRef.current.reconfigure([]) });
-        view.dispatch({ effects: historyCompRef.current.reconfigure(history()) });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [docSwapId]);
+        const createState = createStateRef.current;
+        if (!view || !createState) return;
+        if (loadedDocumentIdRef.current === documentId && (!sessionState || view.state === sessionState)) return;
+        const next = sessionState ?? createState(contentPropRef.current);
+        loadedDocumentIdRef.current = documentId;
+        view.setState(next);
+        lastEmittedRef.current = next.doc.toString();
+        onStateChangeRef.current?.(documentId, next);
+    }, [documentId, sessionState]);
 
     // Reconfigure word-wrap / spellcheck when their props change.
     useEffect(() => {

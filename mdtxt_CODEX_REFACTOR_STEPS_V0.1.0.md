@@ -28,7 +28,7 @@
 | P1 安全契约 | 完成 | `ca32c04`，fixture、回归与预检基础 | 后续功能必须补对应 fixture |
 | P2 产品身份 | 完成 | `122071b` 至 `9495dd6`，mdtxt 标识、品牌隔离、updater 关闭 | 发布前再次扫描泄漏 |
 | P3 双语底座 | 完成 | `96a9931`，默认中文、双语键、硬编码门禁 | 新增文字必须双语 |
-| P4 文档会话 | 进行中 | ADR、纯模型、版本防护、每标签模式与会话控制器 | 每标签 `EditorState`，并清除按键级全文 React 主状态 |
+| P4 文档会话 | 进行中 | ADR、纯模型、版本防护、会话控制器及每标签 `EditorState` | 清除按键级全文 React 主状态 |
 | P5–P11 | 未开始 | 不提前实现 | 严格按依赖进入 |
 
 截至本次定稿，最低本地门禁已通过：`bun run release:check`、前端测试与构建、`cargo fmt --check`、Clippy 和 Rust 测试。后续每一个阶段都必须重新执行与该阶段相称的门禁，不能借用历史通过结果。
@@ -70,7 +70,7 @@ P7 + P8 + P3 + P4 ────────────┴→ P9 → P10 → P11
 | --- | --- | --- |
 | P4a ✓ 会话契约 | ADR、纯 `DocumentSession`、版本/保存/外部变更/模式模型 | 纯模型测试覆盖脏恢复、过期结果、外部内容与每标签模式 |
 | P4b ✓ 会话控制器 | 已建立 framework-independent controller/store；React 订阅摘要；打开、激活、关闭、修改、保存与外部更新经统一会话 API | 控制器测试覆盖摘要隔离、激活、关闭、保存、外部更新与过期结果；App 不再维护独立 session Map |
-| P4c EditorState 所有权 | 每标签保存 CodeMirror `EditorState`；单一 `EditorView` 在切换时回存/`setState`；正文、选择、undo 不经 React 往返 | 两标签交替编辑的选择、undo/redo 完全隔离；语言和模式切换不重建 View |
+| P4c ✓ EditorState 所有权 | 每标签保存 CodeMirror `EditorState`；单一 `EditorView` 在切换时回存/`setState`；移除 `docSwapId` 历史重置 | 存储与浏览器验证覆盖两标签文本/历史隔离；语言和模式切换不重建 View |
 | P4d 迁移收口 | 删除 `App.tsx` 中活动全文主状态、`docSwapId` 式全文替换及与之竞争的 tab 内容副本；预览/保存/AI 读取版本化快照 | 输入路径没有按键级全文 React 更新；Source/Split/Reader、自动保存、外部变化、AI 审阅回归通过 |
 
 退出条件：P4a–P4d 全部通过，且代码审查能明确证明 React 仅接收 `DocumentSessionSummary` 与 UI 状态。任何一个标签的正文、选择或历史仍由 React 作为主状态即不退出 P4。
@@ -142,4 +142,4 @@ bun run tauri build --debug
 
 ## 7. 当前执行边界
 
-下一项工作固定为 **P4c：每标签 EditorState 与单一 EditorView**。先为标签切换、选择与 undo 隔离补测试，再将活动 View 的 state 回存/`setState` 到会话；不在此提交拆分其余编辑器模块或实现 Live。P4d 删除 React 全文主状态后，才进入 P5。
+下一项工作固定为 **P4d：移除 React 全文主状态**。将 tab 列表与活动文档的正文改为会话快照按需读取，预览、保存、AI、统计和恢复使用版本化读取；不在此提交拆分其余编辑器模块或实现 Live。P4d 通过后，才进入 P5。

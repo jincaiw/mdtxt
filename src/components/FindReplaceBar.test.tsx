@@ -18,7 +18,7 @@ afterEach(cleanup);
 const DEBOUNCE_MS = 100;
 
 async function mountEditorWithFindOpen(onChange = vi.fn()) {
-    const utils = render(<CodeEditor content="hello world hello" onChange={onChange} />);
+    const utils = render(<CodeEditor documentId="test" content="hello world hello" onChange={onChange} />);
     const content = await waitFor(() => {
         const el = utils.container.querySelector<HTMLElement>(".cm-content");
         expect(el).toBeTruthy();

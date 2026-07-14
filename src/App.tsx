@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save, ask } from "@tauri-apps/plugin-dialog";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { Window } from "@tauri-apps/api/window";
+import type { EditorState as CMEditorState } from "@codemirror/state";
 
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
@@ -119,6 +120,7 @@ import {
   type DocumentSession,
 } from "./utils/documentSession";
 import { DocumentSessionController } from "./utils/documentSessionController";
+import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
 import tutorialMarkdown from "./assets/tutorial.md?raw";
@@ -186,11 +188,6 @@ function AppContent() {
   // the snapshots of every open file (incl. the active one). TABS-01.
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  // Bumped on every genuine document swap (tab switch, file open, new file) so
-  // the editor can reset its undo history and Ctrl+Z can't reach into the
-  // previously-shown document. See CodeEditor's docSwapId effect. TABS-03.
-  const [docSwapId, setDocSwapId] = useState(0);
-  const bumpDocSwap = useCallback(() => setDocSwapId((n) => n + 1), []);
   const [splitRatio, setSplitRatioState] = usePersistedState<number>(getSplitRatio, setSplitRatio);
   const [aiConfig, setAiConfigState] = useState(() => getAIConfig());
   const [aiEnabled, setAiEnabledState] = usePersistedState<boolean>(getAIEnabled, setAIEnabled);
@@ -362,6 +359,10 @@ function AppContent() {
     () => new Map(sessionSnapshot.sessions.map((session) => [session.id, session])),
     [sessionSnapshot.sessions],
   );
+  const editorStateStoreRef = useRef<DocumentEditorStateStore | null>(null);
+  if (editorStateStoreRef.current === null) editorStateStoreRef.current = new DocumentEditorStateStore();
+  const editorStateStore = editorStateStoreRef.current;
+  const [activeEditorState, setActiveEditorState] = useState<CMEditorState | null>(null);
   // The line we'd return to when this file is re-activated: the caret line while
   // editing, or the top-visible line in reader mode. TABS-02.
   const currentLineRef = useRef(1);
@@ -374,8 +375,9 @@ function AppContent() {
   const setActiveTab = useCallback((id: string | null) => {
     activeTabIdRef.current = id;
     sessionController.activate(id);
+    setActiveEditorState(id ? editorStateStore.get(id) : null);
     setActiveTabId(id);
-  }, [sessionController]);
+  }, [sessionController, editorStateStore]);
   const newTabId = useCallback(() => `tab-${++tabSeqRef.current}`, []);
 
   const activeSession = useCallback((): DocumentSession | null => {
@@ -446,7 +448,6 @@ function AppContent() {
   // Load a tab's stored snapshot into the live editor state.
   const applyTabToLive = useCallback((tab: TabState) => {
     setProposedDoc(null); // an AI review belongs to the file we're leaving
-    bumpDocSwap(); // new document → editor resets undo history. TABS-03.
     setFilePath(tab.filePath);
     setFileName(tab.fileName);
     setContent(tab.content);
@@ -471,7 +472,7 @@ function AppContent() {
       if (line > 1) window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line } }));
       else window.dispatchEvent(new CustomEvent("mdtxt:scroll-top"));
     });
-  }, [bumpDocSwap, mode, setModeState, sessionController]);
+  }, [mode, setModeState, sessionController]);
 
   // Switch to an already-open tab, snapshotting the current one first.
   const activateTab = useCallback((id: string) => {
@@ -501,7 +502,6 @@ function AppContent() {
     setIsLoading(true);
     try {
       const fileData = await invoke<FileData>("read_file", { path });
-      bumpDocSwap(); // new document → editor resets undo history. TABS-03.
       setFilePath(fileData.path);
       setFileName(fileData.name);
       setContent(fileData.content);
@@ -558,7 +558,7 @@ function AppContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, snapshotActiveTab, commitTabs, setActiveTab, newTabId, bumpDocSwap, setMode, tr, mode]);
+  }, [showToast, snapshotActiveTab, commitTabs, setActiveTab, newTabId, setMode, tr, mode]);
 
   // Settings flags above persist themselves via usePersistedState; the matching
   // setters (setSavedViewMode, setSplitRatio, …) are passed into that hook.
@@ -706,7 +706,6 @@ function AppContent() {
       if (!activeId) activeId = loaded[0].id;
       const activeTabData = loaded.find((t) => t.id === activeId)!;
 
-      bumpDocSwap(); // restored document → editor starts with clean undo history
       commitTabs(loaded);
       loaded.forEach((tab) => sessionController.open({
         id: tab.id, path: tab.filePath, name: tab.fileName, content: tab.content,
@@ -1010,6 +1009,7 @@ function AppContent() {
     const nextId = nextActiveAfterClose(tabsRef.current, id);
     const remaining = tabsRef.current.filter((t) => t.id !== id);
     sessionController.remove(id);
+    editorStateStore.remove(id);
     commitTabs(remaining);
     if (!isActive) return;
     const target = nextId ? remaining.find((t) => t.id === nextId) : undefined;
@@ -1020,7 +1020,6 @@ function AppContent() {
       // Last tab closed — return to the clean welcome state.
       setActiveTab(null);
       setProposedDoc(null);
-      bumpDocSwap();
       setFilePath(null);
       setFileName(null);
       setContent("");
@@ -1029,7 +1028,7 @@ function AppContent() {
       knownMtimeRef.current = 0;
       setLastFile(null);
     }
-  }, [commitTabs, setActiveTab, applyTabToLive, bumpDocSwap, sessionController]);
+  }, [commitTabs, setActiveTab, applyTabToLive, sessionController, editorStateStore]);
 
   // Close a tab. A clean tab closes immediately; a dirty one opens the
   // Save / Discard / Cancel dialog (TABS-05) rather than the old two-button
@@ -1225,14 +1224,16 @@ function AppContent() {
   // stays open in its tab, so nothing is discarded). Reuses a pristine empty
   // untitled tab if one exists, and numbers new ones Untitled-N.md. TABS-01/08.
   const handleNewFile = useCallback(() => {
+    // Snapshot before deciding whether a blank tab is reusable. Otherwise an
+    // edited active Untitled tab still looks empty in tabsRef and gets reused,
+    // replacing its draft when the user asks for a second tab.
+    snapshotActiveTab();
     const reusable = findReusableUntitledTab(tabsRef.current);
     if (reusable) {
       if (reusable.id !== activeTabIdRef.current) activateTab(reusable.id);
       setMode("code");
       return;
     }
-    snapshotActiveTab();
-    bumpDocSwap(); // fresh Untitled buffer → editor resets undo history. TABS-03.
     const id = newTabId();
     const name = nextUntitledName(tabsRef.current);
     commitTabs([...tabsRef.current, {
@@ -1250,7 +1251,7 @@ function AppContent() {
     knownMtimeRef.current = 0;
     setLastFile(null);
     setMode("code");
-  }, [snapshotActiveTab, commitTabs, setActiveTab, newTabId, bumpDocSwap, activateTab, sessionController]);
+  }, [snapshotActiveTab, commitTabs, setActiveTab, newTabId, activateTab, sessionController]);
 
   // Open the interactive feature guide (offered at the end of the tour and from
   // the command palette). It opens as a real, editable document so users can
@@ -1268,7 +1269,6 @@ function AppContent() {
     // switch to (or reuse) a different tab. snapshotActiveTab updates tabsRef
     // synchronously, so the reuse lookup below sees the up-to-date list.
     snapshotActiveTab();
-    bumpDocSwap(); // fresh document → reset the editor's undo history. TABS-03.
 
     const reusable = findReusableUntitledTab(tabsRef.current);
     const id = reusable ? reusable.id : newTabId();
@@ -1296,7 +1296,7 @@ function AppContent() {
     knownMtimeRef.current = 0;
     setLastFile(null);
     setMode("split");
-  }, [locale, snapshotActiveTab, commitTabs, setActiveTab, newTabId, bumpDocSwap, sessionController]);
+  }, [locale, snapshotActiveTab, commitTabs, setActiveTab, newTabId, sessionController]);
 
   // "Replay the welcome tour" from Settings → About. The tour spotlights
   // editor chrome, so make sure a buffer exists before showing it.
@@ -1490,6 +1490,10 @@ function AppContent() {
     if (session) sessionController.replaceContent(session.id, newContent);
     setContent(newContent);
   }, [activeSession, sessionController]);
+
+  const handleEditorStateChange = useCallback((documentId: string, state: CMEditorState) => {
+    editorStateStore.set(documentId, state);
+  }, [editorStateStore]);
 
   // Stable cursor + preview-line setters. Critical that these are useCallback
   // (not inline arrows): CodeEditor wires `onCursorChange` into a useEffect via
@@ -2054,8 +2058,10 @@ function AppContent() {
               }}
             >
               <CodeEditor
+                documentId={activeTabId ?? "welcome"}
+                sessionState={activeEditorState}
+                onStateChange={handleEditorStateChange}
                 content={content}
-                docSwapId={docSwapId}
                 onChange={handleContentChange}
                 onCursorChange={handleCursorChange}
                 onSelectionChange={handleSelectionChange}

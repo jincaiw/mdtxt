@@ -15,7 +15,7 @@ afterEach(cleanup);
 
 describe("editor selection theming", () => {
     it("overrides CodeMirror's focused-selection base rule with --selection-bg", async () => {
-        const { container } = render(<CodeEditor content="hello" onChange={() => {}} />);
+        const { container } = render(<CodeEditor documentId="test" content="hello" onChange={() => {}} />);
         await waitFor(() => expect(container.querySelector(".cm-content")).toBeTruthy());
 
         const css = Array.from(document.querySelectorAll("style"))
