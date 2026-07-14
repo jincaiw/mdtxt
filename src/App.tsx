@@ -282,12 +282,10 @@ function AppContent() {
   // focus to detect the file changing under us (sync tools, other editors).
   const knownMtimeRef = useRef<number>(0);
 
-  // === Tabs (snapshot-swap) ===
-  // The live state (filePath/content/…) IS the active tab. `tabsRef`/`liveRef`
-  // mirror state synchronously so the open/switch/close helpers can read and
-  // commit without waiting for a re-render. We snapshot the active tab before
-  // leaving it and restore the target's snapshot into the live state — so every
-  // single-file system (autosave, AI review, external-change) is untouched. TABS-01.
+  // === Tabs (metadata only) ===
+  // DocumentSession owns every document body and save revision. Tabs retain
+  // ordering, labels and cursor metadata; switching activates a session and its
+  // retained CodeMirror state without copying Markdown through React. TABS-01.
   const tabSeqRef = useRef(0);
   const tabsRef = useRef<TabState[]>([]);
   tabsRef.current = tabs;
