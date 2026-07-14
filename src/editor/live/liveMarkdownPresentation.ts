@@ -1,0 +1,104 @@
+import { RangeSetBuilder, StateField, type EditorState, type Extension, type Range, type Transaction } from "@codemirror/state";
+import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
+
+const marks: Record<string, Decoration> = {
+    ATXHeading1: Decoration.mark({ class: "cm-live-heading-1" }),
+    ATXHeading2: Decoration.mark({ class: "cm-live-heading-2" }),
+    ATXHeading3: Decoration.mark({ class: "cm-live-heading-3" }),
+    ATXHeading4: Decoration.mark({ class: "cm-live-heading-4" }),
+    ATXHeading5: Decoration.mark({ class: "cm-live-heading-5" }),
+    ATXHeading6: Decoration.mark({ class: "cm-live-heading-6" }),
+    StrongEmphasis: Decoration.mark({ class: "cm-live-strong" }),
+    Emphasis: Decoration.mark({ class: "cm-live-emphasis" }),
+    Strikethrough: Decoration.mark({ class: "cm-live-strikethrough" }),
+    InlineCode: Decoration.mark({ class: "cm-live-inline-code" }),
+    Link: Decoration.mark({ class: "cm-live-link" }),
+    Blockquote: Decoration.mark({ class: "cm-live-quote" }),
+    BulletList: Decoration.mark({ class: "cm-live-list" }),
+    OrderedList: Decoration.mark({ class: "cm-live-list" }),
+    ListMark: Decoration.mark({ class: "cm-live-list-mark" }),
+    HorizontalRule: Decoration.mark({ class: "cm-live-rule" }),
+    Task: Decoration.mark({ class: "cm-live-task" }),
+    TaskMarker: Decoration.mark({ class: "cm-live-task-marker" }),
+};
+
+function decorationRanges(state: EditorState, from: number, to: number): readonly Range<Decoration>[] {
+    const ranges: Range<Decoration>[] = [];
+    syntaxTree(state).iterate({
+        enter: (node) => {
+            const mark = marks[node.name];
+            // Do not create clipped decorations. Expanding changed ranges to
+            // full lines means a node is either atomically retained or rebuilt.
+            if (mark && node.from >= from && node.to <= to && node.from < node.to) {
+                ranges.push(mark.range(node.from, node.to));
+            }
+        },
+    });
+    return ranges;
+}
+
+function decorationsInRange(state: EditorState, from: number, to: number): DecorationSet {
+    const builder = new RangeSetBuilder<Decoration>();
+    for (const range of decorationRanges(state, from, to)) {
+        builder.add(range.from, range.to, range.value);
+    }
+    return builder.finish();
+}
+
+function changedLineRanges(state: EditorState, transaction: Transaction) {
+    const ranges: Array<{ from: number; to: number }> = [];
+    transaction.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
+        const startLine = state.doc.lineAt(Math.min(fromB, state.doc.length));
+        const endLine = state.doc.lineAt(Math.min(toB, state.doc.length));
+        // One adjacent line accounts for list/blockquote continuation markers
+        // without degrading normal typing into a whole-document scan.
+        const from = state.doc.line(Math.max(1, startLine.number - 1)).from;
+        const to = state.doc.line(Math.min(state.doc.lines, endLine.number + 1)).to;
+        ranges.push({ from, to });
+    });
+    return ranges;
+}
+
+/**
+ * Safe P6 Live presentation: syntax-tree driven visual styling only. Markdown
+ * delimiters are never hidden, so every focused, IME, selection and unknown
+ * construct retains an immediately usable Source fallback.
+ */
+export const liveMarkdownDecorations = StateField.define<DecorationSet>({
+    create(state) {
+        return decorationsInRange(state, 0, state.doc.length);
+    },
+    update(decorations, transaction) {
+        if (!transaction.docChanged) return decorations;
+        let next = decorations.map(transaction.changes);
+        for (const range of changedLineRanges(transaction.state, transaction)) {
+            next = next.update({
+                filter: (from, to) => to <= range.from || from >= range.to,
+                add: decorationRanges(transaction.state, range.from, range.to),
+            });
+        }
+        return next;
+    },
+    provide: (field) => EditorView.decorations.from(field),
+});
+
+export const liveMarkdownTheme = EditorView.baseTheme({
+    ".cm-live-heading-1": { fontSize: "1.55em", fontWeight: "750", lineHeight: "1.45" },
+    ".cm-live-heading-2": { fontSize: "1.32em", fontWeight: "720", lineHeight: "1.45" },
+    ".cm-live-heading-3": { fontSize: "1.16em", fontWeight: "700" },
+    ".cm-live-heading-4, .cm-live-heading-5, .cm-live-heading-6": { fontWeight: "700" },
+    ".cm-live-strong": { fontWeight: "700" },
+    ".cm-live-emphasis": { fontStyle: "italic" },
+    ".cm-live-strikethrough": { textDecoration: "line-through" },
+    ".cm-live-inline-code": {
+        fontFamily: "var(--font-mono)", backgroundColor: "var(--code-bg)",
+        borderRadius: "3px", padding: "0 0.18em", color: "var(--code-text)",
+    },
+    ".cm-live-link": { color: "var(--accent)", textDecoration: "underline" },
+    ".cm-live-quote": { color: "var(--text-secondary)" },
+    ".cm-live-list-mark, .cm-live-task-marker": { color: "var(--accent)" },
+    ".cm-live-rule": { color: "var(--border)", fontWeight: "700" },
+});
+
+export const liveMarkdownPresentation: Extension = [liveMarkdownDecorations, liveMarkdownTheme];

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import liveBetaFixture from "./fixtures/markdown/live-beta.md?raw";
 
 /**
@@ -10,7 +10,7 @@ import liveBetaFixture from "./fixtures/markdown/live-beta.md?raw";
  */
 describe("Live Beta source round-trip baseline", () => {
     it("keeps the supported P6 syntax and deferred constructs byte-for-byte in the editor state", () => {
-        const state = EditorState.create({ doc: liveBetaFixture, extensions: [markdown()] });
+        const state = EditorState.create({ doc: liveBetaFixture, extensions: [markdown({ base: markdownLanguage })] });
 
         expect(state.doc.toString()).toBe(liveBetaFixture);
         expect(syntaxTree(state).length).toBe(liveBetaFixture.length);
