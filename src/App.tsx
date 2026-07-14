@@ -317,6 +317,8 @@ function AppContent() {
     () => new Map(sessionSnapshot.sessions.map((session) => [session.id, session])),
     [sessionSnapshot.sessions],
   );
+  const activeSessionRef = useRef<DocumentSession | null>(null);
+  activeSessionRef.current = sessionController.getActive();
   const activeSessionSummary = sessionSnapshot.activeId
     ? sessionSummaryById.get(sessionSnapshot.activeId) ?? null
     : null;
@@ -725,17 +727,8 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Latest content + originalContent are read via refs inside `loadFile` so
-  // its identity stays stable across keystrokes. Without this, every typed
-  // character would change `loadFile`'s reference, which would tear down and
-  // re-register the Tauri DRAG_DROP listener, the file-open-from-cli listener,
-  // and the global keydown handler — all of which depend on `loadFile` —
-  // causing per-keystroke listener churn (and a small but real OS-level IPC
-  // round-trip for the Tauri ones).
-  const contentRef = useRef(content);
-  contentRef.current = content;
-  const originalContentRef = useRef(originalContent);
-  originalContentRef.current = originalContent;
+  // File metadata stays in refs for long-lived native listeners. Document text
+  // itself is no longer mirrored here: those listeners read DocumentSession.
   const filePathRef = useRef(filePath);
   filePathRef.current = filePath;
   // Whether an AI review is pending, mirrored into a ref for the focus-time
@@ -839,8 +832,17 @@ function AppContent() {
     () => showToast(tr("This file changed on disk. Saving will overwrite those changes."), "error"),
     [showToast, tr]
   );
+  const handleExternalDiskRevision = useCallback((documentId: string, diskRevision: number) => {
+    sessionController.updateFileMetadata(documentId, {
+      path: sessionController.get(documentId)?.path ?? null,
+      name: sessionController.get(documentId)?.name ?? "Untitled.md",
+      diskRevision,
+    });
+    if (documentId === activeTabIdRef.current) knownMtimeRef.current = diskRevision;
+  }, [sessionController]);
   useExternalChangeWatcher({
-    filePathRef, contentRef, originalContentRef, knownMtimeRef,
+    sessionRef: activeSessionRef,
+    onDiskRevision: handleExternalDiskRevision,
     isReviewActiveRef: reviewActiveRef,
     reload: loadFileDirect,
     onReloaded: handleExternalReloaded,

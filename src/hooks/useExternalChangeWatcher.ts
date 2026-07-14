@@ -1,15 +1,12 @@
 import { useEffect, type RefObject } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import type { DocumentSession } from "../utils/documentSession";
 
 export interface UseExternalChangeWatcherOptions {
-  /** Path of the open file, or null. Read live via ref (listener mounts once). */
-  filePathRef: RefObject<string | null>;
-  /** Live editor content. */
-  contentRef: RefObject<string>;
-  /** Last-persisted content. */
-  originalContentRef: RefObject<string>;
-  /** Known on-disk mtime (ms). Updated in place when a newer mtime is seen. */
-  knownMtimeRef: RefObject<number>;
+  /** Active controller-owned session, read live by the one mounted listener. */
+  sessionRef: RefObject<DocumentSession | null>;
+  /** Records a newer disk revision without making the document clean. */
+  onDiskRevision: (documentId: string, diskRevision: number) => void;
   /** True while an AI review is pending — don't reload over a proposed diff. */
   isReviewActiveRef: RefObject<boolean>;
   /** Reload the file from disk (used when the buffer is clean). */
@@ -30,10 +27,8 @@ export interface UseExternalChangeWatcherOptions {
  * else is read through refs so the focus listener mounts once.
  */
 export function useExternalChangeWatcher({
-  filePathRef,
-  contentRef,
-  originalContentRef,
-  knownMtimeRef,
+  sessionRef,
+  onDiskRevision,
   isReviewActiveRef,
   reload,
   onReloaded,
@@ -42,18 +37,19 @@ export function useExternalChangeWatcher({
   useEffect(() => {
     let checking = false;
     const checkExternalChange = async () => {
-      const path = filePathRef.current;
+      const session = sessionRef.current;
+      const path = session?.path;
       // Bail before claiming the `checking` slot so an early return can never
       // strand it set (that would silently kill detection for the session).
       if (!path || checking || isReviewActiveRef.current) return;
       checking = true;
       try {
         const info = await invoke<{ modified: number }>("get_file_info", { path });
-        const known = knownMtimeRef.current ?? 0;
+        const known = session.diskRevision;
         if (known > 0 && info.modified > known) {
           // Update first so a failed/declined reload doesn't re-toast forever.
-          knownMtimeRef.current = info.modified;
-          if (contentRef.current === originalContentRef.current) {
+          onDiskRevision(session.id, info.modified);
+          if (session.version === session.savedVersion) {
             await reload(path);
             onReloaded();
           } else {
@@ -68,5 +64,5 @@ export function useExternalChangeWatcher({
     };
     window.addEventListener("focus", checkExternalChange);
     return () => window.removeEventListener("focus", checkExternalChange);
-  }, [filePathRef, contentRef, originalContentRef, knownMtimeRef, isReviewActiveRef, reload, onReloaded, onConflict]);
+  }, [sessionRef, onDiskRevision, isReviewActiveRef, reload, onReloaded, onConflict]);
 }

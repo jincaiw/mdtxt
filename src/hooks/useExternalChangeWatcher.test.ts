@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, type Mock, type RefObj
 import { renderHook, cleanup } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useExternalChangeWatcher, type UseExternalChangeWatcherOptions } from "./useExternalChangeWatcher";
+import { createDocumentSession } from "../utils/documentSession";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
@@ -14,10 +15,8 @@ const ref = <T,>(value: T): RefObject<T> => ({ current: value });
 
 function setup(over: Partial<UseExternalChangeWatcherOptions> = {}) {
   const opts: UseExternalChangeWatcherOptions = {
-    filePathRef: ref<string | null>("C:/doc.md"),
-    contentRef: ref("same"),
-    originalContentRef: ref("same"),
-    knownMtimeRef: ref(100),
+    sessionRef: ref(createDocumentSession({ id: "doc", path: "C:/doc.md", name: "doc.md", content: "same", diskRevision: 100 })),
+    onDiskRevision: vi.fn(),
     isReviewActiveRef: ref(false),
     reload: vi.fn().mockResolvedValue(undefined),
     onReloaded: vi.fn(),
@@ -44,12 +43,12 @@ describe("useExternalChangeWatcher", () => {
     expect(o.reload).toHaveBeenCalledWith("C:/doc.md");
     expect(o.onReloaded).toHaveBeenCalled();
     expect(o.onConflict).not.toHaveBeenCalled();
-    expect(o.knownMtimeRef.current).toBe(200); // advanced so it won't re-fire
+    expect(o.onDiskRevision).toHaveBeenCalledWith("doc", 200);
   });
 
   it("warns instead of reloading when the buffer is dirty", async () => {
     (invoke as Mock).mockResolvedValue({ modified: 200 });
-    const o = setup({ contentRef: ref("edited"), originalContentRef: ref("same") });
+    const o = setup({ sessionRef: ref(createDocumentSession({ id: "doc", path: "C:/doc.md", name: "doc.md", content: "edited", savedContent: "same", diskRevision: 100 })) });
     await focus();
     expect(o.onConflict).toHaveBeenCalled();
     expect(o.reload).not.toHaveBeenCalled();
@@ -57,7 +56,7 @@ describe("useExternalChangeWatcher", () => {
 
   it("does nothing when the on-disk mtime is not newer", async () => {
     (invoke as Mock).mockResolvedValue({ modified: 100 });
-    const o = setup({ knownMtimeRef: ref(100) });
+    const o = setup({ sessionRef: ref(createDocumentSession({ id: "doc", path: "C:/doc.md", name: "doc.md", content: "same", diskRevision: 100 })) });
     await focus();
     expect(o.reload).not.toHaveBeenCalled();
     expect(o.onConflict).not.toHaveBeenCalled();
@@ -87,7 +86,7 @@ describe("useExternalChangeWatcher", () => {
   });
 
   it("ignores focus when no file is open", async () => {
-    const o = setup({ filePathRef: ref<string | null>(null) });
+    const o = setup({ sessionRef: ref(null) });
     await focus();
     expect(invoke).not.toHaveBeenCalled();
     expect(o.reload).not.toHaveBeenCalled();
