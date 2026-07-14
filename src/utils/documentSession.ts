@@ -1,4 +1,6 @@
-import type { ViewMode } from "../components/ModeToggle";
+/** Kept independent from React components so sessions can be tested and owned
+ * by the editor controller in P5. */
+export type DocumentViewMode = "code" | "split" | "preview";
 
 export interface DocumentFormat {
     encoding: "utf-8";
@@ -17,7 +19,7 @@ export interface DocumentSession {
     diskRevision: number;
     fileSize: number;
     format: DocumentFormat;
-    viewMode: ViewMode;
+    viewMode: DocumentViewMode;
     cursorLine: number;
     recoveryPending: boolean;
 }
@@ -29,7 +31,7 @@ export interface DocumentSessionInput {
     content: string;
     diskRevision?: number;
     fileSize?: number;
-    viewMode?: ViewMode;
+    viewMode?: DocumentViewMode;
     cursorLine?: number;
 }
 
