@@ -1342,19 +1342,18 @@ function AppContent() {
     });
     if (!selected) return;
     const name = selected.replace(/\\/g, "/").split("/").pop() || "Untitled";
-    const session = activeSession();
+    const snapshot = sessionController.readActive();
+    if (!snapshot) return;
     try {
-      const mtime = await invoke<number>("save_file", { path: selected, content });
-      if (session) {
-        const current = sessionController.get(session.id);
-        if (!current || current.version !== session.version || current.content !== content) return;
-        sessionController.markSaved(session.id, { documentId: session.id, version: session.version, value: mtime });
-        sessionController.updateFileMetadata(session.id, { path: selected, name, fileSize: content.length, diskRevision: mtime });
-      }
+      const mtime = await invoke<number>("save_file", { path: selected, content: snapshot.value });
+      const current = sessionController.get(snapshot.documentId);
+      if (!current || !sessionController.acceptsResult(snapshot.documentId, snapshot)) return;
+      sessionController.markSaved(snapshot.documentId, { documentId: snapshot.documentId, version: snapshot.version, value: mtime });
+      sessionController.updateFileMetadata(snapshot.documentId, { path: selected, name, fileSize: snapshot.value.length, diskRevision: mtime });
       knownMtimeRef.current = mtime;
       setFilePath(selected);
       setFileName(name);
-      setOriginalContent(content);
+      setOriginalContent(snapshot.value);
       addRecentFile(selected, name);
       setLastFile(selected);
       // Keep the active tab's entry in step with the new path/name so reopening
@@ -1362,7 +1361,7 @@ function AppContent() {
       const activeId = activeTabIdRef.current;
       if (activeId) {
         commitTabs(tabsRef.current.map((t) => (t.id === activeId ? {
-          ...t, filePath: selected, fileName: name, content, originalContent: content,
+          ...t, filePath: selected, fileName: name, content: snapshot.value, originalContent: snapshot.value,
           knownMtime: knownMtimeRef.current,
         } : t)));
       }
@@ -1372,31 +1371,29 @@ function AppContent() {
       const msg = errMessage(err);
       showToast(msg || tr("Failed to save file"), "error");
     }
-  }, [content, fileName, showToast, commitTabs, tr, activeSession, sessionController]);
+  }, [fileName, showToast, commitTabs, tr, sessionController]);
 
   // Save file (Save As if no path yet)
   const handleSaveFile = useCallback(async () => {
-    if (!filePath) {
+    const snapshot = sessionController.readActive();
+    const path = snapshot ? sessionController.get(snapshot.documentId)?.path : null;
+    if (!path) {
       await handleSaveAs();
       return;
     }
-    const session = activeSession();
     try {
-      const mtime = await invoke<number>("save_file", { path: filePath, content });
-      if (session) {
-        const current = sessionController.get(session.id);
-        if (!current || current.version !== session.version || current.content !== content) return;
-        sessionController.markSaved(session.id, { documentId: session.id, version: session.version, value: mtime });
-      }
+      const mtime = await invoke<number>("save_file", { path, content: snapshot!.value });
+      if (!sessionController.acceptsResult(snapshot!.documentId, snapshot!)) return;
+      sessionController.markSaved(snapshot!.documentId, { documentId: snapshot!.documentId, version: snapshot!.version, value: mtime });
       knownMtimeRef.current = mtime;
-      setOriginalContent(content);
+      setOriginalContent(snapshot!.value);
       showToast(tr("File saved"), "success");
     } catch (err) {
       console.error("Failed to save file:", err);
       const msg = errMessage(err);
       showToast(msg || tr("Failed to save file"), "error");
     }
-  }, [filePath, content, showToast, handleSaveAs, tr, activeSession, sessionController]);
+  }, [showToast, handleSaveAs, tr, sessionController]);
 
   // Runtime file-open forwards. Cold-start CLI files are handled by the pull
   // in the boot effect above; this event now arrives only from the

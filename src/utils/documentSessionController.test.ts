@@ -33,6 +33,17 @@ describe("DocumentSessionController", () => {
         expect(controller.get("b")).toMatchObject({ content: "second", version: 0, savedVersion: 0 });
     });
 
+    it("returns an immutable versioned read for save, preview, and AI work", () => {
+        const controller = new DocumentSessionController();
+        controller.open(input("a", "first"));
+        const read = controller.readActive();
+        controller.replaceContent("a", "second");
+
+        expect(read).toEqual({ documentId: "a", version: 0, value: "first" });
+        expect(controller.acceptsResult("a", read!)).toBe(false);
+        expect(controller.read("missing")).toBeNull();
+    });
+
     it("notifies subscribers only when a session projection changes", () => {
         const controller = new DocumentSessionController();
         const listener = vi.fn();

@@ -43,6 +43,9 @@ export interface DocumentSessionFileMetadata {
     diskRevision?: number;
 }
 
+/** Immutable content read for work that may complete asynchronously. */
+export interface DocumentSessionContentSnapshot extends SessionResult<string> {}
+
 type SnapshotListener = () => void;
 
 /**
@@ -71,6 +74,15 @@ export class DocumentSessionController {
 
     getActive(): DocumentSession | null {
         return this.activeId ? this.get(this.activeId) : null;
+    }
+
+    read(id: string): DocumentSessionContentSnapshot | null {
+        const session = this.get(id);
+        return session ? { documentId: session.id, version: session.version, value: session.content } : null;
+    }
+
+    readActive(): DocumentSessionContentSnapshot | null {
+        return this.activeId ? this.read(this.activeId) : null;
     }
 
     open(input: DocumentSessionInput, activate = true): DocumentSession {
