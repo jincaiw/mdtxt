@@ -50,6 +50,7 @@ export interface DocumentSessionContentSnapshot extends SessionResult<string> {}
 export interface DirtyDocumentSessionSnapshot extends DocumentSessionContentSnapshot {
     path: string | null;
     name: string;
+    diskRevision: number;
 }
 
 type SnapshotListener = () => void;
@@ -103,6 +104,7 @@ export class DocumentSessionController {
             value: session.content,
             path: session.path,
             name: session.name,
+            diskRevision: session.diskRevision,
             dirty: isSessionDirty(session),
         }))
             .filter((snapshot) => snapshot.dirty)

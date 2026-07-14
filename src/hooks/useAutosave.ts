@@ -9,6 +9,8 @@ export interface UseAutosaveOptions {
     documentId: string;
     version: number;
     filePath: string | null;
+    /** Disk revision read when this document revision was selected. */
+    diskRevision: number;
     content: string;
     dirty: boolean;
   } | null;
@@ -52,7 +54,11 @@ export function useAutosave({
     if (!enabled || !snapshot?.filePath || !snapshot.dirty || isReviewActive) return;
     const id = window.setTimeout(async () => {
       try {
-        const mtime = await invoke<number>("save_file", { path: snapshot.filePath, content: snapshot.content });
+        const mtime = await invoke<number>("save_file", {
+          path: snapshot.filePath,
+          content: snapshot.content,
+          expectedRevision: snapshot.diskRevision || undefined,
+        });
         onSaved(mtime, snapshot);
         lastErrorRef.current = 0;
       } catch (err) {

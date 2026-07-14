@@ -20,8 +20,9 @@ export interface UseExternalChangeWatcherOptions {
 /**
  * Detect the open file changing underneath us (sync tools, another editor). On
  * window focus, stat the file: if it's newer than what we last wrote and the
- * buffer is clean, reload silently; if the buffer is dirty, warn that saving will
- * overwrite. EXT-01.
+ * buffer is clean, reload silently. A dirty buffer keeps its older disk
+ * revision so the native expected-revision guard rejects saves until the
+ * conflict is explicitly resolved. EXT-01 / FR-COMPAT-004.
  *
  * `reload`/`onReloaded`/`onConflict` should be stable (useCallback); everything
  * else is read through refs so the focus listener mounts once.
@@ -47,9 +48,8 @@ export function useExternalChangeWatcher({
         const info = await invoke<{ modified: number }>("get_file_info", { path });
         const known = session.diskRevision;
         if (known > 0 && info.modified > known) {
-          // Update first so a failed/declined reload doesn't re-toast forever.
-          onDiskRevision(session.id, info.modified);
           if (session.version === session.savedVersion) {
+            onDiskRevision(session.id, info.modified);
             await reload(path);
             onReloaded();
           } else {

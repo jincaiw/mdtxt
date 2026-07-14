@@ -371,6 +371,7 @@ function AppContent() {
       documentId: active.id,
       version: active.version,
       filePath: active.path,
+      diskRevision: active.diskRevision,
       content: active.content,
       dirty: active.version !== active.savedVersion,
     };
@@ -787,7 +788,11 @@ function AppContent() {
         path = selected;
       }
       try {
-        const mtime = await invoke<number>("save_file", { path, content: snapshot.value });
+        const mtime = await invoke<number>("save_file", {
+          path,
+          content: snapshot.value,
+          expectedRevision: snapshot.path ? snapshot.diskRevision || undefined : undefined,
+        });
         if (!sessionController.acceptsResult(snapshot.documentId, snapshot)) {
           showToast(tr("The document changed while saving. Please save again."), "error");
           return;
@@ -826,7 +831,7 @@ function AppContent() {
     [showToast, tr]
   );
   const handleExternalConflict = useCallback(
-    () => showToast(tr("This file changed on disk. Saving will overwrite those changes."), "error"),
+    () => showToast(tr("This file changed on disk. Saving is blocked until you reload or save a copy."), "error"),
     [showToast, tr]
   );
   const handleExternalDiskRevision = useCallback((documentId: string, diskRevision: number) => {
@@ -881,7 +886,11 @@ function AppContent() {
         const snapshot = sessionController.read(summary.id);
         if (!snapshot || !summary.path) continue;
         try {
-          const mtime = await invoke<number>("save_file", { path: summary.path, content: snapshot.value });
+          const mtime = await invoke<number>("save_file", {
+            path: summary.path,
+            content: snapshot.value,
+            expectedRevision: summary.diskRevision || undefined,
+          });
           if (!sessionController.acceptsResult(summary.id, snapshot)) continue;
           sessionController.markSaved(summary.id, { documentId: summary.id, version: snapshot.version, value: mtime });
           // Keep the temporary tab projection synchronized until P4d removes it.
@@ -895,8 +904,8 @@ function AppContent() {
   // External-change detection for BACKGROUND tabs. The active tab is handled by
   // useExternalChangeWatcher; on window focus we also stat every other open
   // file. A clean background tab silently refreshes its snapshot; a dirty one
-  // gets a one-time conflict warning (its knownMtime is advanced so it won't
-  // re-toast every focus). TABS-06.
+  // gets a one-time conflict warning. Its session revision stays unchanged, so
+  // the native save guard rejects an accidental overwrite. TABS-06.
   useEffect(() => {
     const onFocus = async () => {
       const activeId = activeTabIdRef.current;
@@ -919,7 +928,7 @@ function AppContent() {
             );
           } else {
             commitTabs(tabsRef.current.map((x) => (x.id === summary.id ? { ...x, knownMtime: info.modified } : x)));
-            showToast(tr("{file} changed on disk in a background tab. Saving it will overwrite those changes.", { file: summary.name }), "error");
+            showToast(tr("{file} changed on disk in a background tab. Saving is blocked until you reload or save a copy.", { file: summary.name }), "error");
           }
         } catch {/* file gone / stat failed — surfaced when that tab is saved */}
       }
@@ -1038,6 +1047,7 @@ function AppContent() {
     return {
       filePath: session.path,
       fileName: session.name,
+      diskRevision: session.diskRevision,
       snapshot,
     };
   }, [sessionController]);
@@ -1059,7 +1069,11 @@ function AppContent() {
       path = selected;
     }
     try {
-      const mtime = await invoke<number>("save_file", { path, content: data.snapshot.value });
+      const mtime = await invoke<number>("save_file", {
+        path,
+        content: data.snapshot.value,
+        expectedRevision: data.filePath ? data.diskRevision || undefined : undefined,
+      });
       if (!sessionController.acceptsResult(prompt.id, data.snapshot)) {
         showToast(tr("The document changed while saving. Please save again."), "error");
         return;
@@ -1379,7 +1393,11 @@ function AppContent() {
       return;
     }
     try {
-      const mtime = await invoke<number>("save_file", { path, content: snapshot!.value });
+      const mtime = await invoke<number>("save_file", {
+        path,
+        content: snapshot!.value,
+        expectedRevision: sessionController.get(snapshot!.documentId)?.diskRevision || undefined,
+      });
       if (!sessionController.acceptsResult(snapshot!.documentId, snapshot!)) return;
       sessionController.markSaved(snapshot!.documentId, { documentId: snapshot!.documentId, version: snapshot!.version, value: mtime });
       knownMtimeRef.current = mtime;

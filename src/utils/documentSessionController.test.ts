@@ -57,6 +57,7 @@ describe("DocumentSessionController", () => {
                 value: "after",
                 path: "/notes/dirty.md",
                 name: "dirty.md",
+                diskRevision: 10,
             },
         ]);
     });

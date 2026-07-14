@@ -51,6 +51,7 @@ describe("useExternalChangeWatcher", () => {
     const o = setup({ sessionRef: ref(createDocumentSession({ id: "doc", path: "C:/doc.md", name: "doc.md", content: "edited", savedContent: "same", diskRevision: 100 })) });
     await focus();
     expect(o.onConflict).toHaveBeenCalled();
+    expect(o.onDiskRevision).not.toHaveBeenCalled();
     expect(o.reload).not.toHaveBeenCalled();
   });
 

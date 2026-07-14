@@ -34,6 +34,8 @@ pub enum CommandError {
     ReadError(String),
     #[error("Failed to write file: {0}")]
     WriteError(String),
+    #[error("File changed on disk: {0}")]
+    Conflict(String),
     #[error("File too large: {0}")]
     TooLarge(String),
 }
@@ -216,7 +218,11 @@ pub async fn read_file(path: String) -> Result<FileData, CommandError> {
 /// `.mdtxt-tmp` file. (std/tokio rename replaces the target on Windows
 /// via MoveFileEx + MOVEFILE_REPLACE_EXISTING, and is atomic on POSIX.)
 #[tauri::command]
-pub async fn save_file(path: String, content: String) -> Result<u64, CommandError> {
+pub async fn save_file(
+    path: String,
+    content: String,
+    expected_revision: Option<u64>,
+) -> Result<u64, CommandError> {
     // Mirror the read-side limit. Refusing to write a >50 MB markdown file
     // protects the user from accidentally truncating something pasted from
     // another tool, and matches what `read_file` would refuse to load back.
@@ -234,7 +240,24 @@ pub async fn save_file(path: String, content: String) -> Result<u64, CommandErro
     // A brand-new file (save-as / new note) has no existing EOL, so we keep the
     // editor's LF. EOL-01.
     let target = PathBuf::from(&path);
-    let existing_metadata = tokio::fs::metadata(&target).await.ok();
+    let existing_metadata = match tokio::fs::metadata(&target).await {
+        Ok(metadata) => {
+            if let Some(expected) = expected_revision.filter(|revision| *revision > 0) {
+                let actual = mtime_ms(&metadata);
+                if actual != expected {
+                    return Err(CommandError::Conflict(path));
+                }
+            }
+            Some(metadata)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            if expected_revision.is_some_and(|revision| revision > 0) {
+                return Err(CommandError::Conflict(path));
+            }
+            None
+        }
+        Err(error) => return Err(CommandError::WriteError(error.to_string())),
+    };
     let content = if existing_metadata.is_some() {
         apply_eol(&content, detect_file_eol(&path).await)
     } else {
@@ -769,7 +792,7 @@ pub fn set_ai_key(key: String) -> Result<(), String> {
 mod tests {
     use super::{
         apply_eol, read_file, sanitize_image_name, save_file, save_temp_path, search_markdown_tree,
-        validate_rel_path, Eol,
+        validate_rel_path, CommandError, Eol,
     };
     use std::path::{Path, PathBuf};
 
@@ -832,12 +855,14 @@ mod tests {
             std::fs::create_dir_all(&dir).unwrap();
             let path = dir.join("doc.md").to_string_lossy().to_string();
 
-            let mtime = save_file(path.clone(), "hello".into()).await.unwrap();
+            let mtime = save_file(path.clone(), "hello".into(), None).await.unwrap();
             assert!(mtime > 0);
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
 
             // Overwrite must replace the existing file (rename-over semantics).
-            let mtime2 = save_file(path.clone(), "world".into()).await.unwrap();
+            let mtime2 = save_file(path.clone(), "world".into(), Some(mtime))
+                .await
+                .unwrap();
             assert!(mtime2 >= mtime);
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "world");
 
@@ -862,6 +887,31 @@ mod tests {
         assert_eq!(first.parent(), Some(Path::new("/tmp")));
     }
 
+    #[test]
+    fn save_file_rejects_a_stale_expected_revision_without_overwriting() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let dir = std::env::temp_dir().join(format!("mdtxt-conflict-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("doc.md");
+            std::fs::write(&path, "disk version").unwrap();
+
+            let result = save_file(
+                path.to_string_lossy().to_string(),
+                "local version".into(),
+                Some(1),
+            )
+            .await;
+
+            assert!(matches!(result, Err(CommandError::Conflict(_))));
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), "disk version");
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
     #[cfg(unix)]
     #[test]
     fn save_file_preserves_existing_permissions() {
@@ -879,7 +929,7 @@ mod tests {
             std::fs::write(&path, "old").unwrap();
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
 
-            save_file(path.to_string_lossy().to_string(), "new".into())
+            save_file(path.to_string_lossy().to_string(), "new".into(), None)
                 .await
                 .unwrap();
 
@@ -939,7 +989,7 @@ mod tests {
             // Seed a CRLF file, then "edit" it with LF-only content (as the editor
             // would hand us) and confirm the CRLF convention survives the save.
             std::fs::write(&path, "one\r\ntwo\r\n").unwrap();
-            save_file(path.clone(), "one\ntwo\nthree".into())
+            save_file(path.clone(), "one\ntwo\nthree".into(), None)
                 .await
                 .unwrap();
             assert_eq!(
@@ -949,7 +999,9 @@ mod tests {
 
             // A brand-new file keeps the editor's LF.
             let lf_path = dir.join("new.md").to_string_lossy().to_string();
-            save_file(lf_path.clone(), "a\nb".into()).await.unwrap();
+            save_file(lf_path.clone(), "a\nb".into(), None)
+                .await
+                .unwrap();
             assert_eq!(std::fs::read_to_string(&lf_path).unwrap(), "a\nb");
 
             std::fs::remove_dir_all(&dir).ok();
@@ -972,7 +1024,7 @@ mod tests {
 
             let opened = read_file(path.clone()).await.unwrap();
             assert_eq!(opened.content, "\u{feff}# title\n\n::: custom {x}\n");
-            save_file(path.clone(), opened.content).await.unwrap();
+            save_file(path.clone(), opened.content, None).await.unwrap();
 
             assert_eq!(std::fs::read(&path).unwrap(), original);
             std::fs::remove_dir_all(&dir).ok();
