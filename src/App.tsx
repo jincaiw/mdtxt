@@ -291,6 +291,8 @@ function AppContent() {
   tabsRef.current = tabs;
   const activeTabIdRef = useRef<string | null>(null);
   activeTabIdRef.current = activeTabId;
+  const modeRef = useRef<ViewMode>(mode);
+  modeRef.current = mode;
   // Stack of recently-closed tabs (path + caret line) for Ctrl+Shift+T. Only
   // saved files are recoverable; untitled buffers aren't pushed. TABS-15.
   const closedTabsRef = useRef<{ path: string; cursorLine?: number }[]>([]);
@@ -367,12 +369,13 @@ function AppContent() {
 
 
   const setMode = useCallback((next: ViewMode | ((previous: ViewMode) => ViewMode)) => {
-    setModeState((previous) => {
-      const resolved = typeof next === "function" ? next(previous) : next;
-      const activeId = activeTabIdRef.current;
-      if (activeId) sessionController.setViewMode(activeId, resolved);
-      return resolved;
-    });
+    // Do not notify the external session store from React's state-updater
+    // callback: React may invoke that callback while rendering, and the store
+    // subscription would then try to update App during its own render.
+    const resolved = typeof next === "function" ? next(modeRef.current) : next;
+    const activeId = activeTabIdRef.current;
+    if (activeId) sessionController.setViewMode(activeId, resolved);
+    setModeState(resolved);
   }, [setModeState, sessionController]);
 
   // Every close-time save reads the controller's versioned snapshots. React tab
