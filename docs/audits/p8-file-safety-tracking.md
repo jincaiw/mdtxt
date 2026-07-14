@@ -31,12 +31,10 @@ accepted.**
 
 ## Remaining P8 gates
 
-1. Provide a visible, non-destructive conflict flow: compare, reload disk,
-   keep local, and save-as. No choice may silently overwrite either version.
-2. Record the equivalent Windows and Linux recovery behavior before release.
-3. Add failure-injection tests for write, sync, rename and directory-sync
+1. Record the equivalent Windows and Linux recovery behavior before release.
+2. Add failure-injection tests for write, sync, rename and directory-sync
    errors; verify the original bytes and editable buffer survive each error.
-4. Record macOS, Windows, and Linux behavior for symbolic links, long paths,
+3. Record macOS, Windows, and Linux behavior for symbolic links, long paths,
    UNC paths, locks, directory synchronization, and replacement semantics.
 
 ## Rollback boundary
