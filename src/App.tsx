@@ -111,6 +111,7 @@ import {
   nextUntitledName,
   findReusableUntitledTab,
   createTabIdFactory,
+  createLaunchInstanceId,
   computeTabLabels,
   moveTab,
   type TabState,
@@ -128,6 +129,7 @@ import {
 import { DocumentSessionController } from "./utils/documentSessionController";
 import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
 import { assessLiveEligibility } from "./editor/live/liveEligibility";
+import { orderRecoveryEntries, selectRecoveredActive } from "./utils/recoveryModel";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
 import tutorialMarkdown from "./assets/tutorial.md?raw";
@@ -315,6 +317,10 @@ function AppContent() {
   // retained CodeMirror state without copying Markdown through React. TABS-01.
   const tabIdFactoryRef = useRef<ReturnType<typeof createTabIdFactory> | null>(null);
   if (tabIdFactoryRef.current === null) tabIdFactoryRef.current = createTabIdFactory();
+  // All snapshots written by this running process share a batch id. It is
+  // metadata only; document ids remain the native recovery-file key.
+  const recoverySessionIdRef = useRef<string | null>(null);
+  if (recoverySessionIdRef.current === null) recoverySessionIdRef.current = createLaunchInstanceId();
   const tabsRef = useRef<TabState[]>([]);
   tabsRef.current = tabs;
   const activeTabIdRef = useRef<string | null>(null);
@@ -953,17 +959,26 @@ function AppContent() {
   // entry, so a successful save never prompts to restore already-durable text.
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      const activeId = activeTabIdRef.current;
       for (const summary of sessionSnapshot.sessions) {
         if (summary.dirty) {
           const snapshot = sessionController.read(summary.id);
           const session = sessionController.get(summary.id);
           if (!snapshot || !session) continue;
+          const tab = tabsRef.current.find((candidate) => candidate.id === summary.id);
+          const tabIndex = tabsRef.current.findIndex((candidate) => candidate.id === summary.id);
           void invoke("write_recovery", {
             documentId: session.id,
             path: session.path,
             name: session.name,
             content: snapshot.value,
             version: snapshot.version,
+            context: {
+              recoverySessionId: recoverySessionIdRef.current,
+              tabIndex: tabIndex >= 0 ? tabIndex : undefined,
+              wasActive: summary.id === activeId,
+              cursorLine: summary.id === activeId ? currentLineRef.current : (tab?.cursorLine ?? session.cursorLine),
+            },
           }).catch((error) => {
             console.warn("Failed to write recovery snapshot:", error);
             showToast(tr("Could not create recovery backup"), "error");
@@ -1398,21 +1413,59 @@ function AppContent() {
       .catch(() => {});
   }, []);
 
-  const handleRestoreRecovery = useCallback((entry: import("./components/RecoveryDialog").RecoveryCandidate) => {
+  const restoreRecoveryEntries = useCallback((entries: import("./components/RecoveryDialog").RecoveryCandidate[]) => {
+    if (entries.length === 0) return;
     snapshotActiveTab();
-    const id = newTabId();
-    const name = `${tr("Recovered")} — ${entry.name}`;
-    commitTabs([...tabsRef.current, { id, filePath: null, fileName: name, fileSize: entry.content.length, knownMtime: 0 }]);
-    sessionController.open({ id, path: null, name, content: entry.content, savedContent: "", fileSize: entry.content.length, viewMode: "code" }, false);
-    setActiveTab(id);
-    setFilePath(null); setFileName(name); setFileSize(entry.content.length); setMode("code");
-    void invoke("discard_recovery", { documentId: entry.documentId }).catch(() => {
-      // Restoration is already safely isolated in a new untitled tab. Keep it
-      // usable, but disclose that the native copy could reappear next launch.
-      showToast(tr("Could not clear the recovered backup. It may appear again after restart."), "error");
-    });
-    setRecoveryEntries((entries) => entries.filter((candidate) => candidate.documentId !== entry.documentId));
-  }, [snapshotActiveTab, newTabId, tr, commitTabs, sessionController, setActiveTab, setMode, showToast]);
+    const ordered = orderRecoveryEntries(entries);
+    const restored = ordered.map((entry) => ({
+      entry,
+      id: newTabId(),
+      name: `${tr("Recovered")} — ${entry.name}`,
+    }));
+    const restoredTabs = restored.map(({ entry, id, name }) => ({
+      id,
+      filePath: null,
+      fileName: name,
+      fileSize: entry.content.length,
+      knownMtime: 0,
+      cursorLine: entry.cursorLine,
+    }));
+    commitTabs([...tabsRef.current, ...restoredTabs]);
+    for (const { entry, id, name } of restored) {
+      sessionController.open({
+        id,
+        path: null,
+        name,
+        content: entry.content,
+        savedContent: "",
+        fileSize: entry.content.length,
+        viewMode: "code",
+        cursorLine: entry.cursorLine,
+      }, false);
+    }
+    const activeEntry = selectRecoveredActive(ordered)!;
+    const active = restored.find(({ entry }) => entry === activeEntry)!;
+    const activeTab = restoredTabs.find((tab) => tab.id === active.id)!;
+    setActiveTab(active.id);
+    applyTabToLive(activeTab);
+    const restoredIds = new Set(entries.map((entry) => entry.documentId));
+    for (const { entry } of restored) {
+      void invoke("discard_recovery", { documentId: entry.documentId }).catch(() => {
+        // Restoration is safely isolated in a new untitled tab. Keep it usable,
+        // but disclose that the native copy could reappear next launch.
+        showToast(tr("Could not clear the recovered backup. It may appear again after restart."), "error");
+      });
+    }
+    setRecoveryEntries((current) => current.filter((candidate) => !restoredIds.has(candidate.documentId)));
+  }, [snapshotActiveTab, newTabId, tr, commitTabs, sessionController, setActiveTab, applyTabToLive, showToast]);
+
+  const handleRestoreRecovery = useCallback((entry: import("./components/RecoveryDialog").RecoveryCandidate) => {
+    restoreRecoveryEntries([entry]);
+  }, [restoreRecoveryEntries]);
+
+  const handleRestoreAllRecovery = useCallback((entries: import("./components/RecoveryDialog").RecoveryCandidate[]) => {
+    restoreRecoveryEntries(entries);
+  }, [restoreRecoveryEntries]);
 
   const handleDiscardRecovery = useCallback((entry: import("./components/RecoveryDialog").RecoveryCandidate) => {
     void invoke("discard_recovery", { documentId: entry.documentId })
@@ -2426,7 +2479,7 @@ function AppContent() {
 
       {recoveryEntries.length > 0 && (
         <Suspense fallback={null}>
-          <RecoveryDialog entries={recoveryEntries} onRestore={handleRestoreRecovery} onDiscard={handleDiscardRecovery} />
+          <RecoveryDialog entries={recoveryEntries} onRestore={handleRestoreRecovery} onRestoreAll={handleRestoreAllRecovery} onDiscard={handleDiscardRecovery} />
         </Suspense>
       )}
 

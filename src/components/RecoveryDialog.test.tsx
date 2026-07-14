@@ -10,6 +10,14 @@ const recovery: RecoveryCandidate = {
     savedAtMs: Date.UTC(2026, 6, 15),
 };
 
+const secondRecovery: RecoveryCandidate = {
+    ...recovery,
+    documentId: "recovery-2",
+    name: "second.md",
+    tabIndex: 1,
+    wasActive: true,
+};
+
 afterEach(cleanup);
 
 describe("RecoveryDialog", () => {
@@ -23,7 +31,7 @@ describe("RecoveryDialog", () => {
         const onDiscard = vi.fn();
         render(
             <LocaleProvider>
-                <RecoveryDialog entries={[recovery]} onRestore={onRestore} onDiscard={onDiscard} />
+                <RecoveryDialog entries={[recovery]} onRestore={onRestore} onRestoreAll={vi.fn()} onDiscard={onDiscard} />
             </LocaleProvider>,
         );
 
@@ -43,10 +51,24 @@ describe("RecoveryDialog", () => {
     it("does not render a recovery prompt without verified entries", () => {
         render(
             <LocaleProvider>
-                <RecoveryDialog entries={[]} onRestore={vi.fn()} onDiscard={vi.fn()} />
+                <RecoveryDialog entries={[]} onRestore={vi.fn()} onRestoreAll={vi.fn()} onDiscard={vi.fn()} />
             </LocaleProvider>,
         );
 
         expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it("offers one explicit restore-all action for a recoverable tab group", () => {
+        const onRestoreAll = vi.fn();
+        render(
+            <LocaleProvider>
+                <RecoveryDialog entries={[recovery, secondRecovery]} onRestore={vi.fn()} onRestoreAll={onRestoreAll} onDiscard={vi.fn()} />
+            </LocaleProvider>,
+        );
+
+        const restoreAll = screen.getByRole("button", { name: "Restore all" });
+        expect(restoreAll).toHaveFocus();
+        fireEvent.click(restoreAll);
+        expect(onRestoreAll).toHaveBeenCalledWith([recovery, secondRecovery]);
     });
 });

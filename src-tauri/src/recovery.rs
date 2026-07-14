@@ -16,6 +16,25 @@ pub struct RecoveryEntry {
     pub version: u64,
     pub saved_at_ms: u64,
     pub checksum: String,
+    /// Metadata is intentionally independent from the checksum: it restores
+    /// session placement but must never change the recovered Markdown bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab_index: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub was_active: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor_line: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryContext {
+    pub recovery_session_id: Option<String>,
+    pub tab_index: Option<u32>,
+    pub was_active: Option<bool>,
+    pub cursor_line: Option<u32>,
 }
 
 fn now_ms() -> u64 {
@@ -40,6 +59,7 @@ pub fn save_entry(
     name: String,
     content: String,
     version: u64,
+    context: RecoveryContext,
 ) -> std::io::Result<RecoveryEntry> {
     std::fs::create_dir_all(directory)?;
     let entry = RecoveryEntry {
@@ -50,6 +70,10 @@ pub fn save_entry(
         content,
         version,
         saved_at_ms: now_ms(),
+        recovery_session_id: context.recovery_session_id,
+        tab_index: context.tab_index,
+        was_active: context.was_active,
+        cursor_line: context.cursor_line,
     };
     let target = entry_path(directory, &entry.document_id);
     let temporary = target.with_extension(format!("{}.tmp", std::process::id()));
@@ -114,6 +138,7 @@ pub fn write_recovery(
     name: String,
     content: String,
     version: u64,
+    context: Option<RecoveryContext>,
 ) -> Result<RecoveryEntry, String> {
     save_entry(
         &recovery_directory(&app)?,
@@ -122,6 +147,7 @@ pub fn write_recovery(
         name,
         content,
         version,
+        context.unwrap_or_default(),
     )
     .map_err(|error| error.to_string())
 }
@@ -179,6 +205,12 @@ mod tests {
             "a.md".into(),
             "local".into(),
             3,
+            RecoveryContext {
+                recovery_session_id: Some("launch-a".into()),
+                tab_index: Some(1),
+                was_active: Some(true),
+                cursor_line: Some(42),
+            },
         )
         .unwrap();
         assert_eq!(read_entries(&dir).unwrap(), vec![saved]);
@@ -199,6 +231,10 @@ mod tests {
             version: 1,
             saved_at_ms: now_ms(),
             checksum: "wrong".into(),
+            recovery_session_id: None,
+            tab_index: None,
+            was_active: None,
+            cursor_line: None,
         };
         std::fs::write(dir.join("bad.json"), serde_json::to_vec(&bad).unwrap()).unwrap();
         assert!(read_entries(&dir).unwrap().is_empty());

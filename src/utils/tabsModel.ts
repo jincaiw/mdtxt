@@ -23,12 +23,13 @@ export interface TabState {
  * snapshots are keyed by document id, so a process-local `tab-1` counter would
  * otherwise let a newly opened tab overwrite an unresolved crash recovery.
  */
-export function createTabIdFactory(instanceId = createTabInstanceId()): () => string {
+export function createTabIdFactory(instanceId = createLaunchInstanceId()): () => string {
   let sequence = 0;
   return () => `tab-${instanceId}-${++sequence}`;
 }
 
-function createTabInstanceId(): string {
+/** A collision-resistant id for one application launch and its recovery batch. */
+export function createLaunchInstanceId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
