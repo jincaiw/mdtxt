@@ -39,6 +39,9 @@ accepted.**
    lock behavior separately because POSIX advisory locks are not automatically
    enforced by rename.
 
+The required platform-by-platform evidence is maintained in
+[`docs/testing/p8-file-system-matrix.md`](../testing/p8-file-system-matrix.md).
+
 ## Rollback boundary
 
 P8a spans `src-tauri/src/commands.rs`, the versioned document-session contract,
