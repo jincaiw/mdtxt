@@ -12,10 +12,8 @@ import {
 } from "@codemirror/view";
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
 import { autocompletion, closeBrackets, closeBracketsKeymap, type CompletionContext, type CompletionResult, type Completion } from "@codemirror/autocomplete";
 import { unifiedMergeView, getChunks, getOriginalDoc } from "@codemirror/merge";
-import { tags as t } from "@lezer/highlight";
 import { getImageFromClipboard, saveImageToFile, createMarkdownImage } from "../utils/imageUtils";
 import {
     handleTab,
@@ -38,6 +36,12 @@ import { applyTableOp, findTableAt, locateCell, type Align } from "../utils/tabl
 import type { Scroller } from "../utils/scrollSync";
 import { useLocale } from "../context/LocaleContext";
 import { minimalTextChange } from "../utils/minimalTextChange";
+import {
+    applyEditorResult,
+    editorTheme,
+    markdownPresentationExtensions,
+    toEditorActionState,
+} from "../editor/core/editorPresentation";
 
 interface CodeEditorProps {
     /** Stable owner used to restore this document's EditorState. */
@@ -67,90 +71,6 @@ interface CodeEditorProps {
     onReviewResolve?: (finalDoc: string | null) => void;
 }
 
-const EDITOR_FONT_FAMILY =
-    "'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace";
-
-// Markdown syntax colours, driven by the same CSS variables the rest of the app
-// themes with — so light/dark/paper/dracula all "just work" in the editor too.
-const markdownHighlight = HighlightStyle.define([
-    { tag: t.heading1, color: "var(--syntax-h1)", fontWeight: "bold" },
-    { tag: t.heading2, color: "var(--syntax-h2)", fontWeight: "bold" },
-    { tag: [t.heading3, t.heading4, t.heading5, t.heading6], color: "var(--syntax-h3)", fontWeight: "600" },
-    { tag: t.strong, color: "var(--syntax-bold)", fontWeight: "bold" },
-    { tag: t.emphasis, fontStyle: "italic" },
-    { tag: t.strikethrough, textDecoration: "line-through" },
-    { tag: t.link, color: "var(--syntax-link)" },
-    { tag: t.url, color: "var(--syntax-link)" },
-    { tag: t.monospace, color: "var(--syntax-code)" },
-    { tag: t.quote, color: "var(--syntax-quote)", fontStyle: "italic" },
-    { tag: t.list, color: "var(--syntax-list)" },
-    { tag: t.processingInstruction, color: "var(--syntax-list)" },
-]);
-
-const editorTheme = EditorView.theme({
-    "&": {
-        height: "100%",
-        color: "var(--text-primary)",
-        backgroundColor: "var(--bg-editor)",
-        fontSize: "14px",
-    },
-    ".cm-scroller": {
-        fontFamily: EDITOR_FONT_FAMILY,
-        lineHeight: "24px",
-        overflow: "auto",
-    },
-    ".cm-content": {
-        caretColor: "var(--accent)",
-        padding: "16px 0",
-    },
-    ".cm-gutters": {
-        backgroundColor: "var(--bg-gutter)",
-        color: "var(--text-muted)",
-        border: "none",
-        borderRight: "1px solid var(--border-subtle)",
-    },
-    ".cm-activeLine": { backgroundColor: "var(--bg-hover)" },
-    ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--text-primary)" },
-    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--accent)" },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
-        backgroundColor: "var(--selection-bg)",
-    },
-    // CodeMirror's base theme paints the FOCUSED selection through a
-    // higher-specificity selector (&light.cm-focused > .cm-scroller > ...), so
-    // without this mirror rule every theme showed the CM default lavender —
-    // near-invisible against light-theme text. Selected-text color comes from
-    // the global ::selection rule in index.css.
-    "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
-        backgroundColor: "var(--selection-bg)",
-    },
-    ".cm-foldPlaceholder": { backgroundColor: "var(--bg-hover)", color: "var(--text-secondary)", border: "none" },
-});
-
-/** Build the EditorState shape the (tested) editorActions helpers expect. */
-function toEdState(view: EditorView): EditorState {
-    const s = view.state.selection.main;
-    return { text: view.state.doc.toString(), selStart: s.from, selEnd: s.to };
-}
-
-/** Apply an EditorResult (full new text + selection) as a MINIMAL change — diff
- *  the common prefix/suffix so CodeMirror only touches what actually changed
- *  (keeps undo granular and avoids full-doc churn). Selection is set atomically,
- *  so there's no one-frame caret flicker (fixes the old rAF restore). */
-function applyResultToView(view: EditorView, r: EditorResult) {
-    const old = view.state.doc.toString();
-    const next = r.text;
-    let p = 0;
-    const maxP = Math.min(old.length, next.length);
-    while (p < maxP && old.charCodeAt(p) === next.charCodeAt(p)) p++;
-    let s = 0;
-    const maxS = Math.min(old.length - p, next.length - p);
-    while (s < maxS && old.charCodeAt(old.length - 1 - s) === next.charCodeAt(next.length - 1 - s)) s++;
-    view.dispatch({
-        changes: { from: p, to: old.length - s, insert: next.slice(p, next.length - s) },
-        selection: { anchor: r.selStart, head: r.selEnd },
-        scrollIntoView: true,
-    });
-}
 
 function CodeEditorImpl({
     documentId,
@@ -309,12 +229,12 @@ function CodeEditorImpl({
         const editingKeymap = Prec.highest(keymap.of([
             { key: "Tab", run: (v) => runAction(v, (st) => handleTab(st, false)), shift: (v) => runAction(v, (st) => handleTab(st, true)) },
             { key: "Enter", run: (v) => runAction(v, handleEnter) },
-            { key: "Mod-b", run: (v) => { applyResultToView(v, wrapSelection(toEdState(v), "**", "**", "bold")); return true; } },
-            { key: "Mod-i", run: (v) => { applyResultToView(v, wrapSelection(toEdState(v), "*", "*", "italic")); return true; } },
-            { key: "Mod-k", run: (v) => { applyResultToView(v, insertLink(toEdState(v))); return true; } },
+            { key: "Mod-b", run: (v) => { applyEditorResult(v, wrapSelection(toEditorActionState(v), "**", "**", "bold")); return true; } },
+            { key: "Mod-i", run: (v) => { applyEditorResult(v, wrapSelection(toEditorActionState(v), "*", "*", "italic")); return true; } },
+            { key: "Mod-k", run: (v) => { applyEditorResult(v, insertLink(toEditorActionState(v))); return true; } },
             {
                 key: "Mod-/", run: (v) => {
-                    const st = toEdState(v);
+                    const st = toEditorActionState(v);
                     const ls = st.text.lastIndexOf("\n", st.selStart - 1) + 1;
                     const lineEnd = st.text.indexOf("\n", st.selStart);
                     const end = lineEnd === -1 ? st.text.length : lineEnd;
@@ -322,7 +242,7 @@ function CodeEditorImpl({
                     const quoted = line.startsWith("> ");
                     const newLine = quoted ? line.slice(2) : "> " + line;
                     const delta = newLine.length - line.length;
-                    applyResultToView(v, { text: st.text.slice(0, ls) + newLine + st.text.slice(end), selStart: st.selStart + delta, selEnd: st.selEnd + delta });
+                    applyEditorResult(v, { text: st.text.slice(0, ls) + newLine + st.text.slice(end), selStart: st.selStart + delta, selEnd: st.selEnd + delta });
                     return true;
                 }
             },
@@ -384,7 +304,7 @@ function CodeEditorImpl({
                 lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(),
                 historyComp.of(history()), drawSelection(), dropCursor(), closeBrackets(),
                 autocompletion({ override: [wikiCompletionSource], icons: false, aboveCursor: false }),
-                markdown(), syntaxHighlighting(markdownHighlight), editorTheme,
+                markdown(), markdownPresentationExtensions, editorTheme,
                 wrapComp.of(wordWrap ? EditorView.lineWrapping : []),
                 spellComp.of(EditorView.contentAttributes.of(spellAttrs(spellCheck))),
                 mergeComp.of([]), editingKeymap,
@@ -416,9 +336,9 @@ function CodeEditorImpl({
     // Helper used by the editing keymap: run a (tested) editorActions function and
     // apply its result, or fall through to CodeMirror's default if it returns null.
     function runAction(view: EditorView, fn: (st: EditorState) => EditorResult | null): boolean {
-        const r = fn(toEdState(view));
+        const r = fn(toEditorActionState(view));
         if (!r) return false;
-        applyResultToView(view, r);
+        applyEditorResult(view, r);
         return true;
     }
 
@@ -502,15 +422,15 @@ function CodeEditorImpl({
         if (!cd) return false;
         const html = cd.getData("text/html");
         const text = cd.getData("text/plain");
-        const state = toEdState(view);
+        const state = toEditorActionState(view);
 
         const urlOnSel = pasteUrlOnSelection(state, text);
-        if (urlOnSel) { event.preventDefault(); applyResultToView(view, urlOnSel); return true; }
+        if (urlOnSel) { event.preventDefault(); applyEditorResult(view, urlOnSel); return true; }
         const autolink = pasteUrlAutolink(state, text);
-        if (autolink) { event.preventDefault(); applyResultToView(view, autolink); return true; }
+        if (autolink) { event.preventDefault(); applyEditorResult(view, autolink); return true; }
         if (!html) {
             const tsv = pasteTsvAsTable(state, text);
-            if (tsv) { event.preventDefault(); applyResultToView(view, tsv); return true; }
+            if (tsv) { event.preventDefault(); applyEditorResult(view, tsv); return true; }
         }
         if (html && /<\w+/.test(html)) {
             event.preventDefault();
@@ -734,11 +654,11 @@ function CodeEditorImpl({
     // === Imperative helpers for child UI (toolbar, find/replace, slash, AI) ===
     const getState = useCallback((): EditorState | null => {
         const v = viewRef.current;
-        return v ? toEdState(v) : null;
+        return v ? toEditorActionState(v) : null;
     }, []);
     const applyResult = useCallback((r: EditorResult) => {
         const v = viewRef.current;
-        if (v) { applyResultToView(v, r); v.focus(); }
+        if (v) { applyEditorResult(v, r); v.focus(); }
     }, []);
     const insertAtCaret = useCallback((text: string) => {
         const v = viewRef.current;
@@ -761,7 +681,7 @@ function CodeEditorImpl({
     const handleFindReplace = useCallback((newContent: string, newCursor: number) => {
         const v = viewRef.current;
         if (!v) return;
-        applyResultToView(v, { text: newContent, selStart: newCursor, selEnd: newCursor });
+        applyEditorResult(v, { text: newContent, selStart: newCursor, selEnd: newCursor });
     }, []);
 
     const handleSlashSelect = useCallback((cmd: SlashCommand) => {
@@ -842,8 +762,8 @@ function CodeEditorImpl({
                         onOp={(op) => {
                             const v = viewRef.current;
                             if (!v) return;
-                            const r = applyTableOp(toEdState(v), op);
-                            if (r) applyResultToView(v, r);
+                            const r = applyTableOp(toEditorActionState(v), op);
+                            if (r) applyEditorResult(v, r);
                             v.focus();
                         }}
                     />
