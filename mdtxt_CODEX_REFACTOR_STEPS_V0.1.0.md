@@ -33,7 +33,7 @@
 | P5 编辑器模块拆分 | 完成 | `d68ec3d` 至 `c162371`；presentation、viewport、document session、completion、AI review、preferences、overlays、paste、host 与 controller 分层；`CodeEditor.tsx` 收缩为 30 行挂载容器；全量 38 测试文件/296 测试、构建与发布预检通过 | P6 以该稳定 host 为唯一接入点 |
 | P6 Live Beta | 进行中，未验收 | `9232178` 建立 fixture、round-trip、IME 清单和 1/10 MiB 基准方法；`39b4604` 以 Lezer `syntaxTree` + `StateField<DecorationSet>` 添加只样式化、源码不隐藏的最小展示；`752a41a` 以 Compartment 重配置且不重建 host | 完成显式 Beta 开关、焦点/IME/选择/撤销验证、受限 Live 与真实平台证据后才可退出 |
 | P7 复杂 Widgets | 未开始 | 不提前实现 | 依赖 P6 退出与焦点/降级协议 |
-| P8 文件安全、冲突与恢复 | 未开始，可独立推进 | 不提前实现 | 可在 P6 期间做不触及活动编辑器的 Rust/fixture 工作 |
+| P8 文件安全、冲突与恢复 | 进行中，未验收 | `docs/audits/p8-file-safety-tracking.md`；同目录唯一临时文件、写前同步、权限保持、替换后 POSIX 目录同步及 Rust 回归已落地 | 外部修改版本/哈希、显式冲突选择、恢复副本、失败注入和三平台文件系统证据 |
 | P9–P11 | 未开始 | 不提前实现 | 依赖 P7、P8 的验收结果 |
 
 截至本次定稿，最低本地门禁已通过：`bun run release:check`、前端测试与构建、`cargo fmt --check`、Clippy 和 Rust 测试。后续每一个阶段都必须重新执行与该阶段相称的门禁，不能借用历史通过结果。

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::ipc::Response;
 use thiserror::Error;
 
@@ -19,6 +20,10 @@ const MAX_IMAGE_BYTES: usize = 25 * 1024 * 1024;
 /// `.dll` / `.lnk` into the user's documents folder under the cover of an
 /// image-paste flow.
 const ALLOWED_IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"];
+
+/// A process ID alone collides whenever two save requests overlap in one app.
+/// Keep temp names unique without relying on a timestamp or a global temp dir.
+static SAVE_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// Error type for file operation commands
 #[derive(Debug, Error)]
@@ -113,6 +118,42 @@ fn mtime_ms(metadata: &std::fs::Metadata) -> u64 {
         .unwrap_or(0)
 }
 
+fn save_temp_path(path: &Path) -> Result<PathBuf, CommandError> {
+    let directory = path.parent().unwrap_or_else(|| Path::new("."));
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            CommandError::WriteError("Save path must include a valid UTF-8 file name".to_string())
+        })?;
+    let sequence = SAVE_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    Ok(directory.join(format!(
+        ".{file_name}.{}.{}.mdtxt-tmp",
+        std::process::id(),
+        sequence
+    )))
+}
+
+/// `rename` durably replaces the file only after the containing directory is
+/// synced on POSIX. Windows has no portable directory-handle equivalent here,
+/// so its atomic MoveFileEx replacement remains the best available guarantee.
+#[cfg(unix)]
+async fn sync_parent_directory(path: &Path) -> Result<(), CommandError> {
+    let directory = path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+    tokio::task::spawn_blocking(move || std::fs::File::open(directory)?.sync_all())
+        .await
+        .map_err(|error| CommandError::WriteError(error.to_string()))?
+        .map_err(|error| CommandError::WriteError(error.to_string()))
+}
+
+#[cfg(not(unix))]
+async fn sync_parent_directory(_path: &Path) -> Result<(), CommandError> {
+    Ok(())
+}
+
 /// Read a markdown file from disk
 #[tauri::command]
 pub async fn read_file(path: String) -> Result<FileData, CommandError> {
@@ -192,8 +233,9 @@ pub async fn save_file(path: String, content: String) -> Result<u64, CommandErro
     // saving a Windows file doesn't rewrite every line and produce a noisy diff.
     // A brand-new file (save-as / new note) has no existing EOL, so we keep the
     // editor's LF. EOL-01.
-    let file_exists = PathBuf::from(&path).exists();
-    let content = if file_exists {
+    let target = PathBuf::from(&path);
+    let existing_metadata = tokio::fs::metadata(&target).await.ok();
+    let content = if existing_metadata.is_some() {
         apply_eol(&content, detect_file_eol(&path).await)
     } else {
         content
@@ -201,7 +243,7 @@ pub async fn save_file(path: String, content: String) -> Result<u64, CommandErro
 
     // Same directory as the target so the rename never crosses a filesystem
     // boundary (cross-device renames aren't atomic and can fail outright).
-    let tmp = format!("{}.{}.mdtxt-tmp", path, std::process::id());
+    let tmp = save_temp_path(&target)?;
 
     // Write, then fsync BEFORE the rename. Without the sync, a crash right after
     // the rename can leave the (renamed) file present but empty/partial on disk,
@@ -213,6 +255,12 @@ pub async fn save_file(path: String, content: String) -> Result<u64, CommandErro
             Ok(f) => f,
             Err(e) => return Err(CommandError::WriteError(e.to_string())),
         };
+        if let Some(metadata) = &existing_metadata {
+            if let Err(e) = tokio::fs::set_permissions(&tmp, metadata.permissions()).await {
+                let _ = tokio::fs::remove_file(&tmp).await;
+                return Err(CommandError::WriteError(e.to_string()));
+            }
+        }
         if let Err(e) = f.write_all(content.as_bytes()).await {
             let _ = tokio::fs::remove_file(&tmp).await;
             return Err(CommandError::WriteError(e.to_string()));
@@ -223,13 +271,15 @@ pub async fn save_file(path: String, content: String) -> Result<u64, CommandErro
         }
     }
 
-    if let Err(e) = tokio::fs::rename(&tmp, &path).await {
+    if let Err(e) = tokio::fs::rename(&tmp, &target).await {
         // Don't leave the temp file behind on failure.
         let _ = tokio::fs::remove_file(&tmp).await;
         return Err(CommandError::WriteError(e.to_string()));
     }
 
-    let metadata = tokio::fs::metadata(&path)
+    sync_parent_directory(&target).await?;
+
+    let metadata = tokio::fs::metadata(&target)
         .await
         .map_err(|e| CommandError::ReadError(e.to_string()))?;
     Ok(mtime_ms(&metadata))
@@ -718,9 +768,10 @@ pub fn set_ai_key(key: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_eol, read_file, sanitize_image_name, save_file, search_markdown_tree,
+        apply_eol, read_file, sanitize_image_name, save_file, save_temp_path, search_markdown_tree,
         validate_rel_path, Eol,
     };
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn search_finds_matches_recursively_and_case_insensitively() {
@@ -798,6 +849,45 @@ mod tests {
                 .collect();
             assert!(leftovers.is_empty());
 
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
+    #[test]
+    fn save_temp_paths_are_unique_within_one_process() {
+        let path = PathBuf::from("/tmp/mdtxt-save-path.md");
+        let first = save_temp_path(&path).unwrap();
+        let second = save_temp_path(&path).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(first.parent(), Some(Path::new("/tmp")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_file_preserves_existing_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let dir =
+                std::env::temp_dir().join(format!("mdtxt-permissions-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("private.md");
+            std::fs::write(&path, "old").unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+
+            save_file(path.to_string_lossy().to_string(), "new".into())
+                .await
+                .unwrap();
+
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o640
+            );
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
             std::fs::remove_dir_all(&dir).ok();
         });
     }
