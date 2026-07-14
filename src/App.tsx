@@ -1404,14 +1404,19 @@ function AppContent() {
     sessionController.open({ id, path: null, name, content: entry.content, savedContent: "", fileSize: entry.content.length, viewMode: "code" }, false);
     setActiveTab(id);
     setFilePath(null); setFileName(name); setFileSize(entry.content.length); setMode("code");
-    void invoke("discard_recovery", { documentId: entry.documentId }).catch(() => {});
+    void invoke("discard_recovery", { documentId: entry.documentId }).catch(() => {
+      // Restoration is already safely isolated in a new untitled tab. Keep it
+      // usable, but disclose that the native copy could reappear next launch.
+      showToast(tr("Could not clear the recovered backup. It may appear again after restart."), "error");
+    });
     setRecoveryEntries((entries) => entries.filter((candidate) => candidate.documentId !== entry.documentId));
-  }, [snapshotActiveTab, newTabId, tr, commitTabs, sessionController, setActiveTab, setMode]);
+  }, [snapshotActiveTab, newTabId, tr, commitTabs, sessionController, setActiveTab, setMode, showToast]);
 
   const handleDiscardRecovery = useCallback((entry: import("./components/RecoveryDialog").RecoveryCandidate) => {
-    void invoke("discard_recovery", { documentId: entry.documentId }).catch(() => {});
-    setRecoveryEntries((entries) => entries.filter((candidate) => candidate.documentId !== entry.documentId));
-  }, []);
+    void invoke("discard_recovery", { documentId: entry.documentId })
+      .then(() => setRecoveryEntries((entries) => entries.filter((candidate) => candidate.documentId !== entry.documentId)))
+      .catch(() => showToast(tr("Could not discard the recovery backup. Please try again."), "error"));
+  }, [showToast, tr]);
 
   // Open the interactive feature guide (offered at the end of the tour and from
   // the command palette). It opens as a real, editable document so users can
