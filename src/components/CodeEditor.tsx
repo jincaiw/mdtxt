@@ -327,7 +327,7 @@ function CodeEditorImpl({
             { key: "Mod-h", run: (v) => { setSelStartForFind(v.state.selection.main.from); setFindMode("replace"); setFindOpen(true); return true; } },
             // NB: the AI shortcut (Alt+J / ⌘J) is handled at the App window level
             // so it fires regardless of editor focus — see App.tsx. The editor
-            // opens the bubble via the paperling:ai-assist event listener below.
+            // opens the bubble via the mdtxt:ai-assist event listener below.
         ]));
 
         const updateListener = EditorView.updateListener.of((update: ViewUpdate) => {
@@ -686,8 +686,8 @@ function CodeEditorImpl({
                 effects: EditorView.scrollIntoView(docLine.from, { y: "start", yMargin: 8 }),
             });
         };
-        window.addEventListener("paperling:goto-line", handler);
-        return () => window.removeEventListener("paperling:goto-line", handler);
+        window.addEventListener("mdtxt:goto-line", handler);
+        return () => window.removeEventListener("mdtxt:goto-line", handler);
     }, []);
 
     // Snap the caret and viewport to the start when a different file opens, so
@@ -702,8 +702,8 @@ function CodeEditorImpl({
             });
             v.scrollDOM.scrollTop = 0;
         };
-        window.addEventListener("paperling:scroll-top", toTop);
-        return () => window.removeEventListener("paperling:scroll-top", toTop);
+        window.addEventListener("mdtxt:scroll-top", toTop);
+        return () => window.removeEventListener("mdtxt:scroll-top", toTop);
     }, []);
 
     // Alt+J (and the command palette's "AI assist") is selection-aware, matching
@@ -722,11 +722,11 @@ function CodeEditorImpl({
                 view.focus();
                 openAIBubble();
             } else {
-                window.dispatchEvent(new CustomEvent("paperling:toggle-ai-panel"));
+                window.dispatchEvent(new CustomEvent("mdtxt:toggle-ai-panel"));
             }
         };
-        window.addEventListener("paperling:ai-assist", handler);
-        return () => window.removeEventListener("paperling:ai-assist", handler);
+        window.addEventListener("mdtxt:ai-assist", handler);
+        return () => window.removeEventListener("mdtxt:ai-assist", handler);
     }, [openAIBubble]);
 
     // Mirror of the Settings "Enable AI" switch; drives whether the format
@@ -735,8 +735,8 @@ function CodeEditorImpl({
     const [aiEnabled, setAiEnabled] = useState(getAIEnabled);
     useEffect(() => {
         const h = (e: Event) => setAiEnabled(!!(e as CustomEvent).detail?.enabled);
-        window.addEventListener("paperling:ai-enabled-toggle", h);
-        return () => window.removeEventListener("paperling:ai-enabled-toggle", h);
+        window.addEventListener("mdtxt:ai-enabled-toggle", h);
+        return () => window.removeEventListener("mdtxt:ai-enabled-toggle", h);
     }, []);
 
     // === Imperative helpers for child UI (toolbar, find/replace, slash, AI) ===

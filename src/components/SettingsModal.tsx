@@ -330,23 +330,23 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             <div className="rounded-[var(--radius-lg)] border border-[var(--border)] divide-y divide-[var(--border-subtle)] overflow-hidden">
                                 {matches("typewriter") && (
                                     <ToggleRow label={t("Typewriter mode")} description={t("Keep caret vertically centered")} checked={typewriter}
-                                        onChange={(v) => { setTypewriterLocal(v); setTypewriterMode(v); fire("paperling:typewriter-toggle", v); }} />
+                                        onChange={(v) => { setTypewriterLocal(v); setTypewriterMode(v); fire("mdtxt:typewriter-toggle", v); }} />
                                 )}
                                 {matches("toolbar") && (
                                     <ToggleRow label={t("Show formatting toolbar")} description={t("Toolbar above the editor")} checked={toolbar}
-                                        onChange={(v) => { setToolbarLocal(v); setToolbarEnabled(v); fire("paperling:toolbar-toggle", v); }} />
+                                        onChange={(v) => { setToolbarLocal(v); setToolbarEnabled(v); fire("mdtxt:toolbar-toggle", v); }} />
                                 )}
                                 {matches("word wrap") && (
                                     <ToggleRow label={t("Word wrap")} description={t("Wrap long lines instead of horizontal scroll")} checked={wordWrap}
-                                        onChange={(v) => { setWordWrapLocal(v); setWordWrap(v); fire("paperling:wordwrap-toggle", v); }} />
+                                        onChange={(v) => { setWordWrapLocal(v); setWordWrap(v); fire("mdtxt:wordwrap-toggle", v); }} />
                                 )}
                                 {matches("spell check") && (
                                     <ToggleRow label={t("Spell check")} description={t("Underline misspelled words while you type")} checked={spellCheck}
-                                        onChange={(v) => { setSpellCheckLocal(v); setSpellCheck(v); fire("paperling:spellcheck-toggle", v); }} />
+                                        onChange={(v) => { setSpellCheckLocal(v); setSpellCheck(v); fire("mdtxt:spellcheck-toggle", v); }} />
                                 )}
                                 {matches("autosave") && (
                                     <ToggleRow label={t("Autosave")} description={t("Save automatically a moment after you stop typing")} checked={autoSave}
-                                        onChange={(v) => { setAutoSaveLocal(v); setAutoSave(v); fire("paperling:autosave-toggle", v); }} />
+                                        onChange={(v) => { setAutoSaveLocal(v); setAutoSave(v); fire("mdtxt:autosave-toggle", v); }} />
                                 )}
                                 {matches("open files in reader mode") && (
                                     // No window event: App reads the flag live at each
@@ -361,7 +361,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             <>
                                 <div className="rounded-[var(--radius-lg)] border border-[var(--border)] overflow-hidden">
                                     <ToggleRow label={t("Enable AI")} description={t("Show the AI button and assistant in the editor")} checked={aiEnabled}
-                                        onChange={(v) => { setAiEnabledLocal(v); setAIEnabled(v); fire("paperling:ai-enabled-toggle", v); }} />
+                                        onChange={(v) => { setAiEnabledLocal(v); setAIEnabled(v); fire("mdtxt:ai-enabled-toggle", v); }} />
                                 </div>
                                 <div className="flex items-start justify-between gap-3">
                                     <p className="text-sm text-[var(--text-secondary)]">
@@ -491,7 +491,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     type="button"
                                     onClick={() => {
                                         onClose();
-                                        window.dispatchEvent(new CustomEvent("paperling:replay-tour"));
+                                        window.dispatchEvent(new CustomEvent("mdtxt:replay-tour"));
                                     }}
                                     className="btn-press mt-3 w-full flex items-center gap-3 px-3.5 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
                                 >

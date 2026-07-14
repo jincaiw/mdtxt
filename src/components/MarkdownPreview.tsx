@@ -369,7 +369,7 @@ function LocalImage({ src, alt, baseDir, ...props }: { src: string; alt: string;
             loading="lazy"
             className="max-w-full h-auto rounded-lg my-4 cursor-zoom-in transition-transform hover:scale-[1.01]"
             onClick={() => {
-                const evt = new CustomEvent("paperling:zoom", { detail: { src: imageSrc, alt } });
+                const evt = new CustomEvent("mdtxt:zoom", { detail: { src: imageSrc, alt } });
                 window.dispatchEvent(evt);
             }}
         />
@@ -681,8 +681,8 @@ function MarkdownPreviewImpl({
             const detail = (e as CustomEvent).detail;
             if (detail?.src) setZoomImage({ src: detail.src, alt: detail.alt || "" });
         };
-        window.addEventListener("paperling:zoom", handler);
-        return () => window.removeEventListener("paperling:zoom", handler);
+        window.addEventListener("mdtxt:zoom", handler);
+        return () => window.removeEventListener("mdtxt:zoom", handler);
     }, []);
 
     // Esc closes lightbox
@@ -1024,16 +1024,16 @@ function MarkdownPreviewImpl({
                 + container.scrollTop - 8;
             container.scrollTo({ top, behavior: "auto" });
         };
-        window.addEventListener("paperling:goto-line", handler);
-        return () => window.removeEventListener("paperling:goto-line", handler);
+        window.addEventListener("mdtxt:goto-line", handler);
+        return () => window.removeEventListener("mdtxt:goto-line", handler);
     }, []);
 
     // Snap to the top when a different file is opened, so you don't land
     // mid-document at the previous file's scroll offset. NAV-04.
     useEffect(() => {
         const toTop = () => { if (mainRef.current) mainRef.current.scrollTop = 0; };
-        window.addEventListener("paperling:scroll-top", toTop);
-        return () => window.removeEventListener("paperling:scroll-top", toTop);
+        window.addEventListener("mdtxt:scroll-top", toTop);
+        return () => window.removeEventListener("mdtxt:scroll-top", toTop);
     }, []);
 
     // Register imperative scroller for split-view sync

@@ -105,7 +105,7 @@ export function TableOfContents({
     // even when two sections share the same title (the old text-matching
     // approach always hit the first occurrence, and only in preview mode).
     const handleHeadingClick = (line: number) => {
-        window.dispatchEvent(new CustomEvent("paperling:goto-line", { detail: { line } }));
+        window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line } }));
     };
 
     const getIndent = (level: number): string => {

@@ -391,8 +391,8 @@ function AppContent() {
     // back to the top for a never-focused / line-1 tab. TABS-02.
     const line = tab.cursorLine ?? 1;
     requestAnimationFrame(() => {
-      if (line > 1) window.dispatchEvent(new CustomEvent("paperling:goto-line", { detail: { line } }));
-      else window.dispatchEvent(new CustomEvent("paperling:scroll-top"));
+      if (line > 1) window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line } }));
+      else window.dispatchEvent(new CustomEvent("mdtxt:scroll-top"));
     });
   }, [bumpDocSwap]);
 
@@ -453,7 +453,7 @@ function AppContent() {
       // Snap the new file to the top — but not on a same-path external reload,
       // which should keep the reader where they were. NAV-04.
       if (outgoing !== fileData.path) {
-        requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("paperling:scroll-top")));
+        requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("mdtxt:scroll-top")));
       }
       // "Open files in reader" applies to every USER file open, read live so
       // a Settings change takes effect without a restart. Mode is global
@@ -481,21 +481,21 @@ function AppContent() {
   // Cross-component event listeners — settings menu and command palette toggle these
   useEffect(() => {
     const handlers: Array<[string, (e: Event) => void]> = [
-      ["paperling:typewriter-toggle", (e) => setTypewriterModeEnabled(!!(e as CustomEvent).detail?.enabled)],
-      ["paperling:toolbar-toggle", (e) => setToolbarVisible(!!(e as CustomEvent).detail?.enabled)],
-      ["paperling:wordwrap-toggle", (e) => setWordWrapEnabled(!!(e as CustomEvent).detail?.enabled)],
-      ["paperling:spellcheck-toggle", (e) => setSpellCheckEnabled(!!(e as CustomEvent).detail?.enabled)],
-      ["paperling:autosave-toggle", (e) => setAutoSaveEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["mdtxt:typewriter-toggle", (e) => setTypewriterModeEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["mdtxt:toolbar-toggle", (e) => setToolbarVisible(!!(e as CustomEvent).detail?.enabled)],
+      ["mdtxt:wordwrap-toggle", (e) => setWordWrapEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["mdtxt:spellcheck-toggle", (e) => setSpellCheckEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["mdtxt:autosave-toggle", (e) => setAutoSaveEnabled(!!(e as CustomEvent).detail?.enabled)],
       // Opened from the title-bar settings dropdown's "More settings…" entry.
-      ["paperling:open-settings", () => setShowSettings(true)],
+      ["mdtxt:open-settings", () => setShowSettings(true)],
       // Alt+J with no selection opens the docked AI side panel. The editor's
       // ai-assist handler decides bubble (selection) vs panel (no selection).
       // Reads the persisted flag live (this effect mounts once) so the panel
       // can't be opened while AI is switched off in Settings.
-      ["paperling:toggle-ai-panel", () => { if (getAIEnabled()) setShowAIPanel((v) => !v); }],
+      ["mdtxt:toggle-ai-panel", () => { if (getAIEnabled()) setShowAIPanel((v) => !v); }],
       // Settings master switch for all AI surfaces; closing the panel here
       // keeps it from lingering open after AI is turned off.
-      ["paperling:ai-enabled-toggle", (e) => {
+      ["mdtxt:ai-enabled-toggle", (e) => {
         const enabled = !!(e as CustomEvent).detail?.enabled;
         setAiEnabledState(enabled);
         if (!enabled) setShowAIPanel(false);
@@ -636,7 +636,7 @@ function AppContent() {
       const line = activeTabData.cursorLine ?? 1;
       if (line > 1) {
         window.setTimeout(
-          () => window.dispatchEvent(new CustomEvent("paperling:goto-line", { detail: { line } })),
+          () => window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line } })),
           150
         );
       }
@@ -873,7 +873,7 @@ function AppContent() {
     if (entry.cursorLine && entry.cursorLine > 1) {
       const line = entry.cursorLine;
       window.setTimeout(
-        () => window.dispatchEvent(new CustomEvent("paperling:goto-line", { detail: { line } })),
+        () => window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line } })),
         150
       );
     }
@@ -1104,7 +1104,7 @@ function AppContent() {
       await loadFile(path);
     }
     requestAnimationFrame(() =>
-      window.dispatchEvent(new CustomEvent("paperling:goto-line", { detail: { line } }))
+      window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line } }))
     );
   }, [loadFile]);
 
@@ -1195,8 +1195,8 @@ function AppContent() {
       if (!hasFile) handleNewFile();
       setShowTour(true);
     };
-    window.addEventListener("paperling:replay-tour", h);
-    return () => window.removeEventListener("paperling:replay-tour", h);
+    window.addEventListener("mdtxt:replay-tour", h);
+    return () => window.removeEventListener("mdtxt:replay-tour", h);
   }, [hasFile, handleNewFile]);
 
   // Open file dialog
@@ -1606,7 +1606,7 @@ function AppContent() {
         section: "AI",
         icon: "auto_awesome",
         keywords: "ai rewrite shorten expand continue translate assistant gpt llm",
-        run: () => window.dispatchEvent(new CustomEvent("paperling:ai-assist")),
+        run: () => window.dispatchEvent(new CustomEvent("mdtxt:ai-assist")),
       });
     }
 
@@ -1737,7 +1737,7 @@ function AppContent() {
             // preview each listen for this event and scroll themselves (hidden
             // panes scroll harmlessly), so this works in every view mode and
             // lands on the RIGHT heading even when titles repeat. NAV-01.
-            window.dispatchEvent(new CustomEvent("paperling:goto-line", { detail: { line: idx + 1 } }));
+            window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line: idx + 1 } }));
           },
         });
       }

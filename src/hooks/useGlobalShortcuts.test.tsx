@@ -87,9 +87,9 @@ describe("useGlobalShortcuts", () => {
 
     it("Alt+J dispatches the AI-assist event", () => {
         const onAi = vi.fn();
-        window.addEventListener("paperling:ai-assist", onAi);
+        window.addEventListener("mdtxt:ai-assist", onAi);
         press({ key: "j", altKey: true });
-        window.removeEventListener("paperling:ai-assist", onAi);
+        window.removeEventListener("mdtxt:ai-assist", onAi);
         expect(onAi).toHaveBeenCalledTimes(1);
     });
 });
