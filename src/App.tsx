@@ -18,7 +18,7 @@ import { SplitDivider } from "./components/SplitDivider";
 import { type PaletteCommand } from "./components/CommandPalette";
 import { useToast } from "./hooks/useToast";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
-import { useDebouncedValue } from "./hooks/useDebouncedValue";
+import { useDocumentPresentationSnapshot } from "./hooks/useDocumentPresentationSnapshot";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { useFullscreen } from "./hooks/useFullscreen";
 import { useScrollSync } from "./hooks/useScrollSync";
@@ -283,47 +283,6 @@ function AppContent() {
     setShowTour(false);
   }, []);
 
-  // PERF: Typing in the editor calls setContent on every keystroke, which would
-  // synchronously re-render every consumer of `content` — including the markdown
-  // preview, which runs remark-gfm + rehype-highlight + react-markdown over the
-  // entire document. On a few-hundred-line file that's 50-200ms of work and the
-  // textarea feels laggy because React can't commit the new value until the tree
-  // is reconciled.
-  //
-  // We debounce the value passed to those heavy consumers by ~80ms — short
-  // enough to feel real-time during a normal pause between keystrokes, long
-  // enough that fast typing skips many intermediate re-renders. The editor
-  // itself still uses live `content` so the glyph you typed appears immediately.
-  // (We previously used useDeferredValue here, but under React StrictMode + the
-  // bursty state churn at file-open it could starve and leave the preview
-  // showing the empty initial value.)
-  // Scale the debounce with document size: tiny docs feel instant at 80ms, but a
-  // multi-thousand-line doc benefits from coalescing more keystrokes before the
-  // (still heavy) full re-parse fires. Combined with the preview's startTransition
-  // render, this keeps typing responsive on large files. PREVIEW-01.
-  const previewDebounceMs = content.length > 40_000 ? 250 : content.length > 12_000 ? 160 : 80;
-  const deferredContent = useDebouncedValue(content, previewDebounceMs);
-
-  // Word/char counts feed the status bar — fine to lag a frame behind on huge
-  // docs, so they read deferred too. countSourceWords is the SAME pipeline the
-  // stats dialog uses (strips frontmatter/code, ignores markdown syntax), so
-  // the status bar and the dialog always agree. STATS-01.
-  const wordCount = useMemo(() => countSourceWords(deferredContent), [deferredContent]);
-  const charCount = deferredContent.length;
-  // Selection word count, when the user has a non-empty range highlighted.
-  // Reads LIVE `content` (not deferredContent) since the selection range and
-  // the underlying text must agree — sliding by 80ms would briefly count words
-  // from a stale buffer right after a fast edit. The slice is cheap regardless.
-  // Uses countWords (no frontmatter/code stripping): a selection inside a code
-  // block should still report what's selected.
-  const selectionLength = selectionRange.end - selectionRange.start;
-  const selectionWordCount = useMemo(
-    () => (selectionLength > 0 ? countWords(content.slice(selectionRange.start, selectionRange.end)) : 0),
-    [content, selectionRange.start, selectionRange.end, selectionLength]
-  );
-  // Average adult reading speed for prose: ~200 wpm.
-  const readingTimeMin = useMemo(() => wordCount / 200, [wordCount]);
-
   // Known on-disk modified time (ms). Compared against a fresh stat on window
   // focus to detect the file changing under us (sync tools, other editors).
   const knownMtimeRef = useRef<number>(0);
@@ -358,6 +317,27 @@ function AppContent() {
     () => new Map(sessionSnapshot.sessions.map((session) => [session.id, session])),
     [sessionSnapshot.sessions],
   );
+  const activeSessionSummary = sessionSnapshot.activeId
+    ? sessionSummaryById.get(sessionSnapshot.activeId) ?? null
+    : null;
+  const activeSessionRead = useMemo(
+    () => activeSessionSummary ? sessionController.read(activeSessionSummary.id) : null,
+    [activeSessionSummary?.id, activeSessionSummary?.version, sessionController],
+  );
+  const presentationSnapshot = useDocumentPresentationSnapshot(activeSessionRead);
+  const presentationContent = presentationSnapshot?.value ?? "";
+
+  // Heavy document consumers deliberately read this debounced, versioned
+  // projection rather than React's legacy editor bridge. This is the P4d-3
+  // boundary that prevents preview work from joining the typing critical path.
+  const wordCount = useMemo(() => countSourceWords(presentationContent), [presentationContent]);
+  const charCount = presentationContent.length;
+  const selectionLength = selectionRange.end - selectionRange.start;
+  const selectionWordCount = useMemo(
+    () => (selectionLength > 0 ? countWords(presentationContent.slice(selectionRange.start, selectionRange.end)) : 0),
+    [presentationContent, selectionRange.start, selectionRange.end, selectionLength],
+  );
+  const readingTimeMin = useMemo(() => wordCount / 200, [wordCount]);
   const autosaveSnapshot = useMemo(() => {
     const active = sessionController.getActive();
     if (!active) return null;
@@ -1477,12 +1457,15 @@ function AppContent() {
 
   // Agent proposed an edited document → show it as a diff to accept/reject.
   // Ensure the editor (where the diff renders) is visible.
-  const handleProposeEdit = useCallback((doc: string) => {
-    const session = activeSession();
-    if (!session) return;
-    setProposedDoc({ documentId: session.id, version: session.version, content: doc });
+  const handleProposeEdit = useCallback((doc: string, source: { documentId: string; version: number; content: string }) => {
+    if (!sessionController.acceptsResult(source.documentId, {
+      documentId: source.documentId,
+      version: source.version,
+      value: source.content,
+    })) return;
+    setProposedDoc({ documentId: source.documentId, version: source.version, content: doc });
     setMode((m) => (m === "preview" ? "split" : m));
-  }, [activeSession]);
+  }, [sessionController, setMode]);
 
   // Review finished: commit the accepted document (or keep the original on reject).
   const handleReviewResolve = useCallback((finalDoc: string | null) => {
@@ -1862,7 +1845,7 @@ function AppContent() {
 
     return items;
   }, [
-    // NB: deferredContent is intentionally NOT a dep here. Building static
+    // NB: presentationContent is intentionally NOT a dep here. Building static
     // file/view/toggle/recent items doesn't depend on the document text, so
     // letting `content` flow into this useMemo would rebuild every keystroke
     // (post-debounce) for no reason. Headings are computed below in a
@@ -1880,9 +1863,9 @@ function AppContent() {
   // ones — and 100 % of that work was discarded if the user wasn't looking
   // at the palette.
   const headingPaletteItems = useMemo<PaletteCommand[]>(() => {
-    if (!showPalette || !deferredContent) return [];
+    if (!showPalette || !presentationContent) return [];
     const items: PaletteCommand[] = [];
-    const lines = deferredContent.split("\n");
+    const lines = presentationContent.split("\n");
     lines.forEach((line, idx) => {
       const m = line.match(/^(#{1,6})\s+(.+)$/);
       if (m) {
@@ -1906,7 +1889,7 @@ function AppContent() {
       }
     });
     return items;
-  }, [showPalette, deferredContent]);
+  }, [showPalette, presentationContent]);
 
   // "Open tabs" palette section — jump to any open tab by name (only worthwhile
   // with more than one open). Uses the same folder disambiguation as the bar. TABS-11.
@@ -2125,7 +2108,7 @@ function AppContent() {
                   preferable to a spinner that pre-empts the layout. */}
               <Suspense fallback={null}>
                 <MarkdownPreview
-                  content={deferredContent}
+                  content={presentationContent}
                   fileName={fileName || ""}
                   fileSize={fileSize}
                   onEditClick={handleToggleMode}
@@ -2169,23 +2152,25 @@ function AppContent() {
             <Suspense fallback={null}>
               <TableOfContents
                 isOpen={showTOC}
-                content={deferredContent}
+                content={presentationContent}
                 onClose={closeAllPanels}
                 activeLine={mode === "preview" ? previewLine : cursorPosition.line}
               />
             </Suspense>
           )}
 
-          {/* Right-side AI assistant panel. Reads the live document + current
-              selection; chat is read-only for now (edit/agent flow is next). */}
+          {/* AI receives the versioned presentation snapshot rather than the
+              editor bridge; proposals are checked against that revision. */}
           {aiEnabled && showAIPanel && (
             <Suspense fallback={null}>
               <AIPanel
                 isOpen={showAIPanel}
                 onClose={() => setShowAIPanel(false)}
-                note={content}
+                note={presentationContent}
+                documentId={presentationSnapshot?.documentId ?? null}
+                documentVersion={presentationSnapshot?.version ?? null}
                 fileName={fileName || ""}
-                selectionText={content.slice(selectionRange.start, selectionRange.end)}
+                selectionText={presentationContent.slice(selectionRange.start, selectionRange.end)}
                 aiConfig={aiConfig}
                 onProposeEdit={handleProposeEdit}
               />
@@ -2267,14 +2252,11 @@ function AppContent() {
           <ShortcutCheatsheet isOpen={showCheatsheet} onClose={() => setShowCheatsheet(false)} />
         </Suspense>
       )}
-      {/* Stats dialog reads LIVE `content`, not the debounced version. The
-          dialog opens on a discrete user action (palette command), not while
-          typing, so the typing-fast-path argument doesn't apply — and a user
-          who opens "Show document statistics" expects the numbers to match
-          what they just typed. */}
+      {/* Stats use the same versioned presentation projection as preview and
+          outline, so they cannot become a second owner of editor content. */}
       {showStats && (
         <Suspense fallback={null}>
-          <StatsDialog isOpen={showStats} content={content} onClose={() => setShowStats(false)} />
+          <StatsDialog isOpen={showStats} content={presentationContent} onClose={() => setShowStats(false)} />
         </Suspense>
       )}
       {showPalette && (

@@ -11,12 +11,15 @@ interface AIPanelProps {
     onClose: () => void;
     /** Current document text. */
     note: string;
+    /** Immutable source revision used for this request and any proposed edit. */
+    documentId: string | null;
+    documentVersion: number | null;
     fileName: string;
     /** Currently-selected text in the editor, if any. */
     selectionText: string;
     aiConfig: AIConfig;
     /** Called (Agent mode) with the proposed document to review in the editor. */
-    onProposeEdit?: (proposedDoc: string) => void;
+    onProposeEdit?: (proposedDoc: string, source: { documentId: string; version: number; content: string }) => void;
 }
 
 interface UIMessage {
@@ -28,7 +31,7 @@ interface UIMessage {
 // itself is attached only to the latest turn inside buildAskMessages).
 const MAX_HISTORY_TURNS = 8;
 
-export function AIPanel({ isOpen, onClose, note, fileName, selectionText, aiConfig, onProposeEdit }: AIPanelProps) {
+export function AIPanel({ isOpen, onClose, note, documentId, documentVersion, fileName, selectionText, aiConfig, onProposeEdit }: AIPanelProps) {
     const { t } = useLocale();
     const [messages, setMessages] = useState<UIMessage[]>([]);
     const [input, setInput] = useState("");
@@ -103,7 +106,9 @@ export function AIPanel({ isOpen, onClose, note, fileName, selectionText, aiConf
                 if (res.hasEdits) {
                     let summary: string;
                     if (res.applied > 0) {
-                        onProposeEdit?.(res.proposedDoc);
+                        if (documentId !== null && documentVersion !== null) {
+                            onProposeEdit?.(res.proposedDoc, { documentId, version: documentVersion, content: note });
+                        }
                         summary = `${res.explanation ? res.explanation + "\n\n" : ""}**Proposed ${res.applied} change${res.applied !== 1 ? "s" : ""}.** Review and Accept/Reject them in the editor.${res.failed ? `\n\n⚠️ ${res.failed} change${res.failed !== 1 ? "s" : ""} couldn't be applied — the text may have shifted. Try again.` : ""}`;
                     } else {
                         summary = "I drafted changes but none matched the current document (it may have changed since). Please try again.";
@@ -124,7 +129,7 @@ export function AIPanel({ isOpen, onClose, note, fileName, selectionText, aiConf
             setBusy(false);
             abortRef.current = null;
         }
-    }, [input, busy, configured, messages, note, selectionText, aiConfig, mode, onProposeEdit]);
+    }, [input, busy, configured, messages, note, documentId, documentVersion, selectionText, aiConfig, mode, onProposeEdit]);
 
     const stop = useCallback(() => abortRef.current?.abort(), []);
     const clear = useCallback(() => { abortRef.current?.abort(); setMessages([]); setError(null); }, []);
