@@ -25,4 +25,17 @@ describe("editor selection theming", () => {
             /\.cm-focused > \.cm-scroller > \.cm-selectionLayer \.cm-selectionBackground[^}]*var\(--selection-bg\)/,
         );
     });
+
+    it("keeps one mounted host while an external document update is synchronized", async () => {
+        const { container, rerender } = render(<CodeEditor documentId="test" content="alpha" onChange={() => {}} />);
+        const content = await waitFor(() => {
+            const element = container.querySelector<HTMLElement>(".cm-content");
+            expect(element).toBeTruthy();
+            return element!;
+        });
+
+        rerender(<CodeEditor documentId="test" content="alpha updated" onChange={() => {}} />);
+        await waitFor(() => expect(content.textContent).toBe("alpha updated"));
+        expect(container.querySelector(".cm-content")).toBe(content);
+    });
 });
