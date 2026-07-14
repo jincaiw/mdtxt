@@ -35,7 +35,6 @@ import { matchWikilinkPrefix, rankFileNames, toWikiName } from "../utils/wikilin
 import { applyTableOp, findTableAt, locateCell, type Align } from "../utils/tableModel";
 import type { Scroller } from "../utils/scrollSync";
 import { useLocale } from "../context/LocaleContext";
-import { minimalTextChange } from "../utils/minimalTextChange";
 import {
     applyEditorResult,
     editorTheme,
@@ -43,6 +42,7 @@ import {
     toEditorActionState,
 } from "../editor/core/editorPresentation";
 import { useEditorViewportBridge } from "../editor/bridge/useEditorViewportBridge";
+import { useEditorDocumentSession } from "../editor/core/useEditorDocumentSession";
 
 interface CodeEditorProps {
     /** Stable owner used to restore this document's EditorState. */
@@ -446,36 +446,17 @@ function CodeEditorImpl({
         return false; // let CodeMirror insert plain text
     }
 
-    // Sync external content changes (file open, AI replace via App, frontmatter
-    // edits) into the editor — skipping our own keystroke echoes cheaply. Until
-    // P4 removes this React bridge, preserve unaffected ranges rather than
-    // recording every external update as a full-document replacement.
-    useEffect(() => {
-        if (loadedDocumentIdRef.current !== documentId) return;
-        if (content === lastEmittedRef.current) return;
-        const view = viewRef.current;
-        if (!view) return;
-        const change = minimalTextChange(view.state.doc.toString(), content);
-        if (change) {
-            view.dispatch({ changes: change });
-        }
-        lastEmittedRef.current = content;
-    }, [content, documentId]);
-
-    // One EditorView serves the window. Switching documents swaps a retained
-    // EditorState (selection + history included); a first visit gets one fresh
-    // state rather than a history-clearing whole-text replacement.
-    useEffect(() => {
-        const view = viewRef.current;
-        const createState = createStateRef.current;
-        if (!view || !createState) return;
-        if (loadedDocumentIdRef.current === documentId && (!sessionState || view.state === sessionState)) return;
-        const next = sessionState ?? createState(contentPropRef.current);
-        loadedDocumentIdRef.current = documentId;
-        view.setState(next);
-        lastEmittedRef.current = next.doc.toString();
-        onStateChangeRef.current?.(documentId, next);
-    }, [documentId, sessionState]);
+    useEditorDocumentSession({
+        viewRef,
+        createStateRef,
+        loadedDocumentIdRef,
+        lastEmittedRef,
+        contentRef: contentPropRef,
+        onStateChangeRef,
+        documentId,
+        sessionState,
+        content,
+    });
 
     // Reconfigure word-wrap / spellcheck when their props change.
     useEffect(() => {
