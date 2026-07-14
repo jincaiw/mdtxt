@@ -11,12 +11,13 @@ import {
     type ViewUpdate,
 } from "@codemirror/view";
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { autocompletion, closeBrackets, closeBracketsKeymap, type CompletionSource } from "@codemirror/autocomplete";
 import { getOriginalDoc } from "@codemirror/merge";
 import { handleTab, handleEnter, wrapSelection, insertLink, type EditorResult, type EditorState } from "../../utils/editorActions";
 import { applyEditorResult, editorTheme, markdownPresentationExtensions, toEditorActionState } from "./editorPresentation";
 import { spellcheckAttributes } from "../extensions/useEditorPreferences";
+import { liveMarkdownPresentation } from "../live/liveMarkdownPresentation";
 
 interface UseCodeMirrorHostOptions {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -28,6 +29,7 @@ interface UseCodeMirrorHostOptions {
     spellCompRef: RefObject<Compartment>;
     historyCompRef: RefObject<Compartment>;
     mergeCompRef: RefObject<Compartment>;
+    liveCompRef: RefObject<Compartment>;
     onChangeRef: RefObject<((content: string) => void) | undefined>;
     onStateChangeRef: RefObject<((documentId: string, state: CMEditorState) => void) | undefined>;
     onCursorChangeRef: RefObject<((line: number, column: number) => void) | undefined>;
@@ -40,6 +42,7 @@ interface UseCodeMirrorHostOptions {
     content: string;
     wordWrap: boolean;
     spellCheck: boolean;
+    liveMode: boolean;
     detectSlash: (view: EditorView) => void;
     detectTable: (view: EditorView) => void;
     openFind: (mode: "find" | "replace", selectionStart: number) => void;
@@ -49,10 +52,10 @@ interface UseCodeMirrorHostOptions {
 /** Owns the one-time CodeMirror view and its stable extension protocol. */
 export function useCodeMirrorHost({
     containerRef, viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef,
-    wrapCompRef, spellCompRef, historyCompRef, mergeCompRef,
+    wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef,
     onChangeRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
     typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-    content, wordWrap, spellCheck, detectSlash, detectTable, openFind, handlePaste,
+    content, wordWrap, spellCheck, liveMode, detectSlash, detectTable, openFind, handlePaste,
 }: UseCodeMirrorHostOptions) {
     useEffect(() => {
         if (!containerRef.current) return;
@@ -114,10 +117,11 @@ export function useCodeMirrorHost({
                 lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(),
                 historyCompRef.current.of(history()), drawSelection(), dropCursor(), closeBrackets(),
                 autocompletion({ override: [wikiCompletionSource], icons: false, aboveCursor: false }),
-                markdown(), markdownPresentationExtensions, editorTheme,
+                markdown({ base: markdownLanguage }), markdownPresentationExtensions, editorTheme,
                 wrapCompRef.current.of(wordWrap ? EditorView.lineWrapping : []),
                 spellCompRef.current.of(EditorView.contentAttributes.of(spellcheckAttributes(spellCheck))),
                 mergeCompRef.current.of([]), editingKeymap,
+                liveCompRef.current.of(liveMode ? liveMarkdownPresentation : []),
                 keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
                 updateListener,
                 EditorView.domEventHandlers({ paste: handlePaste }),

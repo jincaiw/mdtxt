@@ -38,4 +38,18 @@ describe("editor selection theming", () => {
         await waitFor(() => expect(content.textContent).toBe("alpha updated"));
         expect(container.querySelector(".cm-content")).toBe(content);
     });
+
+    it("adds and removes Live presentation through a compartment without rebuilding the host", async () => {
+        const { container, rerender } = render(<CodeEditor documentId="test" content="# heading" onChange={() => {}} liveMode />);
+        const content = await waitFor(() => {
+            const element = container.querySelector<HTMLElement>(".cm-content");
+            expect(element).toBeTruthy();
+            return element!;
+        });
+        expect(content.querySelector(".cm-live-heading-1")).toBeTruthy();
+
+        rerender(<CodeEditor documentId="test" content="# heading" onChange={() => {}} liveMode={false} />);
+        await waitFor(() => expect(content.querySelector(".cm-live-heading-1")).toBeNull());
+        expect(container.querySelector(".cm-content")).toBe(content);
+    });
 });

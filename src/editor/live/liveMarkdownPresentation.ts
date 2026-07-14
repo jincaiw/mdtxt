@@ -1,4 +1,5 @@
-import { RangeSetBuilder, StateField, type EditorState, type Extension, type Range, type Transaction } from "@codemirror/state";
+import { useEffect, type RefObject } from "react";
+import { RangeSetBuilder, StateField, type Compartment, type EditorState, type Extension, type Range, type Transaction } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 
@@ -102,3 +103,18 @@ export const liveMarkdownTheme = EditorView.baseTheme({
 });
 
 export const liveMarkdownPresentation: Extension = [liveMarkdownDecorations, liveMarkdownTheme];
+
+/** Reconfigures the isolated Live compartment without rebuilding EditorView. */
+export function useLiveMarkdownPresentation({
+    viewRef,
+    liveCompRef,
+    enabled,
+}: {
+    viewRef: RefObject<EditorView | null>;
+    liveCompRef: RefObject<Compartment>;
+    enabled: boolean;
+}) {
+    useEffect(() => {
+        viewRef.current?.dispatch({ effects: liveCompRef.current.reconfigure(enabled ? liveMarkdownPresentation : []) });
+    }, [enabled, liveCompRef, viewRef]);
+}
