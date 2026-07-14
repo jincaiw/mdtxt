@@ -28,8 +28,9 @@ accepted.**
 | Active conflict choice | `bun run test -- src/components/FileConflictDialog.test.tsx` | Passed: comparison reads disk only on request; keep-local, save-as and reload remain separate explicit operations |
 | Background conflict marker | `bun run test -- src/components/TabBar.test.tsx` | Passed: conflict metadata produces an accessible persistent tab warning without altering dirty state |
 | macOS file-system boundary | Darwin 25.5.0 / macOS 26.5.2 / arm64; `cargo test ... symbolic_link` and `... long_nested_path` | Passed: saving a symbolic-link path is explicitly refused without replacing the link or target; a nested path over 600 characters writes and reads successfully |
-| Frontend release gates | `bun run test && bun run build && bun run release:check` | Passed: 45 files / 314 tests, production build, and preflight (`mdtxt` `0.1.0`; 436 Chinese keys / 97 source files; 0 direct user-copy literals) |
+| Frontend release gates | `bun run test && bun run build && bun run release:check` | Passed: 46 files / 316 tests, production build, and preflight (`mdtxt` `0.1.0`; 436 Chinese keys / 97 source files; 0 direct user-copy literals) |
 | Recovery store | `cargo test --manifest-path src-tauri/Cargo.toml recovery::tests` | Passed: checksum validation, tamper cleanup, atomic write/read and clear |
+| Recovery prompt | `bun run test -- src/components/RecoveryDialog.test.tsx` | Passed: 2 tests cover verified-entry-only rendering, explicit restore/discard callbacks, the non-overwrite warning, and initial focus on Restore |
 | macOS recovery smoke | Debug `mdtxt.app`, Apple M4 / Darwin 25.5.0 / WKWebView | Edited an Untitled draft, waited for recovery debounce, terminated/relaunched the Debug app, observed `RecoveryDialog`, restored into `已恢复 — Untitled-1.md`, and verified the original text remained editable as an unsaved tab |
 
 ## Remaining P8 gates
