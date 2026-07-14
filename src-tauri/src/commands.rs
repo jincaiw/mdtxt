@@ -290,6 +290,17 @@ async fn save_file_impl(
     // A brand-new file (save-as / new note) has no existing EOL, so we keep the
     // editor's LF. EOL-01.
     let target = PathBuf::from(&path);
+    match tokio::fs::symlink_metadata(&target).await {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            // rename(tmp, symlink) replaces the link itself rather than its
+            // target on POSIX. Refuse explicitly instead of silently breaking
+            // a workspace link or writing outside the user-selected boundary.
+            return Err(CommandError::WriteError(format!(
+                "Refusing to replace symbolic link: {path}"
+            )));
+        }
+        Ok(_) | Err(_) => {}
+    }
     let existing_metadata = match tokio::fs::metadata(&target).await {
         Ok(metadata) => {
             if let Some(expected) = expected_revision.filter(|revision| *revision > 0) {
@@ -1136,6 +1147,57 @@ mod tests {
             );
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
             std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_file_refuses_to_replace_a_symbolic_link() {
+        use std::os::unix::fs::symlink;
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let dir = std::env::temp_dir().join(format!("mdtxt-symlink-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let target = dir.join("target.md");
+            let link = dir.join("link.md");
+            std::fs::write(&target, "original target").unwrap();
+            symlink(&target, &link).unwrap();
+
+            let result = save_file(link.to_string_lossy().to_string(), "replacement".into(), None, None).await;
+
+            assert!(matches!(result, Err(CommandError::WriteError(message)) if message.contains("symbolic link")));
+            assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+            assert_eq!(std::fs::read_to_string(&target).unwrap(), "original target");
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_file_handles_a_long_nested_path() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let root = std::env::temp_dir().join(format!("mdtxt-long-path-{}", std::process::id()));
+            let mut directory = root.clone();
+            for index in 0..8 {
+                directory.push(format!("segment-{index}-{}", "x".repeat(64)));
+            }
+            std::fs::create_dir_all(&directory).unwrap();
+            let path = directory.join("long.md").to_string_lossy().to_string();
+
+            save_file(path.clone(), "long-path content".into(), None, None)
+                .await
+                .unwrap();
+
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), "long-path content");
+            std::fs::remove_dir_all(&root).ok();
         });
     }
 

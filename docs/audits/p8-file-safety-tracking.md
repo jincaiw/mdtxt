@@ -21,11 +21,12 @@ accepted.**
 | Scope | Command | Result |
 | --- | --- | --- |
 | Rust formatting and static analysis | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` and `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Passed |
-| Rust persistence tests | `cargo test --manifest-path src-tauri/Cargo.toml` | Passed: 28 tests; includes atomic write, cleanup, durable result hash, failure injection, CRLF preservation, temporary-path uniqueness, stale-revision/hash rejection and Unix permission preservation |
+| Rust persistence tests | `cargo test --manifest-path src-tauri/Cargo.toml` | Passed: 30 tests; includes atomic write, cleanup, durable result hash, failure injection, CRLF preservation, temporary-path uniqueness, stale-revision/hash rejection, symlink refusal, long-path write and Unix permission preservation |
 | Failure injection | `cargo test --manifest-path src-tauri/Cargo.toml injected_` | Passed: write, file-sync and rename failures preserve original bytes and remove the sibling temporary file; directory-sync failure is explicitly recorded as post-rename and returns a successful save result with `durabilityWarning`, so the UI keeps the session durable while warning the user |
 | Revision-aware save paths | `bun run test -- src/hooks/useExternalChangeWatcher.test.ts src/hooks/useAutosave.test.ts src/utils/documentSessionController.test.ts src/utils/documentSession.test.ts` | Passed: 4 files / 29 tests; active, background, autosave and close-time paths carry the known revision/hash, and a successful write updates both only for the saved version |
 | Active conflict choice | `bun run test -- src/components/FileConflictDialog.test.tsx` | Passed: comparison reads disk only on request; keep-local, save-as and reload remain separate explicit operations |
 | Background conflict marker | `bun run test -- src/components/TabBar.test.tsx` | Passed: conflict metadata produces an accessible persistent tab warning without altering dirty state |
+| macOS file-system boundary | Darwin 25.5.0 / macOS 26.5.2 / arm64; `cargo test ... symbolic_link` and `... long_nested_path` | Passed: saving a symbolic-link path is explicitly refused without replacing the link or target; a nested path over 600 characters writes and reads successfully |
 | Frontend release gates | `bun run build` | Passed after the P8a result-contract change; `release:check` remains a required final P8 gate |
 | Recovery store | `cargo test --manifest-path src-tauri/Cargo.toml recovery::tests` | Passed: checksum validation, tamper cleanup, atomic write/read and clear |
 | macOS recovery smoke | Debug `mdtxt.app`, Apple M4 / Darwin 25.5.0 / WKWebView | Edited an Untitled draft, waited for recovery debounce, terminated/relaunched the Debug app, observed `RecoveryDialog`, restored into `已恢复 — Untitled-1.md`, and verified the original text remained editable as an unsaved tab |
@@ -33,8 +34,10 @@ accepted.**
 ## Remaining P8 gates
 
 1. Record the equivalent Windows and Linux recovery behavior before release.
-2. Record macOS, Windows, and Linux behavior for symbolic links, long paths,
-   UNC paths, locks, directory synchronization, and replacement semantics.
+2. Record Windows and Linux behavior for symbolic links, long paths, UNC paths,
+   locks, directory synchronization, and replacement semantics; record macOS
+   lock behavior separately because POSIX advisory locks are not automatically
+   enforced by rename.
 
 ## Rollback boundary
 
