@@ -25,7 +25,7 @@ export interface UseAutosaveOptions {
   /** Called after a successful write with the exact version that was written. */
   onSaved: (result: DiskSaveResult, snapshot: NonNullable<UseAutosaveOptions["snapshot"]>) => void;
   /** Called when a write fails (already throttled to at most once per 30s). */
-  onError: (message: string) => void;
+  onError: (message: string, snapshot: NonNullable<UseAutosaveOptions["snapshot"]>) => void;
 }
 
 /** Debounce before persisting after the last edit. */
@@ -69,7 +69,7 @@ export function useAutosave({
         if (now - lastErrorRef.current > ERROR_THROTTLE_MS) {
           lastErrorRef.current = now;
           const msg = typeof err === "string" ? err : (err as { message?: string })?.message;
-          onError(msg || "Autosave failed");
+          onError(msg || "Autosave failed", snapshot);
         }
       }
     }, AUTOSAVE_DELAY_MS);

@@ -85,7 +85,7 @@ describe("useAutosave", () => {
     });
     await vi.advanceTimersByTimeAsync(1600);
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith("Disk full");
+    expect(onError).toHaveBeenCalledWith("Disk full", expect.objectContaining({ documentId: "doc", version: 1 }));
 
     // A second failure shortly after stays silent (30s throttle window).
     rerender(base({ snapshot: { documentId: "doc", version: 2, filePath: "C:/doc.md", diskRevision: 100, diskHash: "known-hash", content: "b", dirty: true }, onError }));

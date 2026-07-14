@@ -159,6 +159,10 @@ const AI_SHORTCUT = IS_MAC ? "⌘J" : "Alt+J";
 // padding-right when it's open so content reflows beside it (not under it).
 const AI_PANEL_WIDTH = 400;
 
+function isDiskConflictMessage(message: string): boolean {
+  return message.startsWith("File changed on disk:");
+}
+
 // The launch-file resolution must run exactly once per webview load. React
 // StrictMode double-invokes effects in dev: without this guard the second run
 // would find the CLI file already consumed (the backend take()s it) and start
@@ -223,7 +227,7 @@ function AppContent() {
   const [showUnsavedBeforeClose, setShowUnsavedBeforeClose] = useState(false);
   // Pending dirty-tab close, awaiting the Save/Discard/Cancel dialog. TABS-05.
   const [closeTabPrompt, setCloseTabPrompt] = useState<{ id: string; fileName: string } | null>(null);
-  const [fileConflict, setFileConflict] = useState<{ path: string; name: string } | null>(null);
+  const [fileConflict, setFileConflict] = useState<{ documentId: string; path: string; name: string } | null>(null);
   const [recoveryEntries, setRecoveryEntries] = useState<import("./components/RecoveryDialog").RecoveryCandidate[]>([]);
   // Find bar over the reader-mode preview (Ctrl+F when mode === "preview").
   const [previewFindOpen, setPreviewFindOpen] = useState(false);
@@ -836,6 +840,10 @@ function AppContent() {
         });
       } catch (err) {
         const msg = errMessage(err);
+        if (isDiskConflictMessage(msg)) {
+          setFileConflict({ documentId: snapshot.documentId, path, name: snapshot.name });
+          return;
+        }
         showToast(msg || tr("Failed to save {file}", { file: snapshot.name }), "error");
         return; // don't close on a failed save — the user would lose the buffer
       }
@@ -859,7 +867,7 @@ function AppContent() {
     () => {
       const session = activeSessionRef.current;
       if (!session?.path) return;
-      setFileConflict({ path: session.path, name: session.name });
+    setFileConflict({ documentId: session.id, path: session.path, name: session.name });
     },
     []
   );
@@ -892,7 +900,13 @@ function AppContent() {
     sessionController.markSaved(snapshot.documentId, { documentId: snapshot.documentId, version: snapshot.version, value: result });
     knownMtimeRef.current = result.modified;
   }, [sessionController]);
-  const handleAutosaveError = useCallback((msg: string) => showToast(msg, "error"), [showToast]);
+  const handleAutosaveError = useCallback((msg: string, snapshot: NonNullable<Parameters<typeof useAutosave>[0]["snapshot"]>) => {
+    if (isDiskConflictMessage(msg) && snapshot.filePath) {
+      setFileConflict({ documentId: snapshot.documentId, path: snapshot.filePath, name: sessionController.get(snapshot.documentId)?.name ?? "Untitled.md" });
+      return;
+    }
+    showToast(msg, "error");
+  }, [sessionController, showToast]);
   useAutosave({
     enabled: autoSaveEnabled,
     snapshot: autosaveSnapshot,
@@ -954,7 +968,14 @@ function AppContent() {
           sessionController.markSaved(summary.id, { documentId: summary.id, version: snapshot.version, value: result });
           // Keep the temporary tab projection synchronized until P4d removes it.
           commitTabs(tabsRef.current.map((x) => x.id === summary.id ? { ...x, knownMtime: result.modified } : x));
-        } catch {/* best-effort; the active-tab path surfaces disk errors */}
+        } catch (err) {
+          const msg = errMessage(err);
+          if (isDiskConflictMessage(msg)) {
+            setFileConflict({ documentId: summary.id, path: summary.path, name: summary.name });
+          }
+          // Other background autosave failures remain non-modal; their next
+          // active save reports the native error without interrupting typing.
+        }
       }
     }, 1500);
     return () => window.clearTimeout(timer);
@@ -1154,6 +1175,10 @@ function AppContent() {
       });
     } catch (err) {
       const msg = errMessage(err);
+      if (isDiskConflictMessage(msg)) {
+        setFileConflict({ documentId: prompt.id, path, name: data.fileName });
+        return;
+      }
       showToast(msg || tr("Failed to save file"), "error");
       return; // keep the tab open on a failed save
     }
@@ -1477,6 +1502,11 @@ function AppContent() {
     await handleSaveAs();
   }, [handleSaveAs]);
 
+  const handleKeepLocalConflict = useCallback(() => {
+    setFileConflict(null);
+    showToast(tr("Local edits are kept. Save a copy to preserve them without overwriting the disk version."), "info");
+  }, [showToast, tr]);
+
   // Save file (Save As if no path yet)
   const handleSaveFile = useCallback(async () => {
     const snapshot = sessionController.readActive();
@@ -1499,6 +1529,10 @@ function AppContent() {
     } catch (err) {
       console.error("Failed to save file:", err);
       const msg = errMessage(err);
+      if (isDiskConflictMessage(msg)) {
+        setFileConflict({ documentId: snapshot!.documentId, path, name: sessionController.get(snapshot!.documentId)?.name ?? "Untitled.md" });
+        return;
+      }
       showToast(msg || tr("Failed to save file"), "error");
     }
   }, [showToast, handleSaveAs, tr, sessionController]);
@@ -2329,8 +2363,11 @@ function AppContent() {
         <Suspense fallback={null}>
           <FileConflictDialog
             isOpen={!!fileConflict}
+            path={fileConflict.path}
             fileName={fileConflict.name}
+            localContent={sessionController.read(fileConflict.documentId)?.value ?? ""}
             onClose={() => setFileConflict(null)}
+            onKeepLocal={handleKeepLocalConflict}
             onReload={handleReloadConflict}
             onSaveCopy={handleSaveConflictCopy}
           />
