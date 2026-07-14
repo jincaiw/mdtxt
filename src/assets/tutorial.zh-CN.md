@@ -1,10 +1,10 @@
 ---
-title: 欢迎使用 Paperling
-author: Paperling
+title: 欢迎使用 mdtxt
+author: mdtxt
 tags: [指南, markdown, 入门]
 ---
 
-# 欢迎使用 Paperling 👋
+# 欢迎使用 mdtxt 👋
 
 这是一份**真实、可编辑的文档**。这里没有截图：右侧看到的一切都由左侧的
 Markdown 实时渲染。试着修改它，观察预览如何立即更新。
@@ -36,7 +36,7 @@ Markdown 实时渲染。试着修改它，观察预览如何立即更新。
 
 直接在笔记中跟踪完成情况。试试点击预览中的复选框：
 
-- [x] 安装 Paperling
+- [x] 安装 mdtxt
 - [x] 打开本指南
 - [ ] 写下第一篇笔记
 - [ ] 导出为 PDF
@@ -56,7 +56,7 @@ Markdown 实时渲染。试着修改它，观察预览如何立即更新。
 
 ```js
 function greet(name) {
-  // Paperling 会自动高亮这里
+  // mdtxt 会自动高亮这里
   return `你好，${name}！欢迎使用。`;
 }
 
@@ -65,7 +65,7 @@ console.log(greet("写作者"));
 
 ## 5. 数学公式
 
-Paperling 使用 KaTeX 渲染 LaTeX 数学公式。可以输入行内公式 $E = mc^2$，或在
+mdtxt 使用 KaTeX 渲染 LaTeX 数学公式。可以输入行内公式 $E = mc^2$，或在
 双美元符号间输入二次方程公式：
 
 $$
@@ -88,7 +88,7 @@ $$
 
 ## 6. Mermaid 图表
 
-将围栏代码块标为 `mermaid`，即可生成图表。下面是笔记在 Paperling 中的流程图：
+将围栏代码块标为 `mermaid`，即可生成图表。下面是笔记在 mdtxt 中的流程图：
 
 ```mermaid
 flowchart LR
@@ -114,7 +114,7 @@ pie showData
 [Markdown 指南](https://www.markdownguide.org)。
 
 自己笔记之间的内部链接使用 Wiki 风格语法。输入 `[[另一篇笔记]]` 会链接到同一
-文件夹内的文件；输入 `[[` 时 Paperling 还会自动补全文件名。
+文件夹内的文件；输入 `[[` 时 mdtxt 还会自动补全文件名。
 
 [^1]: 脚注会显示在这里，上方的引用会链接到它。
 
@@ -123,7 +123,7 @@ pie showData
 ## 接下来做什么？
 
 - 按 **Ctrl+P** 后输入内容，可立即前往任意命令。
-- 将图片拖入编辑器，Paperling 会把它保存到笔记旁。
+- 将图片拖入编辑器，mdtxt 会把它保存到笔记旁。
 - 在齿轮菜单中选择主题（深色、浅色、纸张或 Dracula）。
 
 工具就这些。随时删除这一页的全部内容，开始写下自己的文字吧。祝你写作愉快！🚀

@@ -1,5 +1,5 @@
 {
-  "name": "paperling-site",
+  "name": "mdtxt-site",
   "version": "1.0.0",
   "packageManager": "bun@1.3.14",
   "dependencies": {

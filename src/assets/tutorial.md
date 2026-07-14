@@ -1,10 +1,10 @@
 ---
-title: Welcome to Paperling
-author: The Paperling
+title: Welcome to mdtxt
+author: mdtxt
 tags: [guide, markdown, getting-started]
 ---
 
-# Welcome to Paperling 👋
+# Welcome to mdtxt 👋
 
 This is a **real, editable document**. Nothing here is a screenshot: everything
 you see rendered on the right is produced from the markdown on the left. Poke at
@@ -40,7 +40,7 @@ without ever touching the mouse. A few handy shortcuts:
 Track what's done right inside your notes. Try clicking a checkbox in the
 preview:
 
-- [x] Install Paperling
+- [x] Install mdtxt
 - [x] Open this guide
 - [ ] Write my first note
 - [ ] Export it to PDF
@@ -61,7 +61,7 @@ copy button in the preview.
 
 ```js
 function greet(name) {
-  // Paperling highlights this automatically
+  // mdtxt highlights this automatically
   return `Hello, ${name}! Welcome aboard.`;
 }
 
@@ -70,7 +70,7 @@ console.log(greet("writer"));
 
 ## 5. Math and formulas
 
-Paperling renders LaTeX math with KaTeX. Write inline math like $E = mc^2$ or
+mdtxt renders LaTeX math with KaTeX. Write inline math like $E = mc^2$ or
 the quadratic formula between double dollar signs:
 
 $$
@@ -94,7 +94,7 @@ $$
 ## 6. Diagrams with Mermaid
 
 Turn a fenced `mermaid` block into a diagram. Here's a flowchart of how a note
-travels through Paperling:
+travels through mdtxt:
 
 ```mermaid
 flowchart LR
@@ -120,7 +120,7 @@ You can cite sources with footnotes[^1] and link out to anything, like the
 [Markdown Guide](https://www.markdownguide.org).
 
 Internal links between your own notes use wiki-style syntax. Typing
-`[[Another Note]]` links straight to a file in the same folder, and Paperling
+`[[Another Note]]` links straight to a file in the same folder, and mdtxt
 autocompletes the names as you type `[[`.
 
 [^1]: Footnotes render down here, and the reference above links to them.
@@ -130,7 +130,7 @@ autocompletes the names as you type `[[`.
 ## Where to next?
 
 - Press **Ctrl+P** and start typing to reach any command instantly.
-- Drop an image into the editor and Paperling saves it alongside your note.
+- Drop an image into the editor and mdtxt saves it alongside your note.
 - Pick a theme (Dark, Light, Paper, Dracula) from the gear menu.
 
 That's the whole toolkit. Delete everything on this page and start writing your
