@@ -21,6 +21,12 @@ describe("DocumentSession", () => {
         expect(isSessionDirty(session)).toBe(false);
     });
 
+    it("starts dirty when restored content differs from its durable snapshot", () => {
+        const session = createDocumentSession({ id: "dirty", path: null, name: "Untitled.md", content: "draft", savedContent: "" });
+        expect(session).toMatchObject({ version: 1, savedVersion: 0 });
+        expect(isSessionDirty(session)).toBe(true);
+    });
+
     it("increments only changed document revisions", () => {
         const session = create();
         expect(replaceSessionContent(session, session.content)).toBe(session);

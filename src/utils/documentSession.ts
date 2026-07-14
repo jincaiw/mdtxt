@@ -29,6 +29,8 @@ export interface DocumentSessionInput {
     path: string | null;
     name: string;
     content: string;
+    /** Content currently known to be durable. Defaults to `content`. */
+    savedContent?: string;
     diskRevision?: number;
     fileSize?: number;
     viewMode?: DocumentViewMode;
@@ -58,12 +60,14 @@ export function inferDocumentFormat(content: string): DocumentFormat {
 }
 
 export function createDocumentSession(input: DocumentSessionInput): DocumentSession {
+    const savedContent = input.savedContent ?? input.content;
+    const dirty = input.content !== savedContent;
     return {
         id: input.id,
         path: input.path,
         name: input.name,
         content: input.content,
-        version: 0,
+        version: dirty ? 1 : 0,
         savedVersion: 0,
         diskRevision: input.diskRevision ?? 0,
         fileSize: input.fileSize ?? input.content.length,

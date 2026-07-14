@@ -111,6 +111,13 @@ import { countSourceWords, countWords } from "./utils/documentStats";
 import { Tour } from "./components/Tour";
 import { PreviewFindBar } from "./components/PreviewFindBar";
 import { useLocale } from "./context/LocaleContext";
+import {
+  acceptsSessionResult,
+  createDocumentSession,
+  markSessionSaved,
+  replaceSessionContent,
+  type DocumentSession,
+} from "./utils/documentSession";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
 import tutorialMarkdown from "./assets/tutorial.md?raw";
@@ -124,6 +131,12 @@ interface FileData {
   line_count: number;
   /** Last-modified time (ms since epoch) — used to detect external edits. */
   modified: number;
+}
+
+interface ProposedDocument {
+  documentId: string;
+  version: number;
+  content: string;
 }
 
 // Platform-aware AI shortcut hint. Windows uses Alt+J because WebView2 reserves
@@ -211,7 +224,7 @@ function AppContent() {
   const [showTOC, setShowTOC] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
   // Proposed document from Agent mode, shown as an inline diff for accept/reject.
-  const [proposedDoc, setProposedDoc] = useState<string | null>(null);
+  const [proposedDoc, setProposedDoc] = useState<ProposedDocument | null>(null);
 
   // Preview scroll position
   const [previewLine, setPreviewLine] = useState(1);
@@ -334,6 +347,10 @@ function AppContent() {
   const closedTabsRef = useRef<{ path: string; cursorLine?: number }[]>([]);
   const liveRef = useRef({ filePath, fileName, content, originalContent, fileSize });
   liveRef.current = { filePath, fileName, content, originalContent, fileSize };
+  // Compatibility bridge for P4: tabs still provide React snapshots while
+  // DocumentSession owns the revision token used by save and AI operations.
+  // P5 removes the duplicate active-buffer bridge when EditorState moves here.
+  const sessionsRef = useRef<Map<string, DocumentSession>>(new Map());
   // The line we'd return to when this file is re-activated: the caret line while
   // editing, or the top-visible line in reader mode. TABS-02.
   const currentLineRef = useRef(1);
@@ -348,6 +365,35 @@ function AppContent() {
     setActiveTabId(id);
   }, []);
   const newTabId = useCallback(() => `tab-${++tabSeqRef.current}`, []);
+
+  const activeSession = useCallback((): DocumentSession | null => {
+    const id = activeTabIdRef.current;
+    if (!id) return null;
+    const live = liveRef.current;
+    const current = sessionsRef.current.get(id);
+    if (!current) {
+      const created = createDocumentSession({
+        id,
+        path: live.filePath,
+        name: live.fileName ?? "Untitled.md",
+        content: live.content,
+        savedContent: live.originalContent,
+        diskRevision: knownMtimeRef.current,
+        fileSize: live.fileSize,
+        viewMode: mode,
+        cursorLine: currentLineRef.current,
+      });
+      sessionsRef.current.set(id, created);
+      return created;
+    }
+    if (current.content === live.content) return current;
+    let synced = replaceSessionContent(current, live.content);
+    if (live.content === live.originalContent) {
+      synced = markSessionSaved(synced, { documentId: id, version: synced.version, value: knownMtimeRef.current });
+    }
+    sessionsRef.current.set(id, synced);
+    return synced;
+  }, [mode]);
 
   // Every open tab that has unsaved changes, reading the ACTIVE tab from live
   // state (its stored snapshot lags until the next switch) and the rest from
@@ -444,10 +490,18 @@ function AppContent() {
       const existing = findTabByPath(tabsRef.current, fileData.path);
       if (existing) {
         commitTabs(tabsRef.current.map((t) => (t.id === existing.id ? { ...t, ...loaded } : t)));
+        sessionsRef.current.set(existing.id, createDocumentSession({
+          id: existing.id, path: loaded.filePath, name: loaded.fileName, content: loaded.content,
+          diskRevision: loaded.knownMtime, fileSize: loaded.fileSize, viewMode: mode,
+        }));
         setActiveTab(existing.id);
       } else {
         const id = newTabId();
         commitTabs([...tabsRef.current, { id, ...loaded }]);
+        sessionsRef.current.set(id, createDocumentSession({
+          id, path: loaded.filePath, name: loaded.fileName, content: loaded.content,
+          diskRevision: loaded.knownMtime, fileSize: loaded.fileSize, viewMode: mode,
+        }));
         setActiveTab(id);
       }
       // Snap the new file to the top — but not on a same-path external reload,
@@ -473,7 +527,7 @@ function AppContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, snapshotActiveTab, commitTabs, setActiveTab, newTabId, bumpDocSwap, setMode, tr]);
+  }, [showToast, snapshotActiveTab, commitTabs, setActiveTab, newTabId, bumpDocSwap, setMode, tr, mode]);
 
   // Settings flags above persist themselves via usePersistedState; the matching
   // setters (setSavedViewMode, setSplitRatio, …) are passed into that hook.
@@ -758,9 +812,15 @@ function AppContent() {
   // the AI-review guard (AI-01). Callbacks are memoised so the debounce timer
   // isn't reset on every unrelated re-render.
   const handleAutosaved = useCallback((mtime: number, saved: string) => {
+    const session = activeSession();
+    // A debounce can finish after the user continues typing. Only the exact
+    // buffer written to disk may become the durable revision.
+    if (!session || session.content !== saved) return;
+    const marked = markSessionSaved(session, { documentId: session.id, version: session.version, value: mtime });
+    sessionsRef.current.set(session.id, marked);
     knownMtimeRef.current = mtime;
     setOriginalContent(saved);
-  }, []);
+  }, [activeSession]);
   const handleAutosaveError = useCallback((msg: string) => showToast(msg, "error"), [showToast]);
   useAutosave({
     enabled: autoSaveEnabled,
@@ -818,6 +878,11 @@ function AppContent() {
           if (!(t.knownMtime > 0 && info.modified > t.knownMtime)) continue;
           if (t.content === t.originalContent) {
             const fd = await invoke<FileData>("read_file", { path: t.filePath! });
+            sessionsRef.current.set(t.id, createDocumentSession({
+              id: t.id, path: fd.path, name: fd.name, content: fd.content,
+              diskRevision: fd.modified ?? 0, fileSize: fd.size, viewMode: mode,
+              cursorLine: t.cursorLine,
+            }));
             commitTabs(
               tabsRef.current.map((x) =>
                 x.id === t.id
@@ -834,7 +899,7 @@ function AppContent() {
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [commitTabs, showToast]);
+  }, [commitTabs, showToast, mode]);
 
   // Persist the whole open-tab session (paths + which is active) so a relaunch
   // reopens everything, not just one file. Runs whenever the tab list or the
@@ -904,6 +969,7 @@ function AppContent() {
     const isActive = id === activeTabIdRef.current;
     const nextId = nextActiveAfterClose(tabsRef.current, id);
     const remaining = tabsRef.current.filter((t) => t.id !== id);
+    sessionsRef.current.delete(id);
     commitTabs(remaining);
     if (!isActive) return;
     const target = nextId ? remaining.find((t) => t.id === nextId) : undefined;
@@ -1231,8 +1297,15 @@ function AppContent() {
       defaultPath: fileName ?? undefined,
     });
     if (!selected) return;
+    const session = activeSession();
     try {
-      knownMtimeRef.current = await invoke<number>("save_file", { path: selected, content });
+      const mtime = await invoke<number>("save_file", { path: selected, content });
+      if (session) {
+        const current = sessionsRef.current.get(session.id);
+        if (!current || current.version !== session.version || current.content !== content) return;
+        sessionsRef.current.set(session.id, markSessionSaved(current, { documentId: session.id, version: session.version, value: mtime }));
+      }
+      knownMtimeRef.current = mtime;
       setFilePath(selected);
       const name = selected.replace(/\\/g, "/").split("/").pop() || "Untitled";
       setFileName(name);
@@ -1254,7 +1327,7 @@ function AppContent() {
       const msg = errMessage(err);
       showToast(msg || tr("Failed to save file"), "error");
     }
-  }, [content, fileName, showToast, commitTabs, tr]);
+  }, [content, fileName, showToast, commitTabs, tr, activeSession]);
 
   // Save file (Save As if no path yet)
   const handleSaveFile = useCallback(async () => {
@@ -1262,8 +1335,15 @@ function AppContent() {
       await handleSaveAs();
       return;
     }
+    const session = activeSession();
     try {
-      knownMtimeRef.current = await invoke<number>("save_file", { path: filePath, content });
+      const mtime = await invoke<number>("save_file", { path: filePath, content });
+      if (session) {
+        const current = sessionsRef.current.get(session.id);
+        if (!current || current.version !== session.version || current.content !== content) return;
+        sessionsRef.current.set(session.id, markSessionSaved(current, { documentId: session.id, version: session.version, value: mtime }));
+      }
+      knownMtimeRef.current = mtime;
       setOriginalContent(content);
       showToast(tr("File saved"), "success");
     } catch (err) {
@@ -1271,7 +1351,7 @@ function AppContent() {
       const msg = errMessage(err);
       showToast(msg || tr("Failed to save file"), "error");
     }
-  }, [filePath, content, showToast, handleSaveAs, tr]);
+  }, [filePath, content, showToast, handleSaveAs, tr, activeSession]);
 
   // Runtime file-open forwards. Cold-start CLI files are handled by the pull
   // in the boot effect above; this event now arrives only from the
@@ -1328,15 +1408,22 @@ function AppContent() {
   // Agent proposed an edited document → show it as a diff to accept/reject.
   // Ensure the editor (where the diff renders) is visible.
   const handleProposeEdit = useCallback((doc: string) => {
-    setProposedDoc(doc);
+    const session = activeSession();
+    if (!session) return;
+    setProposedDoc({ documentId: session.id, version: session.version, content: doc });
     setMode((m) => (m === "preview" ? "split" : m));
-  }, []);
+  }, [activeSession]);
 
   // Review finished: commit the accepted document (or keep the original on reject).
   const handleReviewResolve = useCallback((finalDoc: string | null) => {
-    if (finalDoc != null) setContent(finalDoc);
+    const review = proposedDoc;
+    const session = activeSession();
+    if (finalDoc != null && review && session && acceptsSessionResult(session, { documentId: review.documentId, version: review.version, value: review.content })) {
+      sessionsRef.current.set(session.id, replaceSessionContent(session, finalDoc));
+      setContent(finalDoc);
+    }
     setProposedDoc(null);
-  }, []);
+  }, [activeSession, proposedDoc]);
 
   // Close all panels
   const closeAllPanels = useCallback(() => {
@@ -1354,8 +1441,10 @@ function AppContent() {
 
 // Handle content change
   const handleContentChange = useCallback((newContent: string) => {
+    const session = activeSession();
+    if (session) sessionsRef.current.set(session.id, replaceSessionContent(session, newContent));
     setContent(newContent);
-  }, []);
+  }, [activeSession]);
 
   // Stable cursor + preview-line setters. Critical that these are useCallback
   // (not inline arrows): CodeEditor wires `onCursorChange` into a useEffect via
@@ -1935,7 +2024,7 @@ function AppContent() {
                 wordWrap={wordWrapEnabled}
                 spellCheck={spellCheckEnabled}
                 aiConfig={aiConfig}
-                reviewDoc={proposedDoc}
+                reviewDoc={proposedDoc?.content ?? null}
                 onReviewResolve={handleReviewResolve}
               />
             </div>
