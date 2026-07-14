@@ -62,6 +62,9 @@ const ShortcutCheatsheet = lazy(() =>
 const UnsavedChangesDialog = lazy(() =>
     import("./components/UnsavedChangesDialog").then((m) => ({ default: m.UnsavedChangesDialog }))
 );
+const FileConflictDialog = lazy(() =>
+    import("./components/FileConflictDialog").then((m) => ({ default: m.FileConflictDialog }))
+);
 const AIPanel = lazy(() =>
     import("./components/AIPanel").then((m) => ({ default: m.AIPanel }))
 );
@@ -214,6 +217,7 @@ function AppContent() {
   const [showUnsavedBeforeClose, setShowUnsavedBeforeClose] = useState(false);
   // Pending dirty-tab close, awaiting the Save/Discard/Cancel dialog. TABS-05.
   const [closeTabPrompt, setCloseTabPrompt] = useState<{ id: string; fileName: string } | null>(null);
+  const [fileConflict, setFileConflict] = useState<{ path: string; name: string } | null>(null);
   // Find bar over the reader-mode preview (Ctrl+F when mode === "preview").
   const [previewFindOpen, setPreviewFindOpen] = useState(false);
   // Autosave: save a moment after the user stops typing (Settings → Editor).
@@ -540,6 +544,14 @@ function AppContent() {
     }
   }, [showToast, snapshotActiveTab, commitTabs, setActiveTab, newTabId, setMode, tr, mode]);
 
+  const handleReloadConflict = useCallback(async () => {
+    const conflict = fileConflict;
+    if (!conflict) return;
+    setFileConflict(null);
+    await loadFileDirect(conflict.path);
+    showToast(tr("File changed on disk, reloaded the latest version"), "info");
+  }, [fileConflict, loadFileDirect, showToast, tr]);
+
   // Settings flags above persist themselves via usePersistedState; the matching
   // setters (setSavedViewMode, setSplitRatio, …) are passed into that hook.
 
@@ -831,8 +843,12 @@ function AppContent() {
     [showToast, tr]
   );
   const handleExternalConflict = useCallback(
-    () => showToast(tr("This file changed on disk. Saving is blocked until you reload or save a copy."), "error"),
-    [showToast, tr]
+    () => {
+      const session = activeSessionRef.current;
+      if (!session?.path) return;
+      setFileConflict({ path: session.path, name: session.name });
+    },
+    []
   );
   const handleExternalDiskRevision = useCallback((documentId: string, diskRevision: number) => {
     sessionController.updateFileMetadata(documentId, {
@@ -1383,6 +1399,11 @@ function AppContent() {
       showToast(msg || tr("Failed to save file"), "error");
     }
   }, [fileName, showToast, commitTabs, tr, sessionController]);
+
+  const handleSaveConflictCopy = useCallback(async () => {
+    setFileConflict(null);
+    await handleSaveAs();
+  }, [handleSaveAs]);
 
   // Save file (Save As if no path yet)
   const handleSaveFile = useCallback(async () => {
@@ -2227,6 +2248,18 @@ function AppContent() {
             onDiscard={handleDiscardCloseTab}
             onSave={handleSaveCloseTab}
             dirtyNames={[closeTabPrompt.fileName]}
+          />
+        </Suspense>
+      )}
+
+      {fileConflict && (
+        <Suspense fallback={null}>
+          <FileConflictDialog
+            isOpen={!!fileConflict}
+            fileName={fileConflict.name}
+            onClose={() => setFileConflict(null)}
+            onReload={handleReloadConflict}
+            onSaveCopy={handleSaveConflictCopy}
           />
         </Suspense>
       )}

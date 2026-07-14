@@ -13,7 +13,7 @@ accepted.**
 | FR-COMPAT-004: durable replacement metadata | POSIX builds synchronize the containing directory after rename | Implemented on Unix; Windows directory-flush semantics require platform-specific verification |
 | Overlapping saves do not share a temporary path | `save_temp_path` combines sibling directory, basename, process id, and an atomic process-local sequence | Implemented; unit test proves distinct paths in one process |
 | Save-format fidelity | Existing EOL/BOM/trailing-newline tests in `commands.rs` | Existing coverage remains green; byte-level preservation of all supported formats is not yet complete |
-| External modification conflict choice | `useExternalChangeWatcher` does not advance a dirty document's revision; UI explains that saving is blocked until reload or save-as | Silent overwrite is blocked and Save As remains available; dedicated compare/reload/retain-local dialog is still missing |
+| External modification conflict choice | `useExternalChangeWatcher` does not advance a dirty document's revision; `FileConflictDialog` offers reload-disk or save-as for the active document | Active-document choice is implemented without overwriting either version; a side-by-side comparison and per-background-tab entry remain pending |
 | Crash recovery | No validated recovery-copy lifecycle, checksum, retention policy, or restore UI | Not started |
 
 ## Automated evidence for the atomic-save slice
