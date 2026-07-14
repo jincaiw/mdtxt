@@ -20,6 +20,7 @@
         "@fontsource/merriweather": "^5.2.11",
         "@fontsource/source-serif-4": "^5.2.9",
         "@lezer/highlight": "^1.2.3",
+        "@lezer/markdown": "^1.6.4",
         "@tailwindcss/vite": "^4.3.2",
         "@tauri-apps/api": "^2.11.1",
         "@tauri-apps/plugin-dialog": "^2.7.1",
