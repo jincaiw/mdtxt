@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+
+function filesBelow(directory) {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(directory, entry.name);
+        return entry.isDirectory() ? filesBelow(path) : [path];
+    });
+}
 
 const packageVersion = JSON.parse(readFileSync("package.json", "utf8")).version;
 const tauriVersion = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8")).version;
@@ -17,4 +25,14 @@ if (!changelog.includes(`## [${packageVersion}]`)) {
 execFileSync(process.execPath, ["scripts/check-product-identity.mjs"], { stdio: "inherit" });
 execFileSync(process.execPath, ["scripts/check-i18n.mjs"], { stdio: "inherit" });
 execFileSync(process.execPath, ["scripts/check-user-copy.mjs", "--enforce"], { stdio: "inherit" });
+// The deployed documentation is part of the public product surface. Build it
+// first, then reject an accidental reintroduction of the upstream brand in the
+// generated files (unused source components are not a release artifact).
+execFileSync("bun", ["run", "build"], { cwd: "docs", stdio: "inherit" });
+const upstreamBrandFiles = filesBelow("docs/dist").filter((path) =>
+    /paperling|jincaiw\/paperling|razee4315\/paperling/i.test(readFileSync(path, "utf8")),
+);
+if (upstreamBrandFiles.length) {
+    throw new Error(`Documentation build retains upstream product identity: ${upstreamBrandFiles.join(", ")}`);
+}
 console.log(`Release preflight passed for v${packageVersion}.`);

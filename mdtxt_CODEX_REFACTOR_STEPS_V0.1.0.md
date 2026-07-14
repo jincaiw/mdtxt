@@ -31,7 +31,7 @@
 | --- | --- | --- | --- |
 | P0 基线冻结 | 完成 | `d46d807`、`docs/audits/baseline-0.1.0.md` | 保持基线可复跑 |
 | P1 安全契约 | 完成 | `ca32c04`，fixture、回归与预检基础 | 后续功能必须补对应 fixture |
-| P2 产品身份 | 完成 | `122071b` 至 `9495dd6`，mdtxt 标识、品牌隔离、updater 关闭 | 发布前再次扫描泄漏 |
+| P2 产品身份 | 完成 | `122071b` 至 `9495dd6`，mdtxt 标识、品牌隔离、updater 关闭；发布/测试工作流、Issue 模板已移除上游用户入口，`release:check` 会构建并扫描文档站产物 | 发布前再次扫描泄漏与真实包标识 |
 | P3 双语底座 | 完成 | `96a9931`，默认中文、双语键、硬编码门禁 | 新增文字必须双语 |
 | P4 文档会话 | 完成 | `8a087ec`、`a8c782c`、`36a2ac4` 至 `c748e70`；控制器、每标签 `EditorState`、版本化保存、展示投影与 metadata-only tabs；浏览器双标签/Reader/Source 回归无控制台告警 | P5 仅拆分编辑器模块，不改变会话边界 |
 | P5 编辑器模块拆分 | 完成 | `d68ec3d` 至 `c162371`；presentation、viewport、document session、completion、AI review、preferences、overlays、paste、host 与 controller 分层；`CodeEditor.tsx` 收缩为 30 行挂载容器；全量 38 测试文件/296 测试、构建与发布预检通过 | P6 以该稳定 host 为唯一接入点 |

@@ -9,6 +9,10 @@ const expected = {
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const tauri = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
 const cargo = readFileSync("src-tauri/Cargo.toml", "utf8");
+const releaseWorkflow = readFileSync(".github/workflows/release.yml", "utf8");
+const testBuildWorkflow = readFileSync(".github/workflows/test-build.yml", "utf8");
+const issueConfig = readFileSync(".github/ISSUE_TEMPLATE/config.yml", "utf8");
+const bugTemplate = readFileSync(".github/ISSUE_TEMPLATE/bug_report.yml", "utf8");
 
 const cargoPackage = /^name = "([^"]+)"/m.exec(cargo)?.[1];
 const cargoVersion = /^version = "([^"]+)"/m.exec(cargo)?.[1];
@@ -25,6 +29,18 @@ if (cargoVersion !== expected.version) failures.push(`cargo version=${cargoVersi
 if (cargoLib !== "mdtxt_lib") failures.push(`cargo lib=${cargoLib ?? "missing"}`);
 if (tauri.plugins?.updater) failures.push("updater must be disabled until mdtxt has an owned endpoint");
 if (tauri.bundle?.createUpdaterArtifacts) failures.push("updater artifacts must be disabled without mdtxt signing keys");
+if (/paperling/i.test(releaseWorkflow) || /paperling/i.test(testBuildWorkflow)) {
+  failures.push("release workflows retain Paperling identity");
+}
+if (/paperling/i.test(issueConfig) || /paperling/i.test(bugTemplate)) {
+  failures.push("issue templates retain Paperling identity");
+}
+if (!/releaseName:\s*"mdtxt \$\{\{ needs\.metadata\.outputs\.tag \}\}"/.test(releaseWorkflow)) {
+  failures.push("release workflow must publish under the mdtxt name");
+}
+if (!/includeUpdaterJson:\s*false/.test(releaseWorkflow)) {
+  failures.push("release workflow must not publish updater metadata");
+}
 
 if (failures.length) {
   throw new Error(`Product identity check failed: ${failures.join("; ")}`);

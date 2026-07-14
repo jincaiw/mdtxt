@@ -46,9 +46,9 @@ jobs:
           {
             echo "tag=$tag"
             echo "version=$version"
-            echo "notes<<PAPERLING_RELEASE_NOTES"
+            echo "notes<<MDTXT_RELEASE_NOTES"
             printf '%s\n' "$notes"
-            echo "PAPERLING_RELEASE_NOTES"
+            echo "MDTXT_RELEASE_NOTES"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -92,17 +92,18 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: bun run tauri
           tagName: ${{ needs.metadata.outputs.tag }}
-          releaseName: "Paperling ${{ needs.metadata.outputs.tag }}"
+          releaseName: "mdtxt ${{ needs.metadata.outputs.tag }}"
           releaseBody: ${{ needs.metadata.outputs.notes }}
           args: ${{ matrix.args }}
-          releaseDraft: false
-          prerelease: false
-          includeUpdaterJson: true
+          # P11 must explicitly promote a verified release. Until then every
+          # generated package remains a draft beta, never an implied GA.
+          releaseDraft: true
+          prerelease: true
+          # mdtxt owns neither an updater endpoint nor signing keys yet.
+          includeUpdaterJson: false
       - name: Upload Windows x64 Portable executable
         if: matrix.portable
         shell: pwsh
@@ -111,9 +112,9 @@ jobs:
           TAG: ${{ needs.metadata.outputs.tag }}
           VERSION: ${{ needs.metadata.outputs.version }}
         run: |
-          $source = "src-tauri/target/x86_64-pc-windows-msvc/release/Paperling.exe"
+          $source = "src-tauri/target/x86_64-pc-windows-msvc/release/mdtxt.exe"
           if (-not (Test-Path $source)) { throw "Portable source executable not found: $source" }
-          $portable = "Paperling_$env:VERSION`_windows_x64_portable.exe"
+          $portable = "mdtxt_$env:VERSION`_windows_x64_portable.exe"
           Copy-Item $source $portable
           $hash = (Get-FileHash $portable -Algorithm SHA256).Hash.ToLower()
           "$hash  $portable" | Set-Content "$portable.sha256" -NoNewline
