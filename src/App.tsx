@@ -359,6 +359,17 @@ function AppContent() {
     () => new Map(sessionSnapshot.sessions.map((session) => [session.id, session])),
     [sessionSnapshot.sessions],
   );
+  const autosaveSnapshot = useMemo(() => {
+    const active = sessionController.getActive();
+    if (!active) return null;
+    return {
+      documentId: active.id,
+      version: active.version,
+      filePath: active.path,
+      content: active.content,
+      dirty: active.version !== active.savedVersion,
+    };
+  }, [sessionController, sessionSnapshot]);
   const editorStateStoreRef = useRef<DocumentEditorStateStore | null>(null);
   if (editorStateStoreRef.current === null) editorStateStoreRef.current = new DocumentEditorStateStore();
   const editorStateStore = editorStateStoreRef.current;
@@ -846,22 +857,20 @@ function AppContent() {
   // Autosave 1.5s after the last edit. See useAutosave for the throttling and
   // the AI-review guard (AI-01). Callbacks are memoised so the debounce timer
   // isn't reset on every unrelated re-render.
-  const handleAutosaved = useCallback((mtime: number, saved: string) => {
-    const session = activeSession();
-    // A debounce can finish after the user continues typing. Only the exact
-    // buffer written to disk may become the durable revision.
-    if (!session || session.content !== saved) return;
-    const marked = markSessionSaved(session, { documentId: session.id, version: session.version, value: mtime });
-    sessionController.replaceSession(marked);
+  const handleAutosaved = useCallback((mtime: number, snapshot: NonNullable<Parameters<typeof useAutosave>[0]["snapshot"]>) => {
+    // A debounce can finish after a new edit or a tab switch. Only the exact
+    // session revision written to disk may become durable.
+    if (!sessionController.acceptsResult(snapshot.documentId, {
+      documentId: snapshot.documentId, version: snapshot.version, value: snapshot.content,
+    })) return;
+    sessionController.markSaved(snapshot.documentId, { documentId: snapshot.documentId, version: snapshot.version, value: mtime });
     knownMtimeRef.current = mtime;
-    setOriginalContent(saved);
-  }, [activeSession, sessionController]);
+    if (snapshot.documentId === activeTabIdRef.current) setOriginalContent(snapshot.content);
+  }, [sessionController]);
   const handleAutosaveError = useCallback((msg: string) => showToast(msg, "error"), [showToast]);
   useAutosave({
     enabled: autoSaveEnabled,
-    filePath,
-    content,
-    originalContent,
+    snapshot: autosaveSnapshot,
     isReviewActive: proposedDoc != null,
     onSaved: handleAutosaved,
     onError: handleAutosaveError,

@@ -4,20 +4,22 @@ import { invoke } from "@tauri-apps/api/core";
 export interface UseAutosaveOptions {
   /** Master toggle (Settings → Editor). */
   enabled: boolean;
-  /** Path of the open file, or null for an unsaved Untitled buffer. */
-  filePath: string | null;
-  /** Live editor content. */
-  content: string;
-  /** Last-persisted content; autosave is a no-op while it equals `content`. */
-  originalContent: string;
+  /** Immutable document revision selected for this debounce cycle. */
+  snapshot: {
+    documentId: string;
+    version: number;
+    filePath: string | null;
+    content: string;
+    dirty: boolean;
+  } | null;
   /**
    * True while an AI review is pending. `content` then reflects only the chunks
    * accepted so far, and a later "Reject all" would otherwise leave disk holding
    * edits the user explicitly rejected, so autosave must stay parked. AI-01.
    */
   isReviewActive: boolean;
-  /** Called after a successful write with the new mtime and the saved content. */
-  onSaved: (mtime: number, content: string) => void;
+  /** Called after a successful write with the exact version that was written. */
+  onSaved: (mtime: number, snapshot: NonNullable<UseAutosaveOptions["snapshot"]>) => void;
   /** Called when a write fails (already throttled to at most once per 30s). */
   onError: (message: string) => void;
 }
@@ -39,9 +41,7 @@ const ERROR_THROTTLE_MS = 30_000;
  */
 export function useAutosave({
   enabled,
-  filePath,
-  content,
-  originalContent,
+  snapshot,
   isReviewActive,
   onSaved,
   onError,
@@ -49,11 +49,11 @@ export function useAutosave({
   const lastErrorRef = useRef(0);
 
   useEffect(() => {
-    if (!enabled || !filePath || content === originalContent || isReviewActive) return;
+    if (!enabled || !snapshot?.filePath || !snapshot.dirty || isReviewActive) return;
     const id = window.setTimeout(async () => {
       try {
-        const mtime = await invoke<number>("save_file", { path: filePath, content });
-        onSaved(mtime, content);
+        const mtime = await invoke<number>("save_file", { path: snapshot.filePath, content: snapshot.content });
+        onSaved(mtime, snapshot);
         lastErrorRef.current = 0;
       } catch (err) {
         const now = Date.now();
@@ -65,5 +65,5 @@ export function useAutosave({
       }
     }, AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(id);
-  }, [enabled, filePath, content, originalContent, isReviewActive, onSaved, onError]);
+  }, [enabled, snapshot, isReviewActive, onSaved, onError]);
 }
