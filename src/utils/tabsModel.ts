@@ -18,6 +18,25 @@ export interface TabState {
   cursorLine?: number;
 }
 
+/**
+ * Creates tab ids that remain unique across application launches. Recovery
+ * snapshots are keyed by document id, so a process-local `tab-1` counter would
+ * otherwise let a newly opened tab overwrite an unresolved crash recovery.
+ */
+export function createTabIdFactory(instanceId = createTabInstanceId()): () => string {
+  let sequence = 0;
+  return () => `tab-${instanceId}-${++sequence}`;
+}
+
+function createTabInstanceId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // WKWebView and supported desktop browsers provide randomUUID. Retain a
+  // collision-resistant fallback for test or older embedded environments.
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 
 /** Find an open tab by file path (null paths never match). */
 export function findTabByPath(tabs: TabState[], path: string | null): TabState | undefined {

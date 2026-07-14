@@ -110,6 +110,7 @@ import {
   nextActiveAfterClose,
   nextUntitledName,
   findReusableUntitledTab,
+  createTabIdFactory,
   computeTabLabels,
   moveTab,
   type TabState,
@@ -312,7 +313,8 @@ function AppContent() {
   // DocumentSession owns every document body and save revision. Tabs retain
   // ordering, labels and cursor metadata; switching activates a session and its
   // retained CodeMirror state without copying Markdown through React. TABS-01.
-  const tabSeqRef = useRef(0);
+  const tabIdFactoryRef = useRef<ReturnType<typeof createTabIdFactory> | null>(null);
+  if (tabIdFactoryRef.current === null) tabIdFactoryRef.current = createTabIdFactory();
   const tabsRef = useRef<TabState[]>([]);
   tabsRef.current = tabs;
   const activeTabIdRef = useRef<string | null>(null);
@@ -426,7 +428,7 @@ function AppContent() {
       return next;
     });
   }, []);
-  const newTabId = useCallback(() => `tab-${++tabSeqRef.current}`, []);
+  const newTabId = useCallback(() => tabIdFactoryRef.current!(), []);
 
 
   const setMode = useCallback((next: ViewMode | ((previous: ViewMode) => ViewMode)) => {

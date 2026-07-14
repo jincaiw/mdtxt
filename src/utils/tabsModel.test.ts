@@ -4,6 +4,7 @@ import {
   nextActiveAfterClose,
   nextUntitledName,
   findReusableUntitledTab,
+  createTabIdFactory,
   computeTabLabels,
   moveTab,
   type TabState,
@@ -12,6 +13,17 @@ import {
 const tab = (id: string, filePath: string | null): TabState => ({
   id, filePath, fileName: filePath?.replace(/\\/g, "/").split("/").pop() ?? "Untitled.md",
   fileSize: 0, knownMtime: 0,
+});
+
+describe("createTabIdFactory", () => {
+  it("keeps ordering within one app instance while separating launches", () => {
+    const beforeCrash = createTabIdFactory("launch-a");
+    const afterRestart = createTabIdFactory("launch-b");
+
+    expect(beforeCrash()).toBe("tab-launch-a-1");
+    expect(beforeCrash()).toBe("tab-launch-a-2");
+    expect(afterRestart()).toBe("tab-launch-b-1");
+  });
 });
 
 describe("findTabByPath", () => {
