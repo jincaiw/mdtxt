@@ -21,7 +21,8 @@ accepted.**
 | Scope | Command | Result |
 | --- | --- | --- |
 | Rust formatting and static analysis | `cargo fmt --manifest-path src-tauri/Cargo.toml --check` and `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Passed |
-| Rust persistence tests | `cargo test --manifest-path src-tauri/Cargo.toml` | Passed: 26 tests; includes atomic write, cleanup, durable result hash, CRLF preservation, temporary-path uniqueness, stale-revision/hash rejection and Unix permission preservation |
+| Rust persistence tests | `cargo test --manifest-path src-tauri/Cargo.toml` | Passed: 28 tests; includes atomic write, cleanup, durable result hash, failure injection, CRLF preservation, temporary-path uniqueness, stale-revision/hash rejection and Unix permission preservation |
+| Failure injection | `cargo test --manifest-path src-tauri/Cargo.toml injected_` | Passed: write, file-sync and rename failures preserve original bytes and remove the sibling temporary file; directory-sync failure is explicitly recorded as post-rename (replacement bytes exist, no temporary file, durability confirmation fails) |
 | Revision-aware save paths | `bun run test -- src/hooks/useExternalChangeWatcher.test.ts src/hooks/useAutosave.test.ts src/utils/documentSessionController.test.ts src/utils/documentSession.test.ts` | Passed: 4 files / 29 tests; active, background, autosave and close-time paths carry the known revision/hash, and a successful write updates both only for the saved version |
 | Active conflict choice | `bun run test -- src/components/FileConflictDialog.test.tsx` | Passed: comparison reads disk only on request; keep-local, save-as and reload remain separate explicit operations |
 | Background conflict marker | `bun run test -- src/components/TabBar.test.tsx` | Passed: conflict metadata produces an accessible persistent tab warning without altering dirty state |
@@ -32,8 +33,9 @@ accepted.**
 ## Remaining P8 gates
 
 1. Record the equivalent Windows and Linux recovery behavior before release.
-2. Add failure-injection tests for write, sync, rename and directory-sync
-   errors; verify the original bytes and editable buffer survive each error.
+2. Surface post-rename directory-sync uncertainty without falsely presenting a
+   failed save as an unchanged original; retain the editable buffer and record
+   the platform-specific user-visible behavior.
 3. Record macOS, Windows, and Linux behavior for symbolic links, long paths,
    UNC paths, locks, directory synchronization, and replacement semantics.
 

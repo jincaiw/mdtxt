@@ -72,6 +72,16 @@ pub struct SaveResult {
     pub hash: String,
 }
 
+/// Test-only fault points for the atomic save boundary. Kept private and passed
+/// explicitly so parallel tests never share a mutable global failure switch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SaveFault {
+    Write,
+    FileSync,
+    Rename,
+    DirectorySync,
+}
+
 /// Line-ending convention of a file.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Eol {
@@ -154,7 +164,12 @@ fn save_temp_path(path: &Path) -> Result<PathBuf, CommandError> {
 /// synced on POSIX. Windows has no portable directory-handle equivalent here,
 /// so its atomic MoveFileEx replacement remains the best available guarantee.
 #[cfg(unix)]
-async fn sync_parent_directory(path: &Path) -> Result<(), CommandError> {
+async fn sync_parent_directory(path: &Path, fault: Option<SaveFault>) -> Result<(), CommandError> {
+    if fault == Some(SaveFault::DirectorySync) {
+        return Err(CommandError::WriteError(
+            "injected directory sync failure".to_string(),
+        ));
+    }
     let directory = path
         .parent()
         .unwrap_or_else(|| Path::new("."))
@@ -166,7 +181,12 @@ async fn sync_parent_directory(path: &Path) -> Result<(), CommandError> {
 }
 
 #[cfg(not(unix))]
-async fn sync_parent_directory(_path: &Path) -> Result<(), CommandError> {
+async fn sync_parent_directory(_path: &Path, fault: Option<SaveFault>) -> Result<(), CommandError> {
+    if fault == Some(SaveFault::DirectorySync) {
+        return Err(CommandError::WriteError(
+            "injected directory sync failure".to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -241,6 +261,16 @@ pub async fn save_file(
     expected_revision: Option<u64>,
     expected_hash: Option<String>,
 ) -> Result<SaveResult, CommandError> {
+    save_file_impl(path, content, expected_revision, expected_hash, None).await
+}
+
+async fn save_file_impl(
+    path: String,
+    content: String,
+    expected_revision: Option<u64>,
+    expected_hash: Option<String>,
+    fault: Option<SaveFault>,
+) -> Result<SaveResult, CommandError> {
     // Mirror the read-side limit. Refusing to write a >50 MB markdown file
     // protects the user from accidentally truncating something pasted from
     // another tool, and matches what `read_file` would refuse to load back.
@@ -314,19 +344,37 @@ pub async fn save_file(
             let _ = tokio::fs::remove_file(&tmp).await;
             return Err(CommandError::WriteError(e.to_string()));
         }
+        if fault == Some(SaveFault::Write) {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Err(CommandError::WriteError(
+                "injected write failure".to_string(),
+            ));
+        }
         if let Err(e) = f.sync_all().await {
             let _ = tokio::fs::remove_file(&tmp).await;
             return Err(CommandError::WriteError(e.to_string()));
         }
+        if fault == Some(SaveFault::FileSync) {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Err(CommandError::WriteError(
+                "injected file sync failure".to_string(),
+            ));
+        }
     }
 
+    if fault == Some(SaveFault::Rename) {
+        let _ = tokio::fs::remove_file(&tmp).await;
+        return Err(CommandError::WriteError(
+            "injected rename failure".to_string(),
+        ));
+    }
     if let Err(e) = tokio::fs::rename(&tmp, &target).await {
         // Don't leave the temp file behind on failure.
         let _ = tokio::fs::remove_file(&tmp).await;
         return Err(CommandError::WriteError(e.to_string()));
     }
 
-    sync_parent_directory(&target).await?;
+    sync_parent_directory(&target, fault).await?;
 
     let metadata = tokio::fs::metadata(&target)
         .await
@@ -823,8 +871,8 @@ pub fn set_ai_key(key: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_eol, content_hash, read_file, sanitize_image_name, save_file, save_temp_path,
-        search_markdown_tree, validate_rel_path, CommandError, Eol,
+        apply_eol, content_hash, read_file, sanitize_image_name, save_file, save_file_impl,
+        save_temp_path, search_markdown_tree, validate_rel_path, CommandError, Eol, SaveFault,
     };
     use std::path::{Path, PathBuf};
 
@@ -975,6 +1023,80 @@ mod tests {
             .await;
             assert!(matches!(result, Err(CommandError::Conflict(_))));
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "disk version");
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
+    #[test]
+    fn injected_pre_replace_failures_keep_original_bytes_and_clean_temp_files() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            for fault in [SaveFault::Write, SaveFault::FileSync, SaveFault::Rename] {
+                let dir = std::env::temp_dir().join(format!(
+                    "mdtxt-save-fault-{}-{:?}",
+                    std::process::id(),
+                    fault
+                ));
+                std::fs::create_dir_all(&dir).unwrap();
+                let path = dir.join("doc.md");
+                std::fs::write(&path, "original bytes").unwrap();
+
+                let result = save_file_impl(
+                    path.to_string_lossy().to_string(),
+                    "replacement bytes".into(),
+                    None,
+                    None,
+                    Some(fault),
+                )
+                .await;
+
+                assert!(matches!(result, Err(CommandError::WriteError(_))));
+                assert_eq!(std::fs::read_to_string(&path).unwrap(), "original bytes");
+                assert!(std::fs::read_dir(&dir).unwrap().all(|entry| !entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains("mdtxt-tmp")));
+                std::fs::remove_dir_all(&dir).ok();
+            }
+        });
+    }
+
+    #[test]
+    fn injected_directory_sync_failure_reports_uncertain_durability_after_replacement() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let dir = std::env::temp_dir()
+                .join(format!("mdtxt-directory-sync-fault-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("doc.md");
+            std::fs::write(&path, "original bytes").unwrap();
+
+            let result = save_file_impl(
+                path.to_string_lossy().to_string(),
+                "replacement bytes".into(),
+                None,
+                None,
+                Some(SaveFault::DirectorySync),
+            )
+            .await;
+
+            assert!(matches!(result, Err(CommandError::WriteError(_))));
+            // The rename has already succeeded: pretending the original survived
+            // would be false. The caller keeps its buffer and is told the save's
+            // durability could not be confirmed.
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), "replacement bytes");
+            assert!(std::fs::read_dir(&dir).unwrap().all(|entry| !entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .contains("mdtxt-tmp")));
             std::fs::remove_dir_all(&dir).ok();
         });
     }
