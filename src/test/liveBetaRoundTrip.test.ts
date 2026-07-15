@@ -6,24 +6,26 @@ import liveBetaFixture from "./fixtures/markdown/live-beta.md?raw";
 
 /**
  * P6 starts with a source-preservation contract. Future Live decorations may
- * change presentation only; every mode must retain exactly this document text.
+ * change presentation only. CodeMirror normalizes CRLF at its document
+ * boundary, so compare against that platform-independent editor value.
  */
 describe("Live Beta source round-trip baseline", () => {
     it("keeps the supported P6 syntax and deferred constructs byte-for-byte in the editor state", () => {
-        const state = EditorState.create({ doc: liveBetaFixture, extensions: [markdown({ base: markdownLanguage })] });
+        const editorFixture = liveBetaFixture.replace(/\r\n?/g, "\n");
+        const state = EditorState.create({ doc: editorFixture, extensions: [markdown({ base: markdownLanguage })] });
 
-        expect(state.doc.toString()).toBe(liveBetaFixture);
-        expect(syntaxTree(state).length).toBe(liveBetaFixture.length);
-        expect(liveBetaFixture).toContain("# Live Beta 标题 / Heading");
-        expect(liveBetaFixture).toContain("**粗体**");
-        expect(liveBetaFixture).toContain("*斜体*");
-        expect(liveBetaFixture).toContain("~~删除线~~");
-        expect(liveBetaFixture).toContain("`inline code`");
-        expect(liveBetaFixture).toContain("[链接](https://example.com");
-        expect(liveBetaFixture).toContain("> 引用");
-        expect(liveBetaFixture).toContain("- [x] 已完成任务");
-        expect(liveBetaFixture).toContain("::: custom-directive");
-        expect(liveBetaFixture).toContain("| 表格 | P7 才处理 |");
-        expect(liveBetaFixture).toContain("```ts");
+        expect(state.doc.toString()).toBe(editorFixture);
+        expect(syntaxTree(state).length).toBe(editorFixture.length);
+        expect(editorFixture).toContain("# Live Beta 标题 / Heading");
+        expect(editorFixture).toContain("**粗体**");
+        expect(editorFixture).toContain("*斜体*");
+        expect(editorFixture).toContain("~~删除线~~");
+        expect(editorFixture).toContain("`inline code`");
+        expect(editorFixture).toContain("[链接](https://example.com");
+        expect(editorFixture).toContain("> 引用");
+        expect(editorFixture).toContain("- [x] 已完成任务");
+        expect(editorFixture).toContain("::: custom-directive");
+        expect(editorFixture).toContain("| 表格 | P7 才处理 |");
+        expect(editorFixture).toContain("```ts");
     });
 });

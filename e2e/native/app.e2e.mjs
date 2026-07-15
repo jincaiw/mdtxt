@@ -5,13 +5,16 @@ describe("mdtxt native Tauri smoke", () => {
         const title = await $("h1=mdtxt");
         await title.waitForDisplayed();
         assert.equal(await title.getText(), "mdtxt");
-        await $("button=Open File").waitForDisplayed();
+        await $("button[aria-label='Settings'], button[aria-label='设置']").waitForDisplayed();
     });
 
     it("switches to Simplified Chinese through the native window", async () => {
-        const settings = await $("button[aria-label='Settings']");
+        const settings = await $("button[aria-label='Settings'], button[aria-label='设置']");
         await settings.click();
-        const chinese = await $("button=Simplified Chinese");
+        const moreSettings = await $("//button[normalize-space()='More settings…' or normalize-space()='更多设置…']");
+        await moreSettings.waitForClickable();
+        await moreSettings.click();
+        const chinese = await $("//button[normalize-space()='Simplified Chinese' or normalize-space()='简体中文']");
         await chinese.waitForClickable();
         await chinese.click();
         const language = await $("h3=语言");
