@@ -8,7 +8,7 @@ Status: **P6b implementation and automated gate complete; P6 Beta is not yet acc
 | Source/Live/Split byte preservation | `src/test/liveBetaRoundTrip.test.ts` asserts fixture identity; `src/components/CodeEditor.test.tsx` verifies Live decoration reconfiguration without host replacement | Source/Live editor contract automated; native Split and platform coverage pending |
 | Lezer-only structural recognition | `@codemirror/lang-markdown`, `syntaxTree(state)` and `StateField<DecorationSet>` in `src/editor/live/liveMarkdownPresentation.ts`; `@lezer/markdown` node count in `src/editor/live/liveEligibility.ts` | Presentation and restricted-Live complex-block admission share Lezer structure; no regex parser |
 | Focus, selection and composition source safety | `src/editor/live/editFocusResolver.ts` and the Live `ViewPlugin` | Multi-selection, caret, pointer/find extension points and IME composition share one conservative source-retention contract; native-WebView validation pending |
-| Chinese IME safety | `docs/testing/p6-live-beta-ime-checklist.md` | Native macOS source editing smoke passed, but real Pinyin/Japanese composition and candidate-window behavior remain unverified |
+| Chinese IME safety | `docs/testing/p6-live-beta-ime-checklist.md` | Native macOS source editing smoke passed, but real Pinyin composition and candidate-window behavior remain unverified |
 | 1 MiB / 10 MiB method | `bun run benchmark:live-editor` | Parser, CodeMirror state creation and local state-transition baseline recorded below; native input-latency and restricted-Live measurements pending |
 | Restricted Live admission and disclosure | `src/editor/live/liveEligibility.ts`, `src/App.tsx`, `src/components/CodeEditor.tsx` | Implemented: UTF-8 bytes, line count, longest line and Lezer-recognized complex blocks select low-cost Live and show the reason. Entry/activation is immediate; same-document growth is reassessed only after the versioned presentation snapshot catches up, keeping full parsing off each keystroke. Source remains editable |
 | Non-default and Source fallback | `src/utils/persistence.ts`, `src/components/SettingsModal.tsx`, `src/components/ModeToggle.tsx`, `src/App.tsx`, `resolveLiveBetaViewMode` | Live is opt-in, its entry is hidden while off, and disabling/restoring without consent returns to Source; component, persistence and session tests cover the gate and fallback |
@@ -32,7 +32,7 @@ Status: **P6b implementation and automated gate complete; P6 Beta is not yet acc
 
 ## Open P6 blockers
 
-1. P6c: macOS Pinyin/Japanese IME composition, clipboard, selection and tab-switch evidence; Windows Microsoft Pinyin and Linux IBus/Fcitx5 evidence. The shared focus/composition resolver is implemented, but an unverified platform is not a pass.
+1. P6c: macOS Pinyin composition, clipboard, selection and tab-switch evidence; Windows Microsoft Pinyin and Linux IBus/Fcitx5 evidence. The shared focus/composition resolver is implemented, but an unverified platform is not a pass.
 2. P6d: measured native input latency and 10 MiB restricted-Live open evidence. Eligibility and visible downgrade state are implemented; parser-only timing is not a substitute.
 3. P6e: accessibility review, real macOS/Windows/Linux evidence and final requirement/rollback record.
 
