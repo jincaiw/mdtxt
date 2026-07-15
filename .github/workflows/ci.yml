@@ -47,6 +47,10 @@ jobs:
         continue-on-error: true
         with:
           workspaces: './src-tauri -> target'
+          # Restore is useful, but the cache service has stalled job teardown on
+          # hosted Windows runners. Never make evidence collection wait on a
+          # cache upload.
+          save-if: false
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-24.04'

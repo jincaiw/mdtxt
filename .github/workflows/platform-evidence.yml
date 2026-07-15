@@ -55,6 +55,9 @@ jobs:
         continue-on-error: true
         with:
           workspaces: ./src-tauri -> target
+          # Package evidence must terminate deterministically even when the
+          # hosted cache backend is slow or unavailable.
+          save-if: false
 
       - name: Install Linux bundle dependencies
         if: runner.os == 'Linux'
