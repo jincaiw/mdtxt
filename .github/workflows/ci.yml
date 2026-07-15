@@ -13,7 +13,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [windows-latest, windows-11-arm, ubuntu-24.04, macos-latest]
+        # v0.1.0 release targets: Windows x64, Ubuntu LTS x64 and Apple
+        # Silicon macOS. Keep the ordinary gate on these explicit runners;
+        # Windows ARM is not a declared target and must not be mistaken for
+        # cross-platform release evidence. P10a.
+        platform: [windows-latest, ubuntu-24.04, macos-14]
 
     runs-on: ${{ matrix.platform }}
 

@@ -8,8 +8,8 @@ Status: **environment and workflow configuration exist; no cross-platform mdtxt
 | Target | Build / launch evidence | Functional evidence | Status |
 | --- | --- | --- | --- |
 | macOS 26.5.2 arm64 | Local Debug build succeeded on 2026-07-15; an isolated Debug variant with only `app.mdtxt.desktop.recoverytest` as its temporary bundle identifier was launched to avoid the user instance | P8 AC-007 two-draft force-terminate/relaunch recovery observed in the isolated WKWebView build; details are recorded in P8 tracking. P6 IME and P8 filesystem matrix remain separate | Build and a limited P8 native smoke present; P6/P8 not accepted |
-| Windows x64 | `.github/workflows/ci.yml` has a `windows-latest` check job; `.github/workflows/platform-evidence.yml` can create a 14-day Debug bundle artifact with SHA-256 manifest | No mdtxt 0.1.0 artifact install, recovery, NTFS lock/long-path/UNC, or Microsoft Pinyin result | Pending run and validation |
-| Ubuntu LTS x64 | `.github/workflows/ci.yml` declares an Ubuntu 24.04 build and native WebKit smoke configuration; `.github/workflows/platform-evidence.yml` can create a 14-day Debug bundle artifact with SHA-256 manifest | No reviewed mdtxt 0.1.0 workflow run or desktop package install; the local Docker attempt is non-creditable and is recorded in P8 tracking | Pending run and validation |
+| Windows x64 | `.github/workflows/ci.yml` is fixed to the declared `windows-latest` x64 target; `.github/workflows/platform-evidence.yml` can create a 14-day Debug bundle artifact with SHA-256 manifest | No mdtxt 0.1.0 artifact install, recovery, NTFS lock/long-path/UNC, or Microsoft Pinyin result | Pending run and validation |
+| Ubuntu LTS x64 | `.github/workflows/ci.yml` is fixed to Ubuntu 24.04 and declares a native WebKit smoke configuration; `.github/workflows/platform-evidence.yml` can create a 14-day Debug bundle artifact with SHA-256 manifest | No reviewed mdtxt 0.1.0 workflow run or desktop package install; the local Docker attempt is non-creditable and is recorded in P8 tracking | Pending run and validation |
 
 ## Remote boundary
 
@@ -28,8 +28,9 @@ command, raw result or logs, screenshots where UI is asserted, known failures,
 and rollback point. CI compilation alone never closes P6 IME, P8 recovery, or
 P8 filesystem semantics.
 
-The manual `Platform Evidence Build` workflow uses `macos-14` (GitHub-hosted
-ARM64), `windows-latest`, and `ubuntu-24.04`. It writes
+The ordinary CI gate and the manual `Platform Evidence Build` workflow use
+the declared `macos-14` (GitHub-hosted ARM64), `windows-latest`, and
+`ubuntu-24.04` targets. The manual workflow writes
 `platform-evidence.json` beside each Debug bundle before uploading the private
 artifact. A successful workflow only proves that the declared bundle was built;
 manual installation and the P6/P8 matrices remain separate acceptance work.
