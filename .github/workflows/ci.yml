@@ -10,6 +10,9 @@ on:
 
 jobs:
   check:
+    # A hung WebView, compiler, or hosted runner must yield a reviewable
+    # failure rather than leaving P8/P10a evidence permanently in progress.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -129,6 +132,7 @@ jobs:
   # lives in src-tauri/deny.toml. Runs once on Linux (not per-platform) since
   # it only reads Cargo.lock — it doesn't compile the project.
   cargo-deny:
+    timeout-minutes: 15
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -171,6 +175,9 @@ jobs:
   # OS dialogs, keychain prompts and updater installation remain intentionally
   # outside this non-interactive smoke path.
   native-smoke:
+    # The native driver launches a full WebKit process under Xvfb. Bound it
+    # independently so a driver teardown issue cannot stall all release proof.
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository

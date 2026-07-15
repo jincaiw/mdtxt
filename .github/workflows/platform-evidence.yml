@@ -12,6 +12,9 @@ permissions:
 jobs:
   bundle:
     name: ${{ matrix.name }} Debug bundle
+    # Debug packaging may compile the full Tauri stack from cache miss, but it
+    # must still terminate with a result suitable for the P10a evidence matrix.
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
