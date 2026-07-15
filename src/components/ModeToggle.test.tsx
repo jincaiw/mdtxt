@@ -25,4 +25,23 @@ describe("ModeToggle Live Beta gate", () => {
         rerender(<ModeToggle mode="code" onSetMode={onSetMode} />);
         expect(screen.queryByRole("button", { name: "Live Beta mode" })).toBeNull();
     });
+
+    it("keeps every exposed mode as a named pressed-state button in one accessible group", () => {
+        const onSetMode = vi.fn();
+        render(<ModeToggle mode="live" onSetMode={onSetMode} liveEnabled />);
+
+        expect(screen.getByRole("group", { name: "View mode toggle" })).toBeInTheDocument();
+        const reader = screen.getByRole("button", { name: "Reader mode" });
+        const live = screen.getByRole("button", { name: "Live Beta mode" });
+        const split = screen.getByRole("button", { name: "Split view" });
+        const source = screen.getByRole("button", { name: "Code editor" });
+
+        expect(reader).toHaveAttribute("aria-pressed", "false");
+        expect(live).toHaveAttribute("aria-pressed", "true");
+        expect(split).toHaveAttribute("aria-pressed", "false");
+        expect(source).toHaveAttribute("aria-pressed", "false");
+
+        fireEvent.click(source);
+        expect(onSetMode).toHaveBeenCalledWith("code");
+    });
 });
