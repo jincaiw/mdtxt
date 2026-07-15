@@ -40,18 +40,6 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        # Caching is an optimization — a flaky GitHub cache service must never
-        # fail the build (it took down a Windows release once).
-        continue-on-error: true
-        with:
-          workspaces: './src-tauri -> target'
-          # Restore is useful, but the cache service has stalled job teardown on
-          # hosted Windows runners. Never make evidence collection wait on a
-          # cache upload.
-          save-if: false
-
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-24.04'
         run: |
