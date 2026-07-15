@@ -129,7 +129,7 @@ import {
 import { DocumentSessionController } from "./utils/documentSessionController";
 import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
 import { assessLiveEligibility } from "./editor/live/liveEligibility";
-import { orderRecoveryEntries, selectRecoveredActive } from "./utils/recoveryModel";
+import { latestRecoveryBatch, orderRecoveryEntries, selectRecoveredActive } from "./utils/recoveryModel";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
 import tutorialMarkdown from "./assets/tutorial.md?raw";
@@ -1464,7 +1464,9 @@ function AppContent() {
   }, [restoreRecoveryEntries]);
 
   const handleRestoreAllRecovery = useCallback((entries: import("./components/RecoveryDialog").RecoveryCandidate[]) => {
-    restoreRecoveryEntries(entries);
+    // Keep the application boundary session-aware even if a future caller
+    // bypasses RecoveryDialog's grouped action.
+    restoreRecoveryEntries(latestRecoveryBatch(entries));
   }, [restoreRecoveryEntries]);
 
   const handleDiscardRecovery = useCallback((entry: import("./components/RecoveryDialog").RecoveryCandidate) => {

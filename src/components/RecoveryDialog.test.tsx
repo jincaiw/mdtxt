@@ -71,4 +71,18 @@ describe("RecoveryDialog", () => {
         fireEvent.click(restoreAll);
         expect(onRestoreAll).toHaveBeenCalledWith([recovery, secondRecovery]);
     });
+
+    it("keeps a restore-all action inside the newest crash batch", () => {
+        const older = { ...recovery, documentId: "older", recoverySessionId: "old", savedAtMs: 1, tabIndex: 0 };
+        const newer = { ...secondRecovery, recoverySessionId: "new", savedAtMs: 2, tabIndex: 0 };
+        const onRestoreAll = vi.fn();
+        render(
+            <LocaleProvider>
+                <RecoveryDialog entries={[older, newer]} onRestore={vi.fn()} onRestoreAll={onRestoreAll} onDiscard={vi.fn()} />
+            </LocaleProvider>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Restore latest session" }));
+        expect(onRestoreAll).toHaveBeenCalledWith([newer]);
+    });
 });

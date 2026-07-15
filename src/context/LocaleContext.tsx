@@ -188,6 +188,7 @@ const zhCN = {
     "Discard": "丢弃",
     "Restore": "恢复",
     "Restore all": "全部恢复",
+    "Restore latest session": "恢复最新会话",
     "Recovered": "已恢复",
     "Could not create recovery backup": "无法创建恢复备份",
     "Could not clear the recovered backup. It may appear again after restart.": "无法清除已恢复的备份；重启后它可能会再次出现。",
