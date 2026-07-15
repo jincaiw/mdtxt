@@ -74,7 +74,17 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build Debug bundle
-        run: bun run tauri build --debug
+        shell: bash
+        run: |
+          # `timeout` gives Linux/AppImage packaging a hard, visible boundary.
+          # The job-level limit is a last resort; this one terminates the child
+          # process and preserves verbose output if an upstream packager stalls.
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            timeout --foreground --signal=TERM --kill-after=60s 30m \
+              bun run tauri build --debug --verbose
+          else
+            bun run tauri build --debug --verbose
+          fi
 
       - name: Write package evidence manifest
         run: node scripts/write-platform-evidence-manifest.mjs
