@@ -36,10 +36,10 @@
 | P3 双语底座 | 完成 | `96a9931`，默认中文、双语键、硬编码门禁 | 新增文字必须双语 |
 | P4 文档会话 | 完成 | `8a087ec`、`a8c782c`、`36a2ac4` 至 `c748e70`；控制器、每标签 `EditorState`、版本化保存、展示投影与 metadata-only tabs；浏览器双标签/Reader/Source 回归无控制台告警 | P5 仅拆分编辑器模块，不改变会话边界 |
 | P5 编辑器模块拆分 | 完成 | `d68ec3d` 至 `c162371`；presentation、viewport、document session、completion、AI review、preferences、overlays、paste、host 与 controller 分层；`CodeEditor.tsx` 收缩为 30 行挂载容器；全量 38 测试文件/296 测试、构建与发布预检通过 | P6 以该稳定 host 为唯一接入点 |
-| P6 Live Beta | 进行中，未验收 | `9232178` 建立 fixture、round-trip、IME 清单和 1/10 MiB 基准方法；`39b4604` 以 Lezer `syntaxTree` + `StateField<DecorationSet>` 添加只样式化、源码不隐藏的最小展示；`752a41a` 以 Compartment 重配置且不重建 host；焦点/组合输入保守解析器已接入 | 完成真实 IME/选择/撤销验证、受限 Live 与原生性能证据；显式 Beta 开关已是入口基线，不等于退出 |
+| P6 Live Beta | 进行中，未验收 | `9232178` 建立 fixture、round-trip、IME 清单和 1/10 MiB 基准方法；`39b4604` 以 Lezer `syntaxTree` + `StateField<DecorationSet>` 添加只样式化、源码不隐藏的最小展示；`752a41a` 以 Compartment 重配置且不重建 host；`6630642` 将基准扩展到 CodeMirror 状态创建与局部状态转换，并固定单实例依赖树 | 完成真实 IME/选择/撤销验证、受限 Live 与原生性能证据；状态基准不含 DOM/WebView/IME 路径，显式 Beta 开关也不等于退出 |
 | P7 复杂 Widgets | 未开始 | 不提前实现 | 依赖 P6 退出与焦点/降级协议 |
 | P8 文件安全、冲突与恢复 | 进行中，未验收 | `20017a3` 起；原子替换、修订与哈希防护、可见冲突入口、校验恢复、失败注入、恢复键跨启动隔离及会话恢复顺序/活动标签/光标行的自动化协议均已落地；以 `docs/audits/p8-file-safety-tracking.md` 为唯一证据表 | 完成 AC-007 多标签原生崩溃恢复，再完成 Windows/Linux 恢复与文件系统矩阵，并对每个 post-rename 不确定性提供可见告警 |
-| P10a 平台证据基座 | 可并行启动，不计入发布工程完成 | `docs/audits/p10a-platform-evidence.md`：当前仅有 macOS Debug 包构建证据；仓库的 Windows/Ubuntu workflow 配置未附 mdtxt 运行结果，Linux Docker 尝试不可计入目标平台通过 | 建立 Windows x64 与 Ubuntu LTS x64 的可复跑构建、安装/启动和矩阵采集入口；不得据此宣称平台功能通过 |
+| P10a 平台证据基座 | 可并行启动，不计入发布工程完成 | `docs/audits/p10a-platform-evidence.md` 与 `019c86e`：已提供手动触发的三平台 Debug 包和 SHA-256 清单采集入口；当前仅有 macOS Debug 包本地构建证据，尚无 mdtxt 的 Windows/Ubuntu 运行结果 | 在 Windows x64 与 Ubuntu LTS x64 的真实环境执行入口并记录构建、安装/启动和矩阵；不得据此宣称平台功能通过 |
 | P9、P10b、P11 | 未开始 | 不提前实现产品整合或正式发布 | 依赖 P7、P8 的验收结果 |
 
 截至本次定稿，最低本地门禁已通过：`bun run release:check`、前端测试与构建、`cargo fmt --check`、Clippy 和 Rust 测试。后续每一个阶段都必须重新执行与该阶段相称的门禁，不能借用历史通过结果。
@@ -208,6 +208,6 @@ bun run tauri build --debug
 2. P6c 验收前不得添加隐藏源码标记、复杂 Widget 或独立 renderer 焦点逻辑；任何焦点/IME 回归均停止扩展并回退到只样式化模式。
 3. P6d 必须先交付可测的降级判定和用户可见状态，再处理复杂节点；10 MiB 的“完整 Live”不作为当前承诺。
 4. P8a/P8b 已完成；P8c 已补 AC-007 会话级恢复的失败测试和实现，下一步是 macOS 两标签原生崩溃恢复，再补 Windows/Linux 记录；P8d 的目标平台替换、目录同步、符号链接、长路径、UNC 与锁矩阵可与 P8c 并行采集。目录同步在替换后失败时只允许“成功 + 耐久性告警”的真实语义。P8 修改不得恢复 React 全文副本或绕过 `DocumentSessionController`。
-5. P6c 以真实 IME、选择、剪贴板、undo/redo、标签切换矩阵为先；P6d 仅在 P6c 无 P0 后记录 1 MiB/10 MiB 原生 WebView 测量。P7 不得提前开始；P7 启动后仍不得把任何 Widget 焦点逻辑绕过 P6 的保守源码策略。
+5. P6c 以真实 IME、选择、剪贴板、undo/redo、标签切换矩阵为先；P6d 的 CodeMirror 状态基线可独立重复，但只有在 P6c 无 P0 后记录的 1 MiB/10 MiB 原生 WebView 测量才能满足退出条件。P7 不得提前开始；P7 启动后仍不得把任何 Widget 焦点逻辑绕过 P6 的保守源码策略。
 6. 每完成一个子关卡，更新对应的 `docs/audits/p6-live-beta-tracking.md` 或 `docs/audits/p8-file-safety-tracking.md`，记录提交、命令、机器/平台、未覆盖原因和回滚点；申请阶段验收时按第 6 节提交完整证据包，而非仅更新状态文字。
 7. P10a 仅维护环境与原始证据索引（`docs/audits/p10a-platform-evidence.md`）；当目标平台不可用时记录阻塞原因、最后尝试时间和替代方案，不得以容器、交叉编译或其他 OS 的结果填充 P6/P8 通过单元格。
