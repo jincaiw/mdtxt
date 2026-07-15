@@ -81,7 +81,14 @@ pub fn save_entry(
         &temporary,
         serde_json::to_vec(&entry).expect("recovery entry serializes"),
     )?;
-    std::fs::File::open(&temporary)?.sync_all()?;
+    // Windows does not permit replacing a file while a compatible handle is
+    // still open. Keep the sync handle in an explicit scope so it is closed
+    // before the atomic replacement below (rather than relying on a
+    // temporary's drop timing).
+    {
+        let temporary_file = std::fs::File::open(&temporary)?;
+        temporary_file.sync_all()?;
+    }
     std::fs::rename(temporary, target)?;
     cleanup_expired(directory, now_ms())?;
     Ok(entry)
