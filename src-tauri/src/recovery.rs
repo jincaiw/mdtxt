@@ -77,16 +77,15 @@ pub fn save_entry(
     };
     let target = entry_path(directory, &entry.document_id);
     let temporary = target.with_extension(format!("{}.tmp", std::process::id()));
-    std::fs::write(
-        &temporary,
-        serde_json::to_vec(&entry).expect("recovery entry serializes"),
-    )?;
-    // Windows does not permit replacing a file while a compatible handle is
-    // still open. Keep the sync handle in an explicit scope so it is closed
-    // before the atomic replacement below (rather than relying on a
-    // temporary's drop timing).
+    // Keep writing and syncing on one explicitly scoped handle. This makes the
+    // close-before-rename boundary unambiguous on Windows, where a lingering
+    // handle without delete sharing rejects an otherwise atomic replacement.
     {
-        let temporary_file = std::fs::File::open(&temporary)?;
+        use std::io::Write;
+
+        let mut temporary_file = std::fs::File::create(&temporary)?;
+        temporary_file
+            .write_all(&serde_json::to_vec(&entry).expect("recovery entry serializes"))?;
         temporary_file.sync_all()?;
     }
     std::fs::rename(temporary, target)?;
@@ -195,11 +194,16 @@ mod tests {
     static TEST_DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
     fn directory() -> PathBuf {
-        std::env::temp_dir().join(format!(
+        let directory = std::env::temp_dir().join(format!(
             "mdtxt-recovery-{}-{}",
             std::process::id(),
             TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed)
-        ))
+        ));
+        // Windows may recycle a process ID between test invocations. Never let
+        // a prior crashed test leave a target file that changes this test from
+        // a first-write atomic replacement into an overwrite attempt.
+        std::fs::remove_dir_all(&directory).ok();
+        directory
     }
 
     #[test]
