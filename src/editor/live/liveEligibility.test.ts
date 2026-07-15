@@ -23,4 +23,15 @@ describe("assessLiveEligibility", () => {
         const eligibility = assessLiveEligibility(`${longLine}\n${complex}`);
         expect(eligibility.reasons).toEqual(expect.arrayContaining(["lineLength", "complexBlocks"]));
     });
+
+    it("counts only Lezer-recognized complex nodes instead of image-shaped source text", () => {
+        const literalImages = Array.from(
+            { length: LIVE_LIMITS.maxComplexBlocks + 1 },
+            () => "`![not-an-image](literal.png)`",
+        ).join("\n");
+        const eligibility = assessLiveEligibility(literalImages);
+
+        expect(eligibility.complexBlocks).toBe(0);
+        expect(eligibility.reasons).not.toContain("complexBlocks");
+    });
 });

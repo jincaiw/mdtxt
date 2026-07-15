@@ -1,3 +1,5 @@
+import { parser } from "@lezer/markdown";
+
 export const LIVE_LIMITS = {
     maxBytes: 5 * 1024 * 1024,
     maxLines: 100_000,
@@ -37,10 +39,16 @@ export function assessLiveEligibility(source: string): LiveEligibility {
     }
     maxLineLength = Math.max(maxLineLength, lineLength);
 
-    // Complex blocks are deferred in restricted mode. Count only unmistakable
-    // fence/image markers here; syntax recognition/rendering remains Lezer-led.
-    const complexBlocks = (source.match(/^```(?:mermaid|[\w+-]+)?\s*$/gim)?.length ?? 0)
-        + (source.match(/!\[[^\]]*\]\([^)]*\)/g)?.length ?? 0);
+    // Complex blocks are deferred in restricted mode. This remains admission
+    // control rather than a renderer, but it must use the same structural
+    // source of truth as Live itself: literal image-looking text (especially
+    // inside inline/fenced code) must not silently change the mode boundary.
+    let complexBlocks = 0;
+    parser.parse(source).iterate({
+        enter(node) {
+            if (node.name === "FencedCode" || node.name === "Image") complexBlocks++;
+        },
+    });
     const reasons: LiveRestrictionReason[] = [];
     if (bytes > LIVE_LIMITS.maxBytes) reasons.push("bytes");
     if (lines > LIVE_LIMITS.maxLines) reasons.push("lines");
