@@ -11,7 +11,7 @@ Status: **release-blocking evidence matrix; do not infer an unchecked cell from 
 | Long nested path | Passed with a path over 600 characters | Pending long-path-enabled NTFS | Pending | Windows test must include long-path policy configuration |
 | File lock | **Not a write-lock guarantee:** POSIX advisory locks do not automatically prevent rename; behavior must be recorded per lock implementation | Pending sharing-violation test | Pending advisory-lock test | Never claim cross-process lock protection without an OS-specific test |
 | UNC path | Not applicable | Pending | Not applicable | Must test both readable and denied-share cases |
-| Crash recovery | Debug crash/relaunch smoke passed; recovered text opens in a new unsaved tab | Pending | Pending | Recovery must never overwrite original path |
+| Crash recovery | Isolated Debug two-draft crash/relaunch passed: original tab order, active tab, saved line and both texts recover into new unsaved tabs | Pending | Pending | Recovery must never overwrite original path; macOS Debug evidence does not imply a release-package or other-platform pass |
 
 ## macOS evidence
 
