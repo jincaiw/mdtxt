@@ -50,15 +50,6 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.96.1
 
-      - name: Restore Rust cache
-        uses: swatinem/rust-cache@v2
-        continue-on-error: true
-        with:
-          workspaces: ./src-tauri -> target
-          # Package evidence must terminate deterministically even when the
-          # hosted cache backend is slow or unavailable.
-          save-if: false
-
       - name: Install Linux bundle dependencies
         if: runner.os == 'Linux'
         run: |
