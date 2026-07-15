@@ -28,6 +28,7 @@ accepted.**
 | Active conflict choice | `bun run test -- src/components/FileConflictDialog.test.tsx` | Passed: comparison reads disk only on request; keep-local, save-as and reload remain separate explicit operations |
 | Background conflict marker | `bun run test -- src/components/TabBar.test.tsx` | Passed: conflict metadata produces an accessible persistent tab warning without altering dirty state |
 | macOS file-system boundary | Darwin 25.5.0 / macOS 26.5.2 / arm64; `cargo test ... symbolic_link` and `... long_nested_path` | Passed: saving a symbolic-link path is explicitly refused without replacing the link or target; a nested path over 600 characters writes and reads successfully |
+| Windows NTFS file-system boundary | GitHub-hosted `windows-latest` / NTFS, commit `557b9d8`, [`CI #29431839622`](https://github.com/jincaiw/mdtxt/actions/runs/29431839622) | Passed: 31 Rust tests including loopback UNC write, long path with `LongPathsEnabled`, symbolic-link refusal, exclusive `FileShare.None` lock refusal, atomic replacement and recovery-store write/read/clear. Cleanup re-read the locked original bytes before deleting the SMB fixture. This does not establish Windows directory-flush durability or interactive crash recovery. |
 | Frontend release gates | `bun run test && bun run build && bun run release:check` | Passed: 47 files / 322 tests, production build, and preflight (`mdtxt` `0.1.0`; 440 Chinese keys / 98 source files; 0 direct user-copy literals) |
 | Recovery store | `cargo test --manifest-path src-tauri/Cargo.toml recovery::tests` | Passed: checksum validation, tamper cleanup, atomic write/read and clear |
 | Recovery prompt | `bun run test -- src/components/RecoveryDialog.test.tsx` | Passed: 3 tests cover verified-entry-only rendering, explicit restore/discard callbacks, the non-overwrite warning, initial focus, and the explicit Restore all action |
@@ -40,10 +41,11 @@ accepted.**
 ## Remaining P8 gates
 
 1. Record the equivalent Windows and Linux recovery behavior before release.
-2. Record Windows and Linux behavior for symbolic links, long paths, UNC paths,
-   locks, directory synchronization, and replacement semantics; record macOS
-   lock behavior separately because POSIX advisory locks are not automatically
-   enforced by rename.
+2. Record Linux behavior for symbolic links, long paths, locks, directory
+   synchronization and replacement semantics. For Windows, obtain the missing
+   directory-flush, denied-share and interactive recovery evidence; record
+   macOS lock behavior separately because POSIX advisory locks are not
+   automatically enforced by rename.
 
 ### Non-creditable Linux attempt
 
