@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessLiveEligibility, LIVE_LIMITS } from "./liveEligibility";
+import { assessLiveEligibility, LIVE_LIMITS, selectLiveEligibilitySource } from "./liveEligibility";
 
 describe("assessLiveEligibility", () => {
     it("keeps normal Markdown in full Live", () => {
@@ -33,5 +33,15 @@ describe("assessLiveEligibility", () => {
 
         expect(eligibility.complexBlocks).toBe(0);
         expect(eligibility.reasons).not.toContain("complexBlocks");
+    });
+
+    it("uses a current editor snapshot at transitions and a matched presentation revision after debounce", () => {
+        const active = { documentId: "draft", version: 2, value: "current oversized source" };
+        const stalePresentation = { documentId: "draft", version: 1, value: "previous short source" };
+        const currentPresentation = { documentId: "draft", version: 2, value: "current oversized source" };
+
+        expect(selectLiveEligibilitySource(active, stalePresentation)).toBe(active.value);
+        expect(selectLiveEligibilitySource(active, currentPresentation)).toBe(currentPresentation.value);
+        expect(selectLiveEligibilitySource(active, { ...currentPresentation, documentId: "other" })).toBe(active.value);
     });
 });

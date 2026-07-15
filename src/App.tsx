@@ -128,7 +128,7 @@ import {
 } from "./utils/documentSession";
 import { DocumentSessionController } from "./utils/documentSessionController";
 import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
-import { assessLiveEligibility } from "./editor/live/liveEligibility";
+import { assessLiveEligibility, selectLiveEligibilitySource } from "./editor/live/liveEligibility";
 import { latestRecoveryBatch, orderRecoveryEntries, selectRecoveredActive } from "./utils/recoveryModel";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
@@ -357,16 +357,13 @@ function AppContent() {
   const presentationSnapshot = useDocumentPresentationSnapshot(activeSessionRead);
   const presentationContent = presentationSnapshot?.value ?? "";
   const editorContent = activeSessionRead?.value ?? "";
-  // Admission control runs when entering Live or activating another document,
-  // rather than for every keystroke. It keeps Live's performance guard out of
-  // the editing hot path; a document opened above a threshold is restricted
-  // before any Live decorations are attached.
+  // Admission control runs immediately on entering Live/activating a document,
+  // then only when the debounced display snapshot catches the active revision.
+  // This keeps full-document parsing out of the typing hot path while still
+  // downgrading a Live document that grows across a safety threshold.
   const liveEligibility = useMemo(
-    () => mode === "live" ? assessLiveEligibility(editorContent) : null,
-    // editorContent intentionally is not a dependency: document switches and
-    // mode switches are the only admission points for this P6 Beta guard.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeSessionRead?.documentId, mode],
+    () => mode === "live" ? assessLiveEligibility(selectLiveEligibilitySource(activeSessionRead, presentationSnapshot)) : null,
+    [activeSessionRead?.documentId, mode, presentationSnapshot?.documentId, presentationSnapshot?.version],
   );
   const liveRestrictionReason = useMemo(() => {
     if (!liveEligibility?.restricted) return undefined;

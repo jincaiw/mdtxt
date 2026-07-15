@@ -18,6 +18,29 @@ export interface LiveEligibility {
     complexBlocks: number;
 }
 
+/** A versioned source snapshot used to keep admission work off the typing path. */
+export interface LiveEligibilitySnapshot {
+    documentId: string;
+    version: number;
+    value: string;
+}
+
+/**
+ * Prefer the debounced presentation snapshot once it catches up with the
+ * active editor revision. On a document/mode transition it is necessarily
+ * stale for one render, so use the current editor snapshot to avoid briefly
+ * admitting an oversized document to full Live.
+ */
+export function selectLiveEligibilitySource(
+    active: LiveEligibilitySnapshot | null,
+    presentation: LiveEligibilitySnapshot | null,
+): string {
+    if (!active) return "";
+    return presentation?.documentId === active.documentId && presentation.version === active.version
+        ? presentation.value
+        : active.value;
+}
+
 /**
  * This is an admission-control heuristic, not a Markdown parser. It only
  * chooses whether expensive future widgets may run; all visible structural
