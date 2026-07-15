@@ -107,11 +107,44 @@ jobs:
 
           $lockPath = Join-Path $root 'exclusive-lock.md'
           $readyPath = Join-Path $root 'exclusive-lock.ready'
+          $lockErrorPath = Join-Path $root 'exclusive-lock.error'
+          $lockScriptPath = Join-Path $root 'hold-exclusive-lock.ps1'
           [System.IO.File]::WriteAllText($lockPath, 'locked original bytes')
-          $script = "`$stream = [System.IO.File]::Open('$lockPath', [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None); [System.IO.File]::WriteAllText('$readyPath', 'locked'); Start-Sleep -Seconds 300"
-          $locker = Start-Process -FilePath powershell -ArgumentList '-NoProfile', '-Command', $script -PassThru
-          for ($attempt = 0; $attempt -lt 30 -and -not (Test-Path $readyPath); $attempt++) { Start-Sleep -Milliseconds 250 }
-          if (-not (Test-Path $readyPath)) { throw 'Timed out waiting for the exclusive Windows lock fixture.' }
+          @'
+          param(
+            [string]$LockPath,
+            [string]$ReadyPath,
+            [string]$ErrorPath
+          )
+          $deadline = [DateTime]::UtcNow.AddSeconds(45)
+          $lastError = $null
+          while ([DateTime]::UtcNow -lt $deadline) {
+            try {
+              $stream = [System.IO.File]::Open($LockPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+              [System.IO.File]::WriteAllText($ReadyPath, 'locked')
+              Start-Sleep -Seconds 300
+              $stream.Dispose()
+              exit 0
+            } catch {
+              $lastError = $_.Exception.ToString()
+              Start-Sleep -Milliseconds 250
+            }
+          }
+          [System.IO.File]::WriteAllText($ErrorPath, $lastError)
+          exit 1
+          '@ | Set-Content -Path $lockScriptPath -Encoding utf8
+          $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          $locker = Start-Process -FilePath $powershell -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $lockScriptPath, '-LockPath', $lockPath, '-ReadyPath', $readyPath, '-ErrorPath', $lockErrorPath) -PassThru
+          for ($attempt = 0; $attempt -lt 120 -and -not (Test-Path $readyPath); $attempt++) {
+            if (Test-Path $lockErrorPath) { break }
+            if ($locker.HasExited) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not (Test-Path $readyPath)) {
+            $exitState = if ($locker.HasExited) { "exited=$($locker.ExitCode)" } else { 'still running' }
+            $details = if (Test-Path $lockErrorPath) { Get-Content -Raw $lockErrorPath } else { "locker process $exitState" }
+            throw "Timed out waiting for the exclusive Windows lock fixture. $details"
+          }
           "MDTXT_TEST_LOCK_PATH=$lockPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "MDTXT_TEST_LOCK_PID=$($locker.Id)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
