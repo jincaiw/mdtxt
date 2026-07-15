@@ -144,9 +144,25 @@ jobs:
         if: ${{ always() && matrix.platform == 'windows-latest' }}
         shell: pwsh
         run: |
-          if ($env:MDTXT_TEST_LOCK_PID) { Stop-Process -Id $env:MDTXT_TEST_LOCK_PID -Force -ErrorAction SilentlyContinue }
+          if ($env:MDTXT_TEST_LOCK_PID) {
+            Stop-Process -Id $env:MDTXT_TEST_LOCK_PID -Force -ErrorAction SilentlyContinue
+            # Stop-Process returns before the child releases FileShare.None.
+            # Wait for exit before asserting that the locked original bytes
+            # survived, otherwise cleanup itself becomes a sharing violation.
+            Wait-Process -Id $env:MDTXT_TEST_LOCK_PID -Timeout 15 -ErrorAction SilentlyContinue
+          }
           if ($env:MDTXT_TEST_LOCK_PATH) {
-            $contents = [System.IO.File]::ReadAllText($env:MDTXT_TEST_LOCK_PATH)
+            $contents = $null
+            $readError = $null
+            for ($attempt = 0; $attempt -lt 30 -and $null -eq $contents; $attempt++) {
+              try {
+                $contents = [System.IO.File]::ReadAllText($env:MDTXT_TEST_LOCK_PATH)
+              } catch {
+                $readError = $_.Exception.Message
+                Start-Sleep -Milliseconds 250
+              }
+            }
+            if ($null -eq $contents) { throw "Could not re-read the exclusive-lock fixture after cleanup: $readError" }
             if ($contents -ne 'locked original bytes') { throw 'Exclusive-lock save changed the original bytes.' }
           }
           if ($env:MDTXT_TEST_SMB_SHARE) { Remove-SmbShare -Name $env:MDTXT_TEST_SMB_SHARE -Force -ErrorAction SilentlyContinue }
