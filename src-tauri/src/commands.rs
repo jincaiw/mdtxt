@@ -1150,10 +1150,13 @@ mod tests {
         });
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn save_file_refuses_to_replace_a_symbolic_link() {
-        use std::os::unix::fs::symlink;
+        #[cfg(unix)]
+        use std::os::unix::fs::symlink as create_symlink;
+        #[cfg(windows)]
+        use std::os::windows::fs::symlink_file as create_symlink;
 
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -1165,7 +1168,7 @@ mod tests {
             let target = dir.join("target.md");
             let link = dir.join("link.md");
             std::fs::write(&target, "original target").unwrap();
-            symlink(&target, &link).unwrap();
+            create_symlink(&target, &link).unwrap();
 
             let result = save_file(link.to_string_lossy().to_string(), "replacement".into(), None, None).await;
 
@@ -1176,7 +1179,7 @@ mod tests {
         });
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn save_file_handles_a_long_nested_path() {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -1198,6 +1201,58 @@ mod tests {
 
             assert_eq!(std::fs::read_to_string(&path).unwrap(), "long-path content");
             std::fs::remove_dir_all(&root).ok();
+        });
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn save_file_handles_configured_unc_path() {
+        let root = match std::env::var("MDTXT_TEST_UNC_ROOT") {
+            Ok(root) => PathBuf::from(root),
+            Err(_) if std::env::var_os("GITHUB_ACTIONS").is_none() => return,
+            Err(_) => panic!("Windows CI must configure MDTXT_TEST_UNC_ROOT"),
+        };
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let path = root.join("unc-save.md");
+            std::fs::write(&path, "UNC original bytes").unwrap();
+
+            save_file(
+                path.to_string_lossy().to_string(),
+                "UNC replacement bytes".into(),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(
+                std::fs::read_to_string(path).unwrap(),
+                "UNC replacement bytes"
+            );
+        });
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn save_file_reports_an_exclusive_windows_lock() {
+        let path = match std::env::var("MDTXT_TEST_LOCK_PATH") {
+            Ok(path) => path,
+            Err(_) if std::env::var_os("GITHUB_ACTIONS").is_none() => return,
+            Err(_) => panic!("Windows CI must configure MDTXT_TEST_LOCK_PATH"),
+        };
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let result = save_file(path, "must not replace locked bytes".into(), None, None).await;
+            assert!(matches!(result, Err(CommandError::WriteError(_))));
         });
     }
 

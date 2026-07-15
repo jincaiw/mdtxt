@@ -80,9 +80,48 @@ jobs:
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
 
+      # The ordinary Windows runner is a real NTFS environment. Configure its
+      # test-only long-path, loopback UNC-share and sharing-violation fixtures
+      # before Rust tests so P8 records OS behaviour instead of inferring it
+      # from POSIX or an emulated filesystem.
+      - name: Configure Windows filesystem evidence fixtures
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -Value 1
+          $root = Join-Path $env:RUNNER_TEMP 'mdtxt-ntfs-evidence'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          $share = "mdtxt-ci-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          Set-Service -Name LanmanServer -StartupType Manual
+          Start-Service -Name LanmanServer
+          New-SmbShare -Name $share -Path $root -FullAccess $env:USERNAME | Out-Null
+          "MDTXT_TEST_UNC_ROOT=\\localhost\$share" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "MDTXT_TEST_SMB_SHARE=$share" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          $lockPath = Join-Path $root 'exclusive-lock.md'
+          $readyPath = Join-Path $root 'exclusive-lock.ready'
+          [System.IO.File]::WriteAllText($lockPath, 'locked original bytes')
+          $script = "`$stream = [System.IO.File]::Open('$lockPath', [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None); [System.IO.File]::WriteAllText('$readyPath', 'locked'); Start-Sleep -Seconds 300"
+          $locker = Start-Process -FilePath powershell -ArgumentList '-NoProfile', '-Command', $script -PassThru
+          for ($attempt = 0; $attempt -lt 30 -and -not (Test-Path $readyPath); $attempt++) { Start-Sleep -Milliseconds 250 }
+          if (-not (Test-Path $readyPath)) { throw 'Timed out waiting for the exclusive Windows lock fixture.' }
+          "MDTXT_TEST_LOCK_PATH=$lockPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "MDTXT_TEST_LOCK_PID=$($locker.Id)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Test Rust
         working-directory: src-tauri
         run: cargo test
+
+      - name: Verify and clean Windows filesystem evidence fixtures
+        if: ${{ always() && matrix.platform == 'windows-latest' }}
+        shell: pwsh
+        run: |
+          if ($env:MDTXT_TEST_LOCK_PID) { Stop-Process -Id $env:MDTXT_TEST_LOCK_PID -Force -ErrorAction SilentlyContinue }
+          if ($env:MDTXT_TEST_LOCK_PATH) {
+            $contents = [System.IO.File]::ReadAllText($env:MDTXT_TEST_LOCK_PATH)
+            if ($contents -ne 'locked original bytes') { throw 'Exclusive-lock save changed the original bytes.' }
+          }
+          if ($env:MDTXT_TEST_SMB_SHARE) { Remove-SmbShare -Name $env:MDTXT_TEST_SMB_SHARE -Force -ErrorAction SilentlyContinue }
 
   # ─── Supply-chain: Rust dependencies ──────────────────────────
   # Fails the build on a known-vulnerable crate (RUSTSEC advisory), a banned
