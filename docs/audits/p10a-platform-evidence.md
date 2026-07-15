@@ -1,24 +1,24 @@
 # P10a Platform Build and Evidence Tracking
 
-Status: **environment and workflow configuration exist; no cross-platform mdtxt
-0.1.0 package or functional acceptance is inferred from configuration alone.**
+Status: **mdtxt-owned remote and macOS/Windows 0.1.0 Debug package evidence
+exist; no functional acceptance is inferred from package compilation alone.**
 
 ## Current evidence
 
 | Target | Build / launch evidence | Functional evidence | Status |
 | --- | --- | --- | --- |
-| macOS 26.5.2 arm64 | At `38ca14e`, `bun run tauri build --debug` produced the regular `mdtxt.app` and arm64 DMG. `node scripts/write-platform-evidence-manifest.mjs` recorded 12 bundle files with `darwin` / `arm64`, product `mdtxt`, identifier `app.mdtxt.desktop`, version `0.1.0`, and no leftover test artifacts. An isolated Debug variant with only `app.mdtxt.desktop.recoverytest` as a temporary bundle identifier was used to avoid the user instance | P8 AC-007 two-draft force-terminate/relaunch recovery observed in the isolated WKWebView build; details are recorded in P8 tracking. P6 IME and P8 filesystem matrix remain separate | Build and a limited P8 native smoke present; P6/P8 not accepted |
-| Windows x64 | `.github/workflows/ci.yml` is fixed to the declared `windows-latest` x64 target; `.github/workflows/platform-evidence.yml` can create a 14-day Debug bundle artifact with SHA-256 manifest | No mdtxt 0.1.0 artifact install, recovery, NTFS lock/long-path/UNC, or Microsoft Pinyin result | Pending run and validation |
-| Ubuntu LTS x64 | `.github/workflows/ci.yml` is fixed to Ubuntu 24.04 and declares a native WebKit smoke configuration; `.github/workflows/platform-evidence.yml` can create a 14-day Debug bundle artifact with SHA-256 manifest | No reviewed mdtxt 0.1.0 workflow run or desktop package install; the local Docker attempt is non-creditable and is recorded in P8 tracking | Pending run and validation |
+| macOS 26.5.2 arm64 | At `38ca14e`, `bun run tauri build --debug` produced the regular `mdtxt.app` and arm64 DMG. The latest mdtxt-owned [`Platform Evidence Build #29431075393`](https://github.com/jincaiw/mdtxt/actions/runs/29431075393), commit `caa0a96`, produced `mdtxt_0.1.0_aarch64.dmg` (SHA-256 `b3c9c3ee8208e66127c622743d926656fc176edf3490c58d3a503326fd005403`) and an ARM64 manifest for `mdtxt` / `app.mdtxt.desktop` / `0.1.0` | P8 AC-007 two-draft force-terminate/relaunch recovery observed in the isolated WKWebView build; details are recorded in P8 tracking. P6 IME and P8 filesystem matrix remain separate | Build and a limited P8 native smoke present; P6/P8 not accepted |
+| Windows x64 | Latest mdtxt-owned [`Platform Evidence Build #29431075393`](https://github.com/jincaiw/mdtxt/actions/runs/29431075393), commit `caa0a96`, produced `mdtxt_0.1.0_x64_en-US.msi` (SHA-256 `a7341b43613da873025ba821e065110c9496f6300ca5163f3b108a2d4e2aa8c5`) and `mdtxt_0.1.0_x64-setup.exe` (SHA-256 `16f6657fd2e715a7f8fceb77be1f9f3abe5fdf1c48e99a39d644ac7f025c9e2a`); the manifest identifies Windows/X64, `mdtxt`, `app.mdtxt.desktop`, `0.1.0` | No artifact installation, recovery UI, or Microsoft Pinyin result; NTFS fixture CI remains a separate P8 record | Debug package evidence present; functional acceptance pending |
+| Ubuntu LTS x64 | `.github/workflows/ci.yml` is fixed to Ubuntu 24.04 and the latest CI native WebKit smoke passed at `caa0a96`; [`Platform Evidence Build #29431075393`](https://github.com/jincaiw/mdtxt/actions/runs/29431075393) is still building the Debug package | The Docker attempt remains non-creditable; CI native smoke is not an installation/IME/recovery pass | Debug package pending; functional acceptance pending |
 
 ## Remote boundary
 
 On 2026-07-15, the checked-out `origin` was verified as
-`https://github.com/jincaiw/Paperling.git`. Its latest visible successful
-Release workflow was for `v1.0.50`, not an mdtxt 0.1.0 ref. The checkout must
-not rewrite `origin`, and those upstream runs must not be cited as mdtxt
-evidence. A future mdtxt-owned remote/ref, or manually supplied target-platform
-evidence, is required before recording CI artifacts here.
+`https://github.com/jincaiw/Paperling.git`; it remains unchanged and its
+workflows are not mdtxt evidence. The dedicated public remote
+[`jincaiw/mdtxt`](https://github.com/jincaiw/mdtxt) now owns the cited commits,
+workflow runs, and artifacts. Its package builds still do not substitute for
+manual installation or P6/P8 functional evidence.
 
 ## Required record per target
 

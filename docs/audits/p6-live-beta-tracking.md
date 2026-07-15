@@ -28,6 +28,7 @@ Status: **P6b implementation and automated gate complete; P6 Beta is not yet acc
 | macOS packaged UI smoke | Debug `mdtxt.app`, Apple M4 / Darwin 25.5.0 / WKWebView | Bundle metadata is `mdtxt` / `app.mdtxt.desktop` / `0.1.0`; default-off gate, explicit enable, Live switch, Chinese Markdown source edit, undo/redo and disable-to-Source fallback all observed |
 | macOS native interaction repeat | Debug `mdtxt.app`, Apple M4 / Darwin 25.5.0 / WKWebView; current `src-tauri/target/debug/bundle/macos/mdtxt.app` | With Live disabled, its mode entry was absent and Source was active. After explicit opt-in, Live was selectable; an ordinary Markdown edit, undo/redo, and `Ctrl+E` fallback to Source were observed. The setting was restored to disabled at the end. This automation cannot drive a native IME candidate window, so it adds **no** P6c IME pass. |
 | Native WebDriver | `bun run test:native` | Debug build succeeds, but `tauri-driver v2.0.6` exits with “not supported on this platform” on macOS; tracked as a harness limitation, not a product pass |
+| Ubuntu native WebDriver smoke | GitHub-hosted `ubuntu-24.04` / Linux WebKit, [`CI #29431042544`](https://github.com/jincaiw/mdtxt/actions/runs/29431042544), commit `caa0a96`; `xvfb-run --auto-servernum bun run test:native` | Passed: the packaged native WebView rendered the welcome screen and opened the native settings menu (2 passing). This is a bootstrap/navigation smoke only; it does not exercise Linux IBus/Fcitx composition, clipboard, tab switching, or P6d native latency. |
 
 ## Open P6 blockers
 
