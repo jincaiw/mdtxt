@@ -24,6 +24,7 @@ jobs:
             artifact: mdtxt-macos-arm64-debug
             paths: |
               src-tauri/target/debug/bundle/macos/**
+              src-tauri/target/debug/bundle/dmg/**
               src-tauri/target/debug/bundle/platform-evidence.json
           - name: windows-x64
             runner: windows-latest
