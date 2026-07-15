@@ -7,7 +7,7 @@ Status: **environment and workflow configuration exist; no cross-platform mdtxt
 
 | Target | Build / launch evidence | Functional evidence | Status |
 | --- | --- | --- | --- |
-| macOS 26.5.2 arm64 | Local `bun run tauri -- build --debug` refreshed `src-tauri/target/debug/bundle/macos/mdtxt.app` on 2026-07-15 | Existing single-draft recovery and P6 basic UI observations are tracked separately; this build has not yet run the new two-tab AC-007 forced-termination scenario in an isolated native instance | Build present; P6/P8 not accepted |
+| macOS 26.5.2 arm64 | Local Debug build succeeded on 2026-07-15; an isolated Debug variant with only `app.mdtxt.desktop.recoverytest` as its temporary bundle identifier was launched to avoid the user instance | P8 AC-007 two-draft force-terminate/relaunch recovery observed in the isolated WKWebView build; details are recorded in P8 tracking. P6 IME and P8 filesystem matrix remain separate | Build and a limited P8 native smoke present; P6/P8 not accepted |
 | Windows x64 | `.github/workflows/ci.yml` has a `windows-latest` check job; `.github/workflows/platform-evidence.yml` can create a 14-day Debug bundle artifact with SHA-256 manifest | No mdtxt 0.1.0 artifact install, recovery, NTFS lock/long-path/UNC, or Microsoft Pinyin result | Pending run and validation |
 | Ubuntu LTS x64 | `.github/workflows/ci.yml` declares an Ubuntu 24.04 build and native WebKit smoke configuration; `.github/workflows/platform-evidence.yml` can create a 14-day Debug bundle artifact with SHA-256 manifest | No reviewed mdtxt 0.1.0 workflow run or desktop package install; the local Docker attempt is non-creditable and is recorded in P8 tracking | Pending run and validation |
 
