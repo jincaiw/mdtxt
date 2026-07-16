@@ -64,7 +64,10 @@ jobs:
             args: "--target aarch64-pc-windows-msvc"
             portable: false
           - platform: ubuntu-24.04
-            args: ""
+            # Ship the native Debian installer plus a portable AppImage. RPM is
+            # not a v0.1.0 target and has repeatedly stalled after the Debian
+            # bundle completed on GitHub-hosted Ubuntu runners.
+            args: "--bundles deb,appimage"
             portable: false
           - platform: macos-latest
             args: ""

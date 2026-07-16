@@ -39,7 +39,6 @@ jobs:
             paths: |
               src-tauri/target/debug/bundle/appimage/**
               src-tauri/target/debug/bundle/deb/**
-              src-tauri/target/debug/bundle/rpm/**
               src-tauri/target/debug/bundle/platform-evidence.json
 
     runs-on: ${{ matrix.runner }}
@@ -73,7 +72,7 @@ jobs:
           # process and preserves verbose output if an upstream packager stalls.
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             timeout --foreground --signal=TERM --kill-after=60s 30m \
-              bun run tauri build --debug --verbose
+              bun run tauri build --debug --verbose --bundles deb,appimage
           else
             bun run tauri build --debug --verbose
           fi
