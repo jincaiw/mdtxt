@@ -15,6 +15,7 @@ describe("assessLiveEligibility", () => {
         const eligibility = assessLiveEligibility(source);
         expect(eligibility.bytes).toBeGreaterThan(LIVE_LIMITS.maxBytes);
         expect(eligibility.reasons).toContain("bytes");
+        expect(eligibility.complexBlocks).toBe(0);
     });
 
     it("limits pathological line and complex-block documents", () => {

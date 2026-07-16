@@ -51,10 +51,20 @@ export function useEditorDocumentSession({
         const createState = createStateRef.current;
         if (!view || !createState) return;
         if (loadedDocumentIdRef.current === documentId && (!sessionState || view.state === sessionState)) return;
+        const createStarted = performance.now();
         const next = sessionState ?? createState(contentRef.current ?? "");
+        reportMetric("editor-create-state", performance.now() - createStarted);
         loadedDocumentIdRef.current = documentId;
+        const swapStarted = performance.now();
         view.setState(next);
+        reportMetric("editor-set-state", performance.now() - swapStarted);
+        const materializeStarted = performance.now();
         lastEmittedRef.current = next.doc.toString();
+        reportMetric("editor-materialize-state", performance.now() - materializeStarted);
         onStateChangeRef.current?.(documentId, next);
     }, [contentRef, createStateRef, documentId, lastEmittedRef, loadedDocumentIdRef, onStateChangeRef, sessionState, viewRef]);
+}
+
+function reportMetric(name: string, duration: number) {
+    window.dispatchEvent(new CustomEvent("mdtxt:editor-metric", { detail: { name, duration } }));
 }

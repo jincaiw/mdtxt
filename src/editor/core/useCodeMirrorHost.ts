@@ -18,6 +18,7 @@ import { handleTab, handleEnter, wrapSelection, insertLink, type EditorResult, t
 import { applyEditorResult, editorTheme, markdownPresentationExtensions, toEditorActionState } from "./editorPresentation";
 import { spellcheckAttributes } from "../extensions/useEditorPreferences";
 import { liveMarkdownPresentation, restrictedLiveMarkdownPresentation } from "../live/liveMarkdownPresentation";
+import type { DocumentTextChange } from "../../utils/documentSessionController";
 
 interface UseCodeMirrorHostOptions {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -32,6 +33,7 @@ interface UseCodeMirrorHostOptions {
     liveCompRef: RefObject<Compartment>;
     sourceSyntaxCompRef: RefObject<Compartment>;
     onChangeRef: RefObject<((content: string) => void) | undefined>;
+    onTextChangesRef: RefObject<((changes: readonly DocumentTextChange[]) => string | null) | undefined>;
     onStateChangeRef: RefObject<((documentId: string, state: CMEditorState) => void) | undefined>;
     onCursorChangeRef: RefObject<((line: number, column: number) => void) | undefined>;
     onSelectionChangeRef: RefObject<((start: number, end: number) => void) | undefined>;
@@ -55,7 +57,7 @@ interface UseCodeMirrorHostOptions {
 export function useCodeMirrorHost({
     containerRef, viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef,
     wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
-    onChangeRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
+    onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
     typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
     content, wordWrap, spellCheck, liveMode, liveRestricted, detectSlash, detectTable, openFind, handlePaste,
 }: UseCodeMirrorHostOptions) {
@@ -94,9 +96,14 @@ export function useCodeMirrorHost({
                     onChangeRef.current?.(accepted);
                 }
             } else if (update.docChanged) {
-                const value = update.state.doc.toString();
+                const changes: DocumentTextChange[] = [];
+                update.changes.iterChanges((from, to, _fromB, _toB, inserted) => {
+                    changes.push({ from, to, insert: inserted.toString() });
+                });
+                const incrementallyApplied = onTextChangesRef.current?.(changes);
+                const value = incrementallyApplied ?? update.state.doc.toString();
                 lastEmittedRef.current = value;
-                onChangeRef.current?.(value);
+                if (!onTextChangesRef.current) onChangeRef.current?.(value);
             }
             if (update.selectionSet || update.docChanged) {
                 onStateChangeRef.current?.(loadedDocumentIdRef.current ?? documentId, update.state);

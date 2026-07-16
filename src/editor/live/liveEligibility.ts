@@ -67,11 +67,16 @@ export function assessLiveEligibility(source: string): LiveEligibility {
     // source of truth as Live itself: literal image-looking text (especially
     // inside inline/fenced code) must not silently change the mode boundary.
     let complexBlocks = 0;
-    parser.parse(source).iterate({
-        enter(node) {
-            if (node.name === "FencedCode" || node.name === "Image") complexBlocks++;
-        },
-    });
+    // Byte admission already guarantees restricted mode. Parsing a document
+    // that cannot enter full Live only delays the safe fallback and provides
+    // no different decision.
+    if (bytes <= LIVE_LIMITS.maxBytes) {
+        parser.parse(source).iterate({
+            enter(node) {
+                if (node.name === "FencedCode" || node.name === "Image") complexBlocks++;
+            },
+        });
+    }
     const reasons: LiveRestrictionReason[] = [];
     if (bytes > LIVE_LIMITS.maxBytes) reasons.push("bytes");
     if (lines > LIVE_LIMITS.maxLines) reasons.push("lines");

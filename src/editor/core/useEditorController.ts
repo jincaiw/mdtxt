@@ -12,6 +12,7 @@ import { useEditorPreferences } from "../extensions/useEditorPreferences";
 import { useEditorOverlays } from "../interactions/EditorOverlays";
 import { createEditorPasteHandler } from "../interactions/editorPaste";
 import { useLiveMarkdownPresentation } from "../live/liveMarkdownPresentation";
+import type { DocumentTextChange } from "../../utils/documentSessionController";
 
 export interface EditorControllerOptions {
     documentId: string;
@@ -19,6 +20,7 @@ export interface EditorControllerOptions {
     onStateChange?: (documentId: string, state: CMEditorState) => void;
     content: string;
     onChange: (content: string) => void;
+    onTextChanges?: (changes: readonly DocumentTextChange[]) => string | null;
     onCursorChange?: (line: number, column: number) => void;
     onSelectionChange?: (start: number, end: number) => void;
     onImagePaste?: () => void;
@@ -47,7 +49,7 @@ export interface EditorControllerOptions {
  * of document text. CodeEditor itself only places the returned mount target.
  */
 export function useEditorController({
-    documentId, sessionState, onStateChange, content, onChange, onCursorChange,
+    documentId, sessionState, onStateChange, content, onChange, onTextChanges, onCursorChange,
     onSelectionChange, onImagePaste, onError, onNotice, filePath,
     onScrollFraction, registerScroller, typewriterMode, showToolbar,
     wordWrap = true, spellCheck = false, liveMode = false, liveRestricted = false, aiConfig, reviewDoc, onReviewResolve,
@@ -56,6 +58,7 @@ export function useEditorController({
     const viewRef = useRef<EditorView | null>(null);
 
     const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
+    const onTextChangesRef = useRef(onTextChanges); onTextChangesRef.current = onTextChanges;
     const onStateChangeRef = useRef(onStateChange); onStateChangeRef.current = onStateChange;
     const onCursorChangeRef = useRef(onCursorChange); onCursorChangeRef.current = onCursorChange;
     const onSelectionChangeRef = useRef(onSelectionChange); onSelectionChangeRef.current = onSelectionChange;
@@ -94,7 +97,7 @@ export function useEditorController({
     useCodeMirrorHost({
         containerRef, viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef,
         wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
-        onChangeRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
+        onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
         typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
         content, wordWrap, spellCheck, liveMode, liveRestricted, detectSlash, detectTable, openFind, handlePaste,
     });

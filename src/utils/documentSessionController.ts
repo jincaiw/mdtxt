@@ -46,6 +46,12 @@ export interface DocumentSessionFileMetadata {
     diskHash?: string;
 }
 
+export interface DocumentTextChange {
+    from: number;
+    to: number;
+    insert: string;
+}
+
 /** Immutable content read for work that may complete asynchronously. */
 export interface DocumentSessionContentSnapshot extends SessionResult<string> {}
 
@@ -174,6 +180,28 @@ export class DocumentSessionController {
         // Keep the editor transaction authoritative immediately, but avoid a
         // synchronous full-workspace React render for every key. Publish the
         // first dirty transition at once, then coalesce preview/autosave reads.
+        if (!isSessionDirty(current) && isSessionDirty(next)) this.emit();
+        else this.scheduleContentEmit();
+        return next;
+    }
+
+    applyContentChanges(id: string, changes: readonly DocumentTextChange[]): DocumentSession | null {
+        const current = this.get(id);
+        if (!current || changes.length === 0) return current;
+        let content = current.content;
+        for (let index = changes.length - 1; index >= 0; index--) {
+            const change = changes[index];
+            content = content.slice(0, change.from) + change.insert + content.slice(change.to);
+        }
+        if (content === current.content) return current;
+        const next: DocumentSession = {
+            ...current,
+            content,
+            version: current.version + 1,
+            fileSize: content.length,
+            format: { ...current.format, trailingNewline: content.endsWith("\n") },
+        };
+        this.sessions.set(id, next);
         if (!isSessionDirty(current) && isSessionDirty(next)) this.emit();
         else this.scheduleContentEmit();
         return next;

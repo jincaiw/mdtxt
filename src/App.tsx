@@ -1423,6 +1423,7 @@ function AppContent() {
 
   const restoreRecoveryEntries = useCallback((entries: import("./components/RecoveryDialog").RecoveryCandidate[]) => {
     if (entries.length === 0) return;
+    const restoreStarted = performance.now();
     snapshotActiveTab();
     const ordered = orderRecoveryEntries(entries);
     const restored = ordered.map((entry) => ({
@@ -1465,6 +1466,9 @@ function AppContent() {
       });
     }
     setRecoveryEntries((current) => current.filter((candidate) => !restoredIds.has(candidate.documentId)));
+    window.dispatchEvent(new CustomEvent("mdtxt:editor-metric", {
+      detail: { name: "restore-handler", duration: performance.now() - restoreStarted },
+    }));
   }, [snapshotActiveTab, newTabId, tr, commitTabs, sessionController, setActiveTab, applyTabToLive, showToast]);
 
   const handleRestoreRecovery = useCallback((entry: import("./components/RecoveryDialog").RecoveryCandidate) => {
@@ -1741,6 +1745,11 @@ function AppContent() {
   const handleContentChange = useCallback((newContent: string) => {
     const session = sessionController.getActive();
     if (session) sessionController.replaceContent(session.id, newContent);
+  }, [sessionController]);
+
+  const handleTextChanges = useCallback((changes: readonly import("./utils/documentSessionController").DocumentTextChange[]) => {
+    const session = sessionController.getActive();
+    return session ? sessionController.applyContentChanges(session.id, changes)?.content ?? null : null;
   }, [sessionController]);
 
   const handleEditorStateChange = useCallback((documentId: string, state: CMEditorState) => {
@@ -2316,6 +2325,7 @@ function AppContent() {
                 onStateChange={handleEditorStateChange}
                 content={editorContent}
                 onChange={handleContentChange}
+                onTextChanges={handleTextChanges}
                 onCursorChange={handleCursorChange}
                 onSelectionChange={handleSelectionChange}
                 onImagePaste={handleImagePaste}

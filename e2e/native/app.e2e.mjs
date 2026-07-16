@@ -44,11 +44,23 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.refresh();
         const dialog = await $("[role='alertdialog']");
         await dialog.waitForDisplayed({ timeout: 20_000 });
+        await browser.execute(() => {
+            window.__mdtxtNativeMetrics = [];
+            if (!window.__mdtxtNativeMetricListener) {
+                window.__mdtxtNativeMetricListener = true;
+                window.addEventListener("mdtxt:editor-metric", (event) => {
+                    window.__mdtxtNativeMetrics.push(event.detail);
+                });
+            }
+        });
         const restoreStarted = Date.now();
         await activate(await $("//*[@role='alertdialog']//button[contains(., '恢复') or contains(., 'Restore')]"));
         await dialog.waitForDisplayed({ reverse: true, timeout: 20_000 });
         await $(".cm-content").waitForDisplayed({ timeout: 20_000 });
-        return Date.now() - restoreStarted;
+        const duration = Date.now() - restoreStarted;
+        const metrics = await browser.execute(() => window.__mdtxtNativeMetrics);
+        console.log(`MDTXT_NATIVE_TRACE ${JSON.stringify(metrics)}`);
+        return duration;
     };
 
     it("launches the packaged WebView and renders the welcome screen", async () => {

@@ -99,6 +99,19 @@ describe("DocumentSessionController", () => {
         }
     });
 
+    it("applies editor change sets without replacing or rescanning the full buffer", () => {
+        const controller = new DocumentSessionController();
+        controller.open(input("a", "first\nsecond\n"));
+
+        const updated = controller.applyContentChanges("a", [
+            { from: 0, to: 5, insert: "1st" },
+            { from: 13, to: 13, insert: "third\n" },
+        ]);
+
+        expect(updated).toMatchObject({ content: "1st\nsecond\nthird\n", version: 1, fileSize: 17 });
+        expect(updated?.format.trailingNewline).toBe(true);
+    });
+
     it("does not let old saves or async results apply to a newer revision", () => {
         const controller = new DocumentSessionController();
         controller.open(input("a"));
