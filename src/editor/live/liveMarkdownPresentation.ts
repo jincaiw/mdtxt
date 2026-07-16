@@ -156,8 +156,14 @@ const liveRestrictedAttributes: Extension = [
 ];
 const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
 export const liveMarkdownPresentation: Extension = [liveMarkdownBase, liveAttributes];
-/** Restricted Live avoids the full-document decoration field entirely. */
-export const restrictedLiveMarkdownPresentation: Extension = [liveEditFocusPlugin, liveMarkdownTheme, liveRestrictedAttributes];
+/**
+ * Restricted Live is an admission-control fallback, not a second renderer.
+ * Keep the existing Source geometry and extensions intact and expose only a
+ * cheap state marker for the notice/test boundary. Applying the Live theme to
+ * a multi-megabyte document changes gutters, width and padding and can force a
+ * full native WebView relayout before this attribute becomes observable.
+ */
+export const restrictedLiveMarkdownPresentation: Extension = liveRestrictedAttributes;
 
 /** Reconfigures the isolated Live compartment without rebuilding EditorView. */
 export function useLiveMarkdownPresentation({

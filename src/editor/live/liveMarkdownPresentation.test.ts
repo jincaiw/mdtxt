@@ -32,7 +32,7 @@ describe("liveMarkdownPresentation", () => {
         expect(decorationCount(updated)).toBeGreaterThan(2);
     });
 
-    it("keeps restricted Live editable without mounting the whole-document decoration field", () => {
+    it("keeps restricted Live as a source-geometry marker without mounting presentation state", () => {
         const source = "# large source\n\n**still text**\n";
         const state = EditorState.create({ doc: source, extensions: restrictedLiveMarkdownPresentation });
 
