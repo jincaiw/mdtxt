@@ -25,11 +25,11 @@ export function ModeToggle({ mode, onSetMode, liveEnabled = false }: ModeToggleP
                     onClick={() => onSetMode("code")}
                     aria-label={t("Code editor")}
                     aria-pressed={mode === "code"}
-                    title={t("Code (Ctrl+E)")}
+                    title={t("Source (Ctrl+E)")}
                     className={`${buttonBase} ${modeClass(mode === "code")}`}
                 >
                     <span className="material-symbols-outlined text-[15px]">code</span>
-                    <span>{t("Code")}</span>
+                    <span>{t("Source")}</span>
                 </button>
 
                 {liveEnabled && <button
