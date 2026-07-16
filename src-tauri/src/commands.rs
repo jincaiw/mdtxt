@@ -163,8 +163,9 @@ fn save_temp_path(path: &Path) -> Result<PathBuf, CommandError> {
 }
 
 /// `rename` durably replaces the file only after the containing directory is
-/// synced on POSIX. Windows has no portable directory-handle equivalent here,
-/// so its atomic MoveFileEx replacement remains the best available guarantee.
+/// synced on POSIX. Windows performs the replacement with MoveFileExW and the
+/// WRITE_THROUGH flag in `atomic_replace`, so no second directory-sync call is
+/// required there.
 #[cfg(unix)]
 async fn sync_parent_directory(path: &Path, fault: Option<SaveFault>) -> Result<(), CommandError> {
     if fault == Some(SaveFault::DirectorySync) {
@@ -190,6 +191,41 @@ async fn sync_parent_directory(_path: &Path, fault: Option<SaveFault>) -> Result
         ));
     }
     Ok(())
+}
+
+#[cfg(not(windows))]
+async fn atomic_replace(from: &Path, to: &Path) -> std::io::Result<()> {
+    tokio::fs::rename(from, to).await
+}
+
+#[cfg(windows)]
+async fn atomic_replace(from: &Path, to: &Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::Storage::FileSystem::{
+        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+    };
+
+    let from = from
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    let to = to
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    tokio::task::spawn_blocking(move || unsafe {
+        MoveFileExW(
+            PCWSTR(from.as_ptr()),
+            PCWSTR(to.as_ptr()),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+        .map_err(|error| std::io::Error::from_raw_os_error(error.code().0))
+    })
+    .await
+    .map_err(std::io::Error::other)?
 }
 
 /// Read a markdown file from disk
@@ -381,7 +417,7 @@ async fn save_file_impl(
             "injected rename failure".to_string(),
         ));
     }
-    if let Err(e) = tokio::fs::rename(&tmp, &target).await {
+    if let Err(e) = atomic_replace(&tmp, &target).await {
         // Don't leave the temp file behind on failure.
         let _ = tokio::fs::remove_file(&tmp).await;
         return Err(CommandError::WriteError(e.to_string()));
