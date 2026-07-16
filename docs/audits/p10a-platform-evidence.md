@@ -1,6 +1,6 @@
 # P10a Platform Build and Evidence Tracking
 
-Status: **mdtxt-owned remote and macOS/Windows 0.1.0 Debug package evidence
+Status: **mdtxt-owned macOS, Windows and Ubuntu 0.1.0 Debug package builds
 exist; no functional acceptance is inferred from package compilation alone.**
 
 ## Current evidence
@@ -9,7 +9,7 @@ exist; no functional acceptance is inferred from package compilation alone.**
 | --- | --- | --- | --- |
 | macOS 26.5.2 arm64 | At `38ca14e`, `bun run tauri build --debug` produced the regular `mdtxt.app` and arm64 DMG. The latest mdtxt-owned [`Platform Evidence Build #29433752750`](https://github.com/jincaiw/mdtxt/actions/runs/29433752750), commit `3d868a6`, uploads both `mdtxt.app` and `mdtxt_0.1.0_aarch64.dmg`; the downloaded DMG SHA-256 is `bedf9c5be0974b28e2936c4aa4a3e9b2f2ed0b871b6c00134cae9088bd1f7d80`, matching its ARM64 manifest for `mdtxt` / `app.mdtxt.desktop` / `0.1.0` | P8 AC-007 two-draft force-terminate/relaunch recovery observed in the isolated WKWebView build; details are recorded in P8 tracking. P6 IME and P8 filesystem matrix remain separate | Build and a limited P8 native smoke present; P6/P8 not accepted |
 | Windows x64 | Latest mdtxt-owned [`Platform Evidence Build #29433752750`](https://github.com/jincaiw/mdtxt/actions/runs/29433752750), commit `3d868a6`, uploaded `mdtxt_0.1.0_x64_en-US.msi` (SHA-256 `f6054a4eaee7357db3de63cbe70523ce337aa5211492258a58d43ce17e865a4b`) and `mdtxt_0.1.0_x64-setup.exe` (SHA-256 `eeee9e3a337e54f7dca35580aec1aeac165a90b3355386768bde188d3469dce0`); downloaded-file hashes match the Windows/X64 manifest (`mdtxt`, `app.mdtxt.desktop`, `0.1.0`) | No artifact installation, recovery UI, or Microsoft Pinyin result; NTFS fixture CI remains a separate P8 record | Debug package evidence present; functional acceptance pending |
-| Ubuntu LTS x64 | `.github/workflows/ci.yml` is fixed to Ubuntu 24.04 and the latest CI native WebKit smoke passed at `caa0a96`; [`Platform Evidence Build #29431075393`](https://github.com/jincaiw/mdtxt/actions/runs/29431075393) is still building the Debug package | The Docker attempt remains non-creditable; CI native smoke is not an installation/IME/recovery pass | Debug package pending; functional acceptance pending |
+| Ubuntu LTS x64 | `.github/workflows/ci.yml` is fixed to Ubuntu 24.04. The mdtxt-owned [`Platform Evidence Build #29478008425`](https://github.com/jincaiw/mdtxt/actions/runs/29478008425), commit `fbf1b22`, completed all three jobs and uploaded the Ubuntu Debug app, DEB and AppImage evidence set. The workflow intentionally excludes RPM because the upstream RPM packager stalled until the 30-minute job timeout while the app and DEB had already completed; 0.1.0 does not claim RPM delivery. | The Docker attempt remains non-creditable; CI native smoke and package compilation are not installation, IME or recovery passes | Debug package evidence present; functional acceptance pending |
 
 ## Remote boundary
 
