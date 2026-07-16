@@ -200,18 +200,37 @@ async fn atomic_replace(from: &Path, to: &Path) -> std::io::Result<()> {
 
 #[cfg(windows)]
 async fn atomic_replace(from: &Path, to: &Path) -> std::io::Result<()> {
+    use std::ffi::OsString;
     use std::os::windows::ffi::OsStrExt;
     use windows::core::PCWSTR;
     use windows::Win32::Storage::FileSystem::{
         MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
     };
 
-    let from = from
+    fn verbatim(path: &Path) -> std::io::Result<OsString> {
+        let absolute = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            std::env::current_dir()?.join(path)
+        };
+        let value = absolute.as_os_str().to_string_lossy();
+        if value.starts_with(r"\\?\") {
+            return Ok(absolute.into_os_string());
+        }
+        if let Some(unc) = value.strip_prefix(r"\\") {
+            return Ok(OsString::from(format!(r"\\?\UNC\{unc}")));
+        }
+        Ok(OsString::from(format!(r"\\?\{value}")))
+    }
+
+    let from_path = verbatim(from)?;
+    let to_path = verbatim(to)?;
+    let from = from_path
         .as_os_str()
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<_>>();
-    let to = to
+    let to = to_path
         .as_os_str()
         .encode_wide()
         .chain(Some(0))
@@ -222,7 +241,7 @@ async fn atomic_replace(from: &Path, to: &Path) -> std::io::Result<()> {
             PCWSTR(to.as_ptr()),
             MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
         )
-        .map_err(|error| std::io::Error::from_raw_os_error(error.code().0))
+        .map_err(|error| std::io::Error::other(error.to_string()))
     })
     .await
     .map_err(std::io::Error::other)?
