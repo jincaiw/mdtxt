@@ -56,7 +56,7 @@ describe("editor selection theming", () => {
     });
 
     it("marks an over-threshold document as restricted without removing its source editor", async () => {
-        const { container } = render(
+        const { container, rerender } = render(
             <CodeEditor
                 documentId="large"
                 content="# large heading"
@@ -75,6 +75,18 @@ describe("editor selection theming", () => {
         expect(content.textContent).toBe("# large heading");
         expect(container.querySelector(".cm-editor")).toHaveAttribute("data-mdtxt-live", "restricted");
         expect(container.querySelector("[role='status']")).toHaveTextContent("Limited Live: large document");
+
+        rerender(
+            <CodeEditor
+                documentId="large"
+                content="# large heading"
+                onChange={() => {}}
+                liveMode={false}
+                liveRestricted
+            />,
+        );
+        await waitFor(() => expect(content).not.toHaveAttribute("data-mdtxt-live"));
+        expect(container.querySelector(".cm-content")).toBe(content);
     });
 
     it("discloses the reversible large-document word-wrap downgrade", async () => {

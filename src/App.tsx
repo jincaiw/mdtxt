@@ -398,14 +398,22 @@ function AppContent() {
   // Heavy document consumers deliberately read this debounced, versioned
   // projection rather than React's legacy editor bridge. This is the P4d-3
   // boundary that prevents preview work from joining the typing critical path.
-  const wordCount = useMemo(() => countSourceWords(presentationContent), [presentationContent]);
+  // Exact Markdown-aware word counting allocates several whole-document
+  // projections. Above the large-file boundary it must not race the first
+  // editable frame or a Source -> restricted-Live transition on the UI
+  // thread. Character count remains exact and the full statistics dialog is
+  // still an explicit, user-initiated operation.
+  const wordCount = useMemo(
+    () => largeDocumentPerformanceMode ? undefined : countSourceWords(presentationContent),
+    [largeDocumentPerformanceMode, presentationContent],
+  );
   const charCount = presentationContent.length;
   const selectionLength = selectionRange.end - selectionRange.start;
   const selectionWordCount = useMemo(
     () => (selectionLength > 0 ? countWords(presentationContent.slice(selectionRange.start, selectionRange.end)) : 0),
     [presentationContent, selectionRange.start, selectionRange.end, selectionLength],
   );
-  const readingTimeMin = useMemo(() => wordCount / 200, [wordCount]);
+  const readingTimeMin = useMemo(() => wordCount === undefined ? undefined : wordCount / 200, [wordCount]);
   const autosaveSnapshot = useMemo(() => {
     const active = sessionController.getActive();
     if (!active) return null;
