@@ -5,6 +5,48 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.execute((target) => target.click(), element);
     };
 
+    const stageSizedRecovery = async (targetBytes, name) => browser.executeAsync((bytes, entryName, done) => {
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (!invoke) {
+            done({ ok: false, error: "Tauri invoke bridge is unavailable" });
+            return;
+        }
+        const prefix = "# Native WebView performance\n\n";
+        const line = "plain markdown input line\n";
+        const repeated = line.repeat(Math.ceil((bytes - prefix.length) / line.length));
+        const content = `${prefix}${repeated}`.slice(0, bytes - 1) + "\n";
+        const timestamp = Date.now();
+        const entry = {
+            documentId: `native-performance-${timestamp}`,
+            path: null,
+            name: entryName,
+            content,
+            version: 1,
+            context: {
+                recoverySessionId: `native-performance-session-${timestamp}`,
+                tabIndex: 0,
+                wasActive: true,
+                cursorLine: 1,
+            },
+        };
+        invoke("list_recoveries")
+            .then((existing) => Promise.all(existing.map((item) => invoke("discard_recovery", { documentId: item.documentId }))))
+            .then(() => invoke("write_recovery", entry))
+            .then(() => done({ ok: true, bytes: new TextEncoder().encode(content).byteLength }))
+            .catch((error) => done({ ok: false, error: String(error) }));
+    }, targetBytes, name);
+
+    const restoreStagedRecovery = async () => {
+        await browser.refresh();
+        const dialog = await $("[role='alertdialog']");
+        await dialog.waitForDisplayed({ timeout: 20_000 });
+        const restoreStarted = Date.now();
+        await activate(await $("//*[@role='alertdialog']//button[contains(., '恢复') or contains(., 'Restore')]"));
+        await dialog.waitForDisplayed({ reverse: true, timeout: 20_000 });
+        await $(".cm-content").waitForDisplayed({ timeout: 20_000 });
+        return Date.now() - restoreStarted;
+    };
+
     it("launches the packaged WebView and renders the welcome screen", async () => {
         const title = await $("h1=mdtxt");
         await title.waitForDisplayed();
@@ -145,5 +187,69 @@ describe("mdtxt native Tauri smoke", () => {
                 .then(() => done())
                 .catch(() => done());
         });
+    });
+
+    it("measures a 10 MiB Source to restricted-Live path in the native WebView", async () => {
+        const targetBytes = 10 * 1024 * 1024;
+        const staged = await stageSizedRecovery(targetBytes, "Native 10 MiB.md");
+        assert.deepEqual(staged, { ok: true, bytes: targetBytes });
+
+        const sourceOpenMs = await restoreStagedRecovery();
+        const liveMode = await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
+        await liveMode.waitForDisplayed();
+        const liveStarted = Date.now();
+        await activate(liveMode);
+        await $(".cm-editor[data-mdtxt-live='restricted']").waitForExist({ timeout: 10_000 });
+        const restrictedLiveMs = Date.now() - liveStarted;
+
+        console.log(`MDTXT_NATIVE_PERF target=10MiB sourceOpenMs=${sourceOpenMs} restrictedLiveMs=${restrictedLiveMs}`);
+        assert.ok(sourceOpenMs <= 3_000, `10 MiB Source open took ${sourceOpenMs} ms`);
+        assert.ok(restrictedLiveMs <= 5_000, `10 MiB restricted Live took ${restrictedLiveMs} ms`);
+    });
+
+    it("measures 1 MiB editing transactions inside the native WebView", async () => {
+        const targetBytes = 1024 * 1024;
+        const staged = await stageSizedRecovery(targetBytes, "Native 1 MiB.md");
+        assert.deepEqual(staged, { ok: true, bytes: targetBytes });
+        await restoreStagedRecovery();
+
+        const result = await browser.execute(() => {
+            const content = document.querySelector(".cm-content");
+            const lastLine = content?.querySelector(".cm-line:last-child");
+            if (!(content instanceof HTMLElement) || !(lastLine instanceof HTMLElement)) {
+                return { ok: false, error: "CodeMirror content is unavailable" };
+            }
+            content.focus();
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(lastLine);
+            range.collapse(false);
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+
+            const samples = [];
+            let accepted = 0;
+            for (let index = 0; index < 40; index++) {
+                const started = performance.now();
+                if (document.execCommand("insertText", false, "x")) accepted++;
+                samples.push(performance.now() - started);
+            }
+            samples.sort((left, right) => left - right);
+            const p95 = samples[Math.ceil(samples.length * 0.95) - 1];
+            return {
+                ok: true,
+                accepted,
+                p50: samples[Math.ceil(samples.length * 0.5) - 1],
+                p95,
+                max: samples.at(-1),
+                suffix: lastLine.textContent?.slice(-40),
+            };
+        });
+
+        console.log(`MDTXT_NATIVE_PERF target=1MiB editP50Ms=${result.p50} editP95Ms=${result.p95} editMaxMs=${result.max}`);
+        assert.equal(result.ok, true);
+        assert.equal(result.accepted, 40);
+        assert.equal(result.suffix, "x".repeat(40));
+        assert.ok(result.p95 <= 16, `1 MiB native WebView edit P95 was ${result.p95} ms`);
     });
 });

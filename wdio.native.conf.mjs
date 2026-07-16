@@ -52,7 +52,7 @@ export const config = {
     framework: "mocha",
     connectionRetryTimeout: 120_000,
     connectionRetryCount: 3,
-    mochaOpts: { ui: "bdd", timeout: 60_000 },
+    mochaOpts: { ui: "bdd", timeout: 120_000 },
     onPrepare: () => {
         const result = spawnSync("bun", ["run", "tauri", "--", "build", "--debug", "--no-bundle"], {
             cwd: root,
