@@ -128,7 +128,7 @@ import {
 } from "./utils/documentSession";
 import { DocumentSessionController } from "./utils/documentSessionController";
 import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
-import { assessLiveEligibility, LIVE_LIMITS, selectLiveEligibilitySource } from "./editor/live/liveEligibility";
+import { assessLiveEligibilityForTransition, LIVE_LIMITS, selectLiveEligibilitySource } from "./editor/live/liveEligibility";
 import { latestRecoveryBatch, orderRecoveryEntries, recoveredDraftName, selectRecoveredActive } from "./utils/recoveryModel";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
@@ -373,7 +373,7 @@ function AppContent() {
   // This keeps full-document parsing out of the typing hot path while still
   // downgrading a Live document that grows across a safety threshold.
   const liveEligibility = useMemo(
-    () => mode === "live" ? assessLiveEligibility(selectLiveEligibilitySource(activeSessionRead, presentationSnapshot)) : null,
+    () => mode === "live" ? assessLiveEligibilityForTransition(selectLiveEligibilitySource(activeSessionRead, presentationSnapshot)) : null,
     [activeSessionRead?.documentId, mode, presentationSnapshot?.documentId, presentationSnapshot?.version],
   );
   const liveRestrictionReason = useMemo(() => {

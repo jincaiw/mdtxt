@@ -53,6 +53,8 @@ export function useEditorOverlays({
     const [slashQuery, setSlashQuery] = useState("");
     const [aiBubble, setAIBubble] = useState<AIBubbleState | null>(null);
     const [tableUI, setTableUI] = useState<TableUIState | null>(null);
+    const tableUIRef = useRef<TableUIState | null>(null);
+    tableUIRef.current = tableUI;
     const slashStateRef = useRef<SlashState | null>(null);
     slashStateRef.current = slashState;
 
@@ -105,11 +107,11 @@ export function useEditorOverlays({
     }, []);
 
     const detectTable = useCallback((view: EditorView) => {
-        if (reviewingRef.current) { setTableUI(null); return; }
+        if (reviewingRef.current) { if (tableUIRef.current) setTableUI(null); return; }
         const head = view.state.selection.main.head;
         const doc = view.state.doc;
         const currentLine = doc.lineAt(head);
-        if (!currentLine.text.includes("|")) { setTableUI(null); return; }
+        if (!currentLine.text.includes("|")) { if (tableUIRef.current) setTableUI(null); return; }
 
         const cap = 500;
         let first = currentLine.number;
@@ -119,10 +121,10 @@ export function useEditorOverlays({
 
         const sliceFrom = doc.line(first).from;
         const region = findTableAt(doc.sliceString(sliceFrom, doc.line(last).to), head - sliceFrom);
-        if (!region) { setTableUI(null); return; }
+        if (!region) { if (tableUIRef.current) setTableUI(null); return; }
         const { colIndex } = locateCell(region, head - sliceFrom);
         const coords = view.coordsAtPos(region.from + sliceFrom);
-        if (!coords) { setTableUI(null); return; }
+        if (!coords) { if (tableUIRef.current) setTableUI(null); return; }
         setTableUI({ x: coords.left, y: coords.top, align: region.model.aligns[colIndex] ?? "none" });
     }, [reviewingRef]);
 

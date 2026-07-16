@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessLiveEligibility, LIVE_LIMITS, selectLiveEligibilitySource } from "./liveEligibility";
+import { assessLiveEligibility, assessLiveEligibilityForTransition, LIVE_LIMITS, selectLiveEligibilitySource } from "./liveEligibility";
 
 describe("assessLiveEligibility", () => {
     it("keeps normal Markdown in full Live", () => {
@@ -44,5 +44,10 @@ describe("assessLiveEligibility", () => {
         expect(selectLiveEligibilitySource(active, stalePresentation)).toBe(active.value);
         expect(selectLiveEligibilitySource(active, currentPresentation)).toBe(currentPresentation.value);
         expect(selectLiveEligibilitySource(active, { ...currentPresentation, documentId: "other" })).toBe(active.value);
+    });
+
+    it("restricts a certainly oversized transition without scanning its structure", () => {
+        const eligibility = assessLiveEligibilityForTransition("x".repeat(LIVE_LIMITS.maxBytes + 1));
+        expect(eligibility).toMatchObject({ restricted: true, reasons: ["bytes"], complexBlocks: 0 });
     });
 });

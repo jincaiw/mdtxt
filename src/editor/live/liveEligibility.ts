@@ -84,3 +84,20 @@ export function assessLiveEligibility(source: string): LiveEligibility {
     if (complexBlocks > LIVE_LIMITS.maxComplexBlocks) reasons.push("complexBlocks");
     return { restricted: reasons.length > 0, reasons, bytes, lines, maxLineLength, complexBlocks };
 }
+
+/**
+ * UTF-8 uses at least one byte per UTF-16 code unit for every valid JS string.
+ * Once this lower bound exceeds the byte gate, restricted Live is certain and
+ * no encoder, line scan, or parser is needed on the mode-switch path.
+ */
+export function assessLiveEligibilityForTransition(source: string): LiveEligibility {
+    if (source.length <= LIVE_LIMITS.maxBytes) return assessLiveEligibility(source);
+    return {
+        restricted: true,
+        reasons: ["bytes"],
+        bytes: source.length,
+        lines: 0,
+        maxLineLength: 0,
+        complexBlocks: 0,
+    };
+}
