@@ -240,13 +240,15 @@ describe("mdtxt native Tauri smoke", () => {
             }
             samples.sort((left, right) => left - right);
             const p95 = samples[Math.ceil(samples.length * 0.95) - 1];
+            const updatedLines = content.querySelectorAll(".cm-line");
+            const updatedLastLine = updatedLines.item(updatedLines.length - 1);
             return {
                 ok: true,
                 accepted,
                 p50: samples[Math.ceil(samples.length * 0.5) - 1],
                 p95,
                 max: samples.at(-1),
-                suffix: lastLine.textContent?.slice(-40),
+                suffix: updatedLastLine?.textContent?.slice(-40),
             };
         });
 
