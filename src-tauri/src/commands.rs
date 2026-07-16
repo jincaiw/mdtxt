@@ -855,8 +855,8 @@ pub async fn read_image_file(base_dir: String, rel_path: String) -> Result<Respo
 //
 // Stored in the platform credential store instead of plaintext localStorage.
 // The front end keeps endpoint + model in localStorage (non-secret) and routes
-// only the key through these commands, with a localStorage fallback on the JS
-// side when no keychain is available (e.g. a headless Linux box).
+// only the key through these commands. A credential-store failure is surfaced
+// to the user; the frontend must never persist the secret in localStorage.
 //
 const AI_KEY_SERVICE: &str = "app.mdtxt.desktop";
 const AI_KEY_ACCOUNT: &str = "ai-api-key";

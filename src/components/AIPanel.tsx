@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { streamChat, buildAskMessages, buildAgentMessages, parseEdits, type ChatMessage } from "../utils/aiChat";
+import { streamChat, buildAskMessages, buildAgentMessages, parseEdits, AI_MAX_DOCUMENT_CONTEXT_CHARS, type ChatMessage } from "../utils/aiChat";
 import type { AIConfig } from "../utils/aiAssist";
 import { useLocale } from "../context/LocaleContext";
 
@@ -171,6 +171,11 @@ export function AIPanel({ isOpen, onClose, note, documentId, documentVersion, fi
                 <span className="truncate text-[11px] text-[var(--text-muted)] min-w-0">{fileName || t("Untitled")}</span>
                 {selectionText.trim() && (
                     <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--accent)] text-[11px] shrink-0">{t("selection")}</span>
+                )}
+                {note.length > AI_MAX_DOCUMENT_CONTEXT_CHARS && (
+                    <span className="px-1.5 py-0.5 rounded bg-[var(--status-unsaved)]/10 text-[var(--status-unsaved)] text-[11px] shrink-0" title={t("Only the first {count} document characters will be sent.", { count: AI_MAX_DOCUMENT_CONTEXT_CHARS.toLocaleString() })}>
+                        {t("context truncated")}
+                    </span>
                 )}
                 <div className="ml-auto flex items-center gap-0.5 bg-[var(--bg-input)] rounded-[var(--radius-sm)] p-0.5 border border-[var(--border-subtle)] shrink-0">
                     {(["ask", "agent"] as const).map((md) => (

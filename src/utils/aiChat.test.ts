@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { buildAskMessages, parseEdits, streamChat, type ChatMessage } from "./aiChat";
+import { AI_MAX_DOCUMENT_CONTEXT_CHARS, buildAskMessages, parseEdits, streamChat, type ChatMessage } from "./aiChat";
 import { aiFetch } from "./aiTransport";
 import type { AIConfig } from "./aiAssist";
 
@@ -127,5 +127,13 @@ describe("buildAskMessages", () => {
         const last = msgs[msgs.length - 1];
         expect(last.content).toContain("the selected bit");
         expect(last.content.toLowerCase()).toContain("selected");
+    });
+
+    it("bounds a large document and explicitly marks omitted context", () => {
+        const note = "x".repeat(AI_MAX_DOCUMENT_CONTEXT_CHARS + 321);
+        const msgs = buildAskMessages([], note, "", "summarize it");
+        const last = msgs[msgs.length - 1];
+        expect(last.content).toContain("document context truncated; 321 characters omitted");
+        expect(last.content).not.toContain("x".repeat(AI_MAX_DOCUMENT_CONTEXT_CHARS + 1));
     });
 });

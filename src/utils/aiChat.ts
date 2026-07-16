@@ -143,6 +143,18 @@ export const ASK_SYSTEM_PROMPT =
     "formatted in Markdown. This is a read-only Q&A mode — do not rewrite or output " +
     "the whole document unless explicitly asked.";
 
+// Bound the document snapshot sent to a model. This keeps large notes from
+// freezing request construction or silently exceeding provider context limits.
+// The marker is part of the user-visible conversation payload and the panel
+// separately discloses the same limit before the request is sent.
+export const AI_MAX_DOCUMENT_CONTEXT_CHARS = 120_000;
+
+function limitDocumentContext(note: string): string {
+    if (note.length <= AI_MAX_DOCUMENT_CONTEXT_CHARS) return note;
+    const omitted = note.length - AI_MAX_DOCUMENT_CONTEXT_CHARS;
+    return `${note.slice(0, AI_MAX_DOCUMENT_CONTEXT_CHARS)}\n\n[mdtxt: document context truncated; ${omitted} characters omitted]`;
+}
+
 /** Wrap untrusted document text in tags (avoids colliding with the doc's own ``` fences). */
 function asDocument(note: string): string {
     return `<document>\n${note}\n</document>`;
@@ -154,9 +166,10 @@ export function buildAskMessages(
     selection: string,
     userInput: string
 ): ChatMessage[] {
+    const boundedNote = limitDocumentContext(note);
     const ctx = selection.trim()
-        ? `Current document:\n${asDocument(note)}\n\nThe user has selected this passage:\n${asDocument(selection)}`
-        : `Current document:\n${asDocument(note)}`;
+        ? `Current document:\n${asDocument(boundedNote)}\n\nThe user has selected this passage:\n${asDocument(selection)}`
+        : `Current document:\n${asDocument(boundedNote)}`;
     return [
         { role: "system", content: ASK_SYSTEM_PROMPT },
         ...history,
@@ -191,9 +204,10 @@ export function buildAgentMessages(
     selection: string,
     userInput: string
 ): ChatMessage[] {
+    const boundedNote = limitDocumentContext(note);
     const ctx = selection.trim()
-        ? `Current document:\n${asDocument(note)}\n\nThe user's current selection:\n${asDocument(selection)}`
-        : `Current document:\n${asDocument(note)}`;
+        ? `Current document:\n${asDocument(boundedNote)}\n\nThe user's current selection:\n${asDocument(selection)}`
+        : `Current document:\n${asDocument(boundedNote)}`;
     return [
         { role: "system", content: AGENT_SYSTEM_PROMPT },
         ...history,

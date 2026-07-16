@@ -149,61 +149,80 @@ export const getOpenInReader = (): boolean => safeGet<boolean>(KEY_OPEN_IN_READE
 export const setOpenInReader = (v: boolean): void => safeSet(KEY_OPEN_IN_READER, v);
 
 // Master switch for every AI surface (title-bar button, side panel, toolbar
-// sparkle, Alt+J, command palette entry). On by default; flipped in Settings.
+// sparkle, Alt+J, command palette entry). Off by default so no network-capable
+// surface appears before the user explicitly opts in from Settings.
 const KEY_AI_ENABLED = "mdtxt:aiEnabled";
-export const getAIEnabled = (): boolean => safeGet<boolean>(KEY_AI_ENABLED, true);
+export const getAIEnabled = (): boolean => safeGet<boolean>(KEY_AI_ENABLED, false);
 export const setAIEnabled = (v: boolean): void => safeSet(KEY_AI_ENABLED, v);
 
 const KEY_AI_ENDPOINT = "mdtxt:aiEndpoint";
 const KEY_AI_MODEL = "mdtxt:aiModel";
 const KEY_AI_API_KEY = "mdtxt:aiApiKey";
 
-// AI API key now lives in the OS keychain (SECURITY-01), accessed via the
-// get_ai_key / set_ai_key Tauri commands. To keep getAIConfig() synchronous (it
-// seeds React useState initializers), the key is mirrored into a module cache
-// that initAIKey() hydrates once at startup. A localStorage fallback covers
-// environments without a keychain (e.g. a headless Linux box) so AI never
-// silently breaks.
+// AI API keys live only in the OS credential store (SECURITY-01), accessed via
+// the get_ai_key / set_ai_key Tauri commands. To keep getAIConfig() synchronous
+// (it seeds React state), the current value is mirrored in process memory after
+// initAIKey() hydrates it. Keychain failures must never fall back to plaintext
+// localStorage; the caller receives a visible failure result instead.
 let cachedAIKey = "";
+let persistedAIKey = "";
 let aiKeyLoaded = false;
+let aiKeyWriteQueue: Promise<void> = Promise.resolve();
+
+export interface AIKeySaveResult {
+    ok: boolean;
+    error?: string;
+}
 
 export async function initAIKey(): Promise<void> {
     if (aiKeyLoaded) return;
     aiKeyLoaded = true;
+    const legacy = safeGet<string>(KEY_AI_API_KEY, "");
+    // Remove legacy plaintext before any fallible credential-store operation.
+    // If migration cannot complete, losing the persisted secret is safer than
+    // silently retaining it in browser storage.
+    try { localStorage.removeItem(KEY_AI_API_KEY); } catch {/* unavailable storage */}
     try {
         cachedAIKey = await invoke<string>("get_ai_key");
+        persistedAIKey = cachedAIKey;
         // One-time migration: move any legacy plaintext key into the keychain.
-        if (!cachedAIKey) {
-            const legacy = safeGet<string>(KEY_AI_API_KEY, "");
-            if (legacy) {
-                cachedAIKey = legacy;
-                try {
-                    await invoke("set_ai_key", { key: legacy });
-                    localStorage.removeItem(KEY_AI_API_KEY);
-                } catch {/* keychain unavailable — leave the localStorage copy */}
-            }
+        if (!cachedAIKey && legacy) {
+            await invoke("set_ai_key", { key: legacy });
+            cachedAIKey = legacy;
+            persistedAIKey = legacy;
         }
     } catch {
-        // No keychain available — fall back to the legacy localStorage value.
-        cachedAIKey = safeGet<string>(KEY_AI_API_KEY, "");
+        // Keep the session safe and usable without a key. Settings surfaces the
+        // failure if the user explicitly attempts to save one.
+        cachedAIKey = "";
+        persistedAIKey = "";
     }
 }
 
 export const getAIConfig = (): { endpoint: string; model: string; apiKey: string } => ({
     endpoint: safeGet<string>(KEY_AI_ENDPOINT, ""),
     model: safeGet<string>(KEY_AI_MODEL, ""),
-    // Prefer the hydrated keychain value; fall back to a (legacy) localStorage
-    // key before initAIKey() has resolved or when no keychain is present.
-    apiKey: cachedAIKey || safeGet<string>(KEY_AI_API_KEY, ""),
+    apiKey: cachedAIKey,
 });
 
-export const setAIConfig = (cfg: { endpoint: string; model: string; apiKey: string }): void => {
+export const setAIConfig = (cfg: { endpoint: string; model: string; apiKey: string }): Promise<AIKeySaveResult> => {
     safeSet(KEY_AI_ENDPOINT, cfg.endpoint);
     safeSet(KEY_AI_MODEL, cfg.model);
     cachedAIKey = cfg.apiKey;
-    // Persist the key to the OS keychain; on failure fall back to localStorage so
-    // the setting still survives a restart.
-    Promise.resolve(invoke("set_ai_key", { key: cfg.apiKey }))
-        .then(() => { try { localStorage.removeItem(KEY_AI_API_KEY); } catch {/* ignore */} })
-        .catch(() => safeSet(KEY_AI_API_KEY, cfg.apiKey));
+    try { localStorage.removeItem(KEY_AI_API_KEY); } catch {/* unavailable storage */}
+    if (cfg.apiKey === persistedAIKey) return Promise.resolve({ ok: true });
+
+    // Serialize writes so a slower earlier credential-store operation cannot
+    // overwrite a newer key. The returned promise always resolves, preventing
+    // ignored UI persistence calls from producing unhandled rejections.
+    const key = cfg.apiKey;
+    const write = aiKeyWriteQueue
+        .catch(() => undefined)
+        .then(() => invoke("set_ai_key", { key }))
+        .then(() => { persistedAIKey = key; });
+    aiKeyWriteQueue = write;
+    return write.then(
+        (): AIKeySaveResult => ({ ok: true }),
+        (error): AIKeySaveResult => ({ ok: false, error: error instanceof Error ? error.message : String(error) }),
+    );
 };

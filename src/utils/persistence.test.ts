@@ -3,6 +3,7 @@ import {
     getRecentFiles, addRecentFile, removeRecentFile, clearRecentFiles,
     getSplitRatio, setSplitRatio,
     getAIConfig, setAIConfig,
+    getAIEnabled,
     getWordWrap,
     migrateLegacyKeys, getLastFile,
     getOpenInReader, setOpenInReader,
@@ -116,12 +117,15 @@ describe("AI config", () => {
         expect(cfg.endpoint).toBe("https://x/v1/chat/completions");
         expect(cfg.model).toBe("m");
     });
-    it("mirrors the API key into the in-memory cache synchronously", () => {
+    it("mirrors the API key in memory without writing plaintext browser storage", async () => {
         // The key is keychain-backed (SECURITY-01); setAIConfig updates a sync
         // cache that getAIConfig reads, so the value is available immediately
         // even though the keychain write happens asynchronously.
-        setAIConfig({ endpoint: "e", model: "m", apiKey: "secret" });
+        const saved = setAIConfig({ endpoint: "e", model: "m", apiKey: "secret" });
         expect(getAIConfig().apiKey).toBe("secret");
+        expect(localStorage.getItem("mdtxt:aiApiKey")).toBeNull();
+        await saved;
+        expect(localStorage.getItem("mdtxt:aiApiKey")).toBeNull();
     });
     it("reports empty endpoint/model when unset", () => {
         setAIConfig({ endpoint: "", model: "", apiKey: "" });
@@ -134,5 +138,8 @@ describe("AI config", () => {
 describe("defaults", () => {
     it("word wrap defaults to true", () => {
         expect(getWordWrap()).toBe(true);
+    });
+    it("keeps every AI surface disabled until explicit opt-in", () => {
+        expect(getAIEnabled()).toBe(false);
     });
 });

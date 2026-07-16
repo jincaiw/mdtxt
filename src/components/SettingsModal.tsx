@@ -111,6 +111,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
     // Connection-test state for the "Test connection" button (AI-04).
     const [aiTest, setAiTest] = useState<{ state: "idle" | "testing" | "ok" | "error"; msg?: string }>({ state: "idle" });
+    const [aiKeySaveError, setAiKeySaveError] = useState(false);
+    const aiKeySaveSequence = useRef(0);
+
+    const persistAIConfig = (next: typeof ai) => {
+        const sequence = ++aiKeySaveSequence.current;
+        void setAIConfig(next).then((result) => {
+            if (sequence === aiKeySaveSequence.current) setAiKeySaveError(!result.ok);
+        });
+    };
 
     // Update an AI field, clear any stale test result, and persist immediately
     // (when the endpoint is empty or valid) so edits survive a close-before-blur.
@@ -118,7 +127,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         const next = { ...ai, ...patch };
         setAi(next);
         setAiTest({ state: "idle" });
-        if (!next.endpoint || isValidEndpoint(next.endpoint)) setAIConfig(next);
+        if (!next.endpoint || isValidEndpoint(next.endpoint)) persistAIConfig(next);
     };
 
     // Derived, not stored: the provider pill is whichever preset the current
@@ -168,7 +177,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         if (isOpen) return; // only fire on open→close transition
         const current = aiRef.current;
         if (current.endpoint && !isValidEndpoint(current.endpoint)) return;
-        setAIConfig(current);
+        persistAIConfig(current);
     }, [isOpen]);
 
     if (!isOpen) return null;
@@ -448,6 +457,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                         />
                                         {activeProvider && (
                                             <span className="block mt-1 text-[11px] text-[var(--text-muted)]">{activeProvider.keyHint}</span>
+                                        )}
+                                        {aiKeySaveError && (
+                                            <span role="alert" className="block mt-1 text-[11px] text-[var(--danger)]">{t("API key could not be saved to the system keychain. It is kept only for this session.")}</span>
                                         )}
                                     </label>
                                     <div className="flex items-center gap-3">
