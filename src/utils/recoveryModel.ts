@@ -10,6 +10,25 @@ export interface RecoveryPlacement {
     savedAtMs: number;
 }
 
+const RECOVERED_PREFIXES = ["Recovered — ", "已恢复 — "] as const;
+
+/** Keep a recovered draft recognizable without compounding the prefix each
+ * time an already-recovered unsaved tab is itself recovered after a crash. */
+export function recoveredDraftName(name: string, recoveredLabel: string): string {
+    let base = name.trim();
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const prefix of RECOVERED_PREFIXES) {
+            if (base.startsWith(prefix)) {
+                base = base.slice(prefix.length).trimStart();
+                changed = true;
+            }
+        }
+    }
+    return `${recoveredLabel} — ${base || name.trim()}`;
+}
+
 export function orderRecoveryEntries<T extends RecoveryPlacement>(entries: readonly T[]): T[] {
     return [...entries].sort((left, right) =>
         (left.tabIndex ?? Number.MAX_SAFE_INTEGER) - (right.tabIndex ?? Number.MAX_SAFE_INTEGER)

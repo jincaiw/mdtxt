@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { latestRecoveryBatch, orderRecoveryEntries, selectRecoveredActive } from "./recoveryModel";
+import { latestRecoveryBatch, orderRecoveryEntries, recoveredDraftName, selectRecoveredActive } from "./recoveryModel";
 
 describe("recovery session placement", () => {
     it("restores the original tab order and active tab independently of write completion order", () => {
@@ -31,5 +31,12 @@ describe("recovery session placement", () => {
         ];
 
         expect(latestRecoveryBatch(entries).map((entry) => entry.name)).toEqual(["new first", "new second"]);
+    });
+
+    it("keeps one localized recovery prefix across repeated crash recovery", () => {
+        expect(recoveredDraftName("已恢复 — 已恢复 — Untitled-1.md", "已恢复"))
+            .toBe("已恢复 — Untitled-1.md");
+        expect(recoveredDraftName("Recovered — 已恢复 — Notes.md", "Recovered"))
+            .toBe("Recovered — Notes.md");
     });
 });

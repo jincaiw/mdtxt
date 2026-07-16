@@ -129,7 +129,7 @@ import {
 import { DocumentSessionController } from "./utils/documentSessionController";
 import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
 import { assessLiveEligibility, selectLiveEligibilitySource } from "./editor/live/liveEligibility";
-import { latestRecoveryBatch, orderRecoveryEntries, selectRecoveredActive } from "./utils/recoveryModel";
+import { latestRecoveryBatch, orderRecoveryEntries, recoveredDraftName, selectRecoveredActive } from "./utils/recoveryModel";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
 import tutorialMarkdown from "./assets/tutorial.md?raw";
@@ -1417,7 +1417,7 @@ function AppContent() {
     const restored = ordered.map((entry) => ({
       entry,
       id: newTabId(),
-      name: `${tr("Recovered")} — ${entry.name}`,
+      name: recoveredDraftName(entry.name, tr("Recovered")),
     }));
     const restoredTabs = restored.map(({ entry, id, name }) => ({
       id,
