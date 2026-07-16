@@ -1150,6 +1150,42 @@ mod tests {
         });
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn save_file_records_unix_advisory_lock_semantics() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let dir =
+                std::env::temp_dir().join(format!("mdtxt-advisory-lock-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("locked.md");
+            std::fs::write(&path, "old bytes").unwrap();
+
+            // POSIX locks are advisory and attach to this inode. Atomic save
+            // replaces the directory entry with a new inode, so a cooperative
+            // lock holder does not prohibit replacement as it does with an
+            // exclusive Windows share mode. Record that platform distinction
+            // explicitly instead of pretending both systems behave alike.
+            let locked = std::fs::File::open(&path).unwrap();
+            locked.lock().unwrap();
+            save_file(
+                path.to_string_lossy().to_string(),
+                "replacement bytes".into(),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), "replacement bytes");
+            locked.unlock().unwrap();
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
     #[cfg(any(unix, windows))]
     #[test]
     fn save_file_refuses_to_replace_a_symbolic_link() {

@@ -132,7 +132,7 @@ describe("mdtxt native Tauri smoke", () => {
             (element) => [...element.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\n"),
             recovered,
         );
-        assert.equal(recoveredText.replaceAll("\u00a0", " "), candidate.content.trimEnd());
+        assert.equal(recoveredText.replaceAll("\u00a0", " "), candidate.content);
 
         await browser.executeAsync((done) => {
             const invoke = window.__TAURI_INTERNALS__?.invoke;

@@ -13,6 +13,7 @@
     "build": "tsc && vite build",
     "check:i18n": "node scripts/check-i18n.mjs",
     "check:identity": "node scripts/check-product-identity.mjs",
+    "check:security": "node scripts/check-security-boundaries.mjs",
     "check:user-copy": "node scripts/check-user-copy.mjs",
     "release:check": "node scripts/release-preflight.mjs",
     "preview": "vite preview",
