@@ -112,9 +112,17 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.refresh();
         const dialog = await $("[role='alertdialog']");
         await dialog.waitForDisplayed({ timeout: 10_000 });
-        assert.equal(await dialog.getText().then((text) => text.includes(candidate.name)), true);
+        const stored = await browser.executeAsync((done) => {
+            window.__TAURI_INTERNALS__.invoke("list_recoveries")
+                .then((entries) => done(entries))
+                .catch((error) => done({ error: String(error) }));
+        });
+        assert.equal(
+            Array.isArray(stored) && stored.some((entry) => entry.documentId === candidate.documentId && entry.name === candidate.name && entry.content === candidate.content),
+            true,
+        );
 
-        const restore = await $("//li[contains(., 'Native Recovery Probe.md')]//button[contains(., '恢复') or contains(., 'Restore')]");
+        const restore = await $("//*[@role='alertdialog']//button[contains(., '恢复') or contains(., 'Restore')]");
         await activate(restore);
         await dialog.waitForDisplayed({ reverse: true });
 
