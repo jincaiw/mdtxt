@@ -44,7 +44,7 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.refresh();
         const dialog = await $("[role='alertdialog']");
         await dialog.waitForDisplayed({ timeout: 20_000 });
-        await browser.execute(() => {
+        const result = await browser.executeAsync((done) => {
             window.__mdtxtNativeMetrics = [];
             if (!window.__mdtxtNativeMetricListener) {
                 window.__mdtxtNativeMetricListener = true;
@@ -52,15 +52,34 @@ describe("mdtxt native Tauri smoke", () => {
                     window.__mdtxtNativeMetrics.push(event.detail);
                 });
             }
+            const button = [...document.querySelectorAll("[role='alertdialog'] button")]
+                .find((candidate) => /恢复|Restore/.test(candidate.textContent ?? ""));
+            if (!(button instanceof HTMLButtonElement)) {
+                done({ error: "Restore button is unavailable" });
+                return;
+            }
+            const started = performance.now();
+            let timeoutId;
+            const finish = () => {
+                if (document.querySelector("[role='alertdialog']") || !document.querySelector(".cm-content")) return false;
+                window.clearTimeout(timeoutId);
+                done({ duration: performance.now() - started, metrics: window.__mdtxtNativeMetrics });
+                return true;
+            };
+            const observer = new MutationObserver(() => {
+                if (finish()) observer.disconnect();
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+            timeoutId = window.setTimeout(() => {
+                observer.disconnect();
+                done({ error: "Restore did not reach an editable Source view within 60 seconds", metrics: window.__mdtxtNativeMetrics });
+            }, 60_000);
+            button.click();
+            finish();
         });
-        const restoreStarted = Date.now();
-        await activate(await $("//*[@role='alertdialog']//button[contains(., '恢复') or contains(., 'Restore')]"));
-        await dialog.waitForDisplayed({ reverse: true, timeout: 60_000 });
-        await $(".cm-content").waitForDisplayed({ timeout: 20_000 });
-        const duration = Date.now() - restoreStarted;
-        const metrics = await browser.execute(() => window.__mdtxtNativeMetrics);
-        console.log(`MDTXT_NATIVE_TRACE ${JSON.stringify(metrics)}`);
-        return duration;
+        console.log(`MDTXT_NATIVE_TRACE ${JSON.stringify(result.metrics ?? [])}`);
+        assert.equal(result.error, undefined, result.error);
+        return result.duration;
     };
 
     it("launches the packaged WebView and renders the welcome screen", async () => {
@@ -211,12 +230,32 @@ describe("mdtxt native Tauri smoke", () => {
         assert.deepEqual(staged, { ok: true, bytes: targetBytes });
 
         const sourceOpenMs = await restoreStagedRecovery();
-        const liveMode = await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
-        await liveMode.waitForDisplayed();
-        const liveStarted = Date.now();
-        await activate(liveMode);
-        await $(".cm-editor[data-mdtxt-live='restricted']").waitForExist({ timeout: 10_000 });
-        const restrictedLiveMs = Date.now() - liveStarted;
+        const restrictedLiveMs = await browser.executeAsync((done) => {
+            const button = document.querySelector("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
+            if (!(button instanceof HTMLButtonElement)) {
+                done({ error: "Live Beta mode is unavailable" });
+                return;
+            }
+            const started = performance.now();
+            let timeoutId;
+            const finish = () => {
+                if (!document.querySelector(".cm-editor[data-mdtxt-live='restricted']")) return false;
+                window.clearTimeout(timeoutId);
+                done(performance.now() - started);
+                return true;
+            };
+            const observer = new MutationObserver(() => {
+                if (finish()) observer.disconnect();
+            });
+            observer.observe(document.body, { attributes: true, childList: true, subtree: true });
+            timeoutId = window.setTimeout(() => {
+                observer.disconnect();
+                done({ error: "Restricted Live did not activate within 20 seconds" });
+            }, 20_000);
+            button.click();
+            finish();
+        });
+        assert.equal(typeof restrictedLiveMs, "number", restrictedLiveMs.error);
 
         console.log(`MDTXT_NATIVE_PERF target=10MiB sourceOpenMs=${sourceOpenMs} restrictedLiveMs=${restrictedLiveMs}`);
         assert.ok(sourceOpenMs <= 3_000, `10 MiB Source open took ${sourceOpenMs} ms`);
