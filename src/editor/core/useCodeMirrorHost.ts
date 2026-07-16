@@ -63,6 +63,7 @@ export function useCodeMirrorHost({
 }: UseCodeMirrorHostOptions) {
     useEffect(() => {
         if (!containerRef.current) return;
+        let inputStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
         const editingKeymap = Prec.highest(keymap.of([
             { key: "Tab", run: (view) => runAction(view, (state) => handleTab(state, false)), shift: (view) => runAction(view, (state) => handleTab(state, true)) },
@@ -107,14 +108,26 @@ export function useCodeMirrorHost({
             }
             if (update.selectionSet || update.docChanged) {
                 onStateChangeRef.current?.(loadedDocumentIdRef.current ?? documentId, update.state);
-                const head = update.state.selection.main.head;
-                const line = update.state.doc.lineAt(head);
-                onCursorChangeRef.current?.(line.number, head - line.from + 1);
-                const selection = update.state.selection.main;
-                onSelectionChangeRef.current?.(selection.from, selection.to);
+                const publishStatus = () => {
+                    const head = update.state.selection.main.head;
+                    const line = update.state.doc.lineAt(head);
+                    onCursorChangeRef.current?.(line.number, head - line.from + 1);
+                    const selection = update.state.selection.main;
+                    onSelectionChangeRef.current?.(selection.from, selection.to);
+                };
+                if (update.docChanged) {
+                    if (inputStatusTimer !== null) clearTimeout(inputStatusTimer);
+                    inputStatusTimer = setTimeout(() => {
+                        inputStatusTimer = null;
+                        publishStatus();
+                    }, 80);
+                } else {
+                    publishStatus();
+                }
                 detectSlash(update.view);
                 detectTable(update.view);
                 if (typewriterRef.current && update.docChanged) {
+                    const head = update.state.selection.main.head;
                     requestAnimationFrame(() => viewRef.current?.dispatch({ effects: EditorView.scrollIntoView(head, { y: "center" }) }));
                 }
             }
@@ -139,7 +152,12 @@ export function useCodeMirrorHost({
         });
         createStateRef.current = createState;
 
-        const view = new EditorView({ parent: containerRef.current, state: sessionState ?? createState(content) });
+        const initialStateStarted = performance.now();
+        const initialState = sessionState ?? createState(content);
+        reportMetric("editor-initial-state", performance.now() - initialStateStarted);
+        const initialViewStarted = performance.now();
+        const view = new EditorView({ parent: containerRef.current, state: initialState });
+        reportMetric("editor-initial-view", performance.now() - initialViewStarted);
         viewRef.current = view;
         loadedDocumentIdRef.current = documentId;
         lastEmittedRef.current = content;
@@ -147,6 +165,7 @@ export function useCodeMirrorHost({
         view.focus();
 
         return () => {
+            if (inputStatusTimer !== null) clearTimeout(inputStatusTimer);
             view.destroy();
             viewRef.current = null;
             createStateRef.current = null;
@@ -155,6 +174,10 @@ export function useCodeMirrorHost({
         // reconfigured by the dedicated session/preferences hooks.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+}
+
+function reportMetric(name: string, duration: number) {
+    window.dispatchEvent(new CustomEvent("mdtxt:editor-metric", { detail: { name, duration } }));
 }
 
 export const LARGE_SOURCE_SYNTAX_LIMIT = 5 * 1024 * 1024;
