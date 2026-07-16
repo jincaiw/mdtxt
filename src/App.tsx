@@ -394,6 +394,13 @@ function AppContent() {
   const editorPerformanceNotice = largeDocumentPerformanceMode
     ? tr("Syntax styling and word wrap paused for this large document")
     : undefined;
+  // Keeping both editor and preview mounted preserves scroll state for normal
+  // documents. A hidden 10 MiB react-markdown tree, however, can monopolize
+  // the WebView immediately after Source opens. Defer only that invisible
+  // large-file render until the user explicitly enters Reader or Split.
+  const renderedPreviewContent = largeDocumentPerformanceMode && mode !== "preview" && mode !== "split"
+    ? ""
+    : presentationContent;
 
   // Heavy document consumers deliberately read this debounced, versioned
   // projection rather than React's legacy editor bridge. This is the P4d-3
@@ -2387,7 +2394,7 @@ function AppContent() {
                   preferable to a spinner that pre-empts the layout. */}
               <Suspense fallback={null}>
                 <MarkdownPreview
-                  content={presentationContent}
+                  content={renderedPreviewContent}
                   fileName={fileName || ""}
                   fileSize={fileSize}
                   onEditClick={handleToggleMode}
