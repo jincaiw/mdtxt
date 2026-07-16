@@ -10,9 +10,10 @@ import Base from "../layouts/Base.astro";
 
     <section class="mt-14 space-y-10 leading-7 text-fg-muted">
       <div><h2 class="text-2xl font-semibold text-fg">打开与编辑</h2><ul class="mt-3 list-disc space-y-2 pl-6"><li>使用 <kbd>Ctrl</kbd> + <kbd>O</kbd> 打开 <code>.md</code> 或 <code>.markdown</code> 文件。</li><li>使用 <kbd>Ctrl</kbd> + <kbd>E</kbd> 在阅读、分栏和源码视图间切换。</li><li>使用 <kbd>Ctrl</kbd> + <kbd>P</kbd> 打开命令面板，使用 <kbd>?</kbd> 查看快捷键。</li></ul></div>
-      <div><h2 class="text-2xl font-semibold text-fg">数据安全</h2><p class="mt-3">mdtxt 保留 Markdown 原文。保存使用同目录原子写入；文件格式、外部冲突和恢复机制会在 0.1.0 发布前继续完成跨平台验证。请在重要修改前保留常规备份。</p></div>
+      <div><h2 class="text-2xl font-semibold text-fg">数据安全</h2><p class="mt-3">mdtxt 保留 Markdown 原文。保存使用同目录临时文件、同步和原子替换；外部变化提供比较、重载、保留本地和另存为，异常退出后的校验恢复会打开为新的未保存标签。预发布阶段仍建议为重要文件保留常规备份。</p></div>
       <div><h2 class="text-2xl font-semibold text-fg">AI 与网络</h2><p class="mt-3">AI 是可选功能。只有在“设置 → AI”配置服务端后才会发送文本；密钥使用系统钥匙串保存。未配置的 mdtxt 构建不检查或下载更新。</p></div>
-      <div><h2 class="text-2xl font-semibold text-fg">安装包</h2><p class="mt-3">公开发布基础设施尚未配置。未来安装包会在 mdtxt 自己的发布渠道提供 Windows、macOS 和 Linux 工件及 SHA256 校验和；请勿从旧产品更新通道下载 mdtxt。</p></div>
+      <div><h2 class="text-2xl font-semibold text-fg">安装包</h2><p class="mt-3">预发布包仅从 <a class="underline" href="https://github.com/jincaiw/mdtxt/releases" rel="noopener">jincaiw/mdtxt Releases</a> 提供，并附统一 SHA256SUMS、SPDX SBOM 与第三方许可证清单。macOS、Windows 和 Linux 包当前未签名，不应视为 GA；请勿从旧产品更新通道下载 mdtxt。</p></div>
+      <div><h2 class="text-2xl font-semibold text-fg">隐私</h2><p class="mt-3">mdtxt 不包含遥测或广告。AI 默认关闭，只向用户自行配置的端点发送明确请求的有限上下文。完整说明见 <a class="underline" href="https://github.com/jincaiw/mdtxt/blob/main/docs/PRIVACY.md" rel="noopener">隐私说明</a>。</p></div>
     </section>
   </main>
 </Base>

@@ -1,8 +1,6 @@
 ---
-import { Image } from "astro:assets";
 import { Icon } from "astro-icon/components";
 import AppWindow from "./AppWindow.astro";
-import mascotWizard from "../assets/mascot/mascot-wizard.png";
 
 const points = [
   {
@@ -42,7 +40,7 @@ const points = [
         AI that <em class="text-gradient">edits</em>, not just chats.
       </h2>
       <p class="mt-4 text-lg text-fg-muted">
-        Most editors bolt on a chatbot. Paperling's Agent proposes real edits to your document as a
+        Most editors bolt on a chatbot. mdtxt Agent proposes real edits to your document as a
         diff you stay in control of. Nothing is written until you say so.
       </p>
 
@@ -63,16 +61,6 @@ const points = [
 
     <!-- Live Agent inline-diff mock -->
     <div class="relative" data-reveal>
-      <!-- Wizard mascot peeking from behind the window, mid-spell -->
-      <Image
-        src={mascotWizard}
-        alt=""
-        aria-hidden="true"
-        widths={[192]}
-        sizes="96px"
-        class="pointer-events-none absolute -top-16 right-10 z-0 h-24 w-24 rotate-3 select-none"
-        loading="lazy"
-      />
       <AppWindow label="notes.md" class="editor-light relative z-10">
         <div class="bg-ink-900 p-3 font-mono text-[13px] leading-relaxed">
           <!-- composer -->
@@ -91,12 +79,12 @@ const points = [
 
             <div class="flex" style="background:var(--diff-del-bg);box-shadow:inset 2px 0 0 var(--diff-del-border)">
               <div class="select-none border-r border-line/40 px-3 py-1 text-right" style="color:var(--diff-del-border)">2</div>
-              <div class="px-3 py-1 line-through" style="color:var(--diff-del-text)">Paperling is a markdown editor for notes.</div>
+              <div class="px-3 py-1 line-through" style="color:var(--diff-del-text)">mdtxt is a markdown editor for notes.</div>
             </div>
 
             <div class="flex" style="background:var(--diff-add-bg);box-shadow:inset 2px 0 0 var(--diff-add-border)">
               <div class="select-none border-r border-line/40 px-3 py-1 text-right" style="color:var(--diff-add-border)">2</div>
-              <div class="px-3 py-1 text-fg">Paperling is a fast, native Markdown editor that renders as you write.</div>
+              <div class="px-3 py-1 text-fg">mdtxt is a fast, native Markdown editor that renders as you write.</div>
             </div>
 
             <div class="flex">

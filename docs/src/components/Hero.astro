@@ -2,10 +2,8 @@
 import { Image } from "astro:assets";
 import { Icon } from "astro-icon/components";
 import splitDark from "../assets/screenshots/split-dark.png";
-import mascotWave from "../assets/mascot/mascot-wave.png";
-
-const repo = "https://github.com/jincaiw/Paperling";
-const releases = "https://github.com/jincaiw/Paperling/releases/latest";
+const repo = "https://github.com/jincaiw/mdtxt";
+const releases = "https://github.com/jincaiw/mdtxt/releases";
 ---
 
 <header id="top" class="relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24">
@@ -17,7 +15,7 @@ const releases = "https://github.com/jincaiw/Paperling/releases/latest";
     <div class="mx-auto max-w-3xl text-center">
       <a href={releases} rel="noopener" class="pill mb-7 hover:border-fg/30" data-reveal>
         <span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-ok)]"></span>
-        v1.0.0 is out · Free &amp; open source
+        v0.1.0 preview · Free &amp; open source
         <Icon name="lucide:arrow-right" class="h-3.5 w-3.5 opacity-60" />
       </a>
 
@@ -29,7 +27,7 @@ const releases = "https://github.com/jincaiw/Paperling/releases/latest";
       </h1>
 
       <p class="mx-auto mt-6 max-w-2xl text-pretty text-lg text-fg-muted md:text-xl" data-reveal>
-        Paperling is a fast, native Markdown editor that renders math, chemistry, and diagrams live as
+        mdtxt is a fast, native Markdown editor that renders math, chemistry, and diagrams as
         you type, with an optional AI that proposes edits you accept or reject right in your text.
       </p>
 
@@ -54,21 +52,10 @@ const releases = "https://github.com/jincaiw/Paperling/releases/latest";
     <!-- Real product screenshot -->
     <div class="relative mx-auto mt-16 max-w-5xl" data-reveal>
       <div class="shot-glow" aria-hidden="true"></div>
-      <!-- Mascot peeking over the window edge: lower half sits behind the
-           editor frame, so it reads as waving from behind the app. -->
-      <Image
-        src={mascotWave}
-        alt=""
-        aria-hidden="true"
-        widths={[160]}
-        sizes="80px"
-        class="mascot-peek pointer-events-none absolute right-8 z-0 h-20 w-20 select-none md:right-14 md:h-24 md:w-24"
-        loading="eager"
-      />
       <div class="editor relative">
         <Image
           src={splitDark}
-          alt="Paperling in split view: syntax-highlighted Markdown source on the left, the live-rendered document with a table, task list, and headings on the right"
+          alt="mdtxt in split view: syntax-highlighted Markdown source on the left and the rendered document on the right"
           widths={[760, 1100, 1600, 1920]}
           sizes="(max-width: 1024px) 100vw, 1024px"
           loading="eager"
@@ -83,17 +70,6 @@ const releases = "https://github.com/jincaiw/Paperling/releases/latest";
 </header>
 
 <style>
-  /* Sits half-hidden behind the editor frame; tilted like it leaned over to wave. */
-  .mascot-peek {
-    top: -3.4rem;
-    rotate: -6deg;
-  }
-  @media (min-width: 768px) {
-    .mascot-peek {
-      top: -4.1rem;
-    }
-  }
-
   /* Brand glow behind the product shot, gives the hero depth without chrome cliches */
   .shot-glow {
     position: absolute;

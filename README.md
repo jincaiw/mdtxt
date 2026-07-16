@@ -2,8 +2,8 @@
 
 > 一款本地优先、默认简体中文、完整支持英语的跨平台 Markdown 编辑器。
 
-mdtxt 直接打开 Markdown 文件，提供源码、阅读和分栏视图；后续版本将以单编辑区
-Live Beta 为核心，同时保留可随时回退的源码模式。文档默认保存在本地，AI 仅在用户
+mdtxt 直接打开 Markdown 文件，提供源码、显式启用的 Live Beta、阅读和分栏视图，
+并始终保留可随时回退的源码模式。文档默认保存在本地，AI 仅在用户
 主动配置服务商后才会发起网络请求。
 
 ## 当前状态
@@ -42,9 +42,10 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 ## 发布
 
-在 mdtxt 的公开发布仓库、签名密钥和更新端点确定前，不提供安装包下载链接或
-自动更新。发布阶段将提供 Windows、macOS 与 Linux 工件、校验和、双语发行说明和
-完整安装文档。
+v0.1.0 通过 mdtxt 专属仓库提供 macOS Apple Silicon、Windows x64 与 Ubuntu LTS
+x64 预发布包，并附统一校验和、SPDX SBOM 与第三方许可证清单。当前产物尚未签名/
+公证，因此不会标记为 GA；自动更新保持关闭。详见
+[发布流程](docs/RELEASE_PROCESS.md)和[隐私说明](docs/PRIVACY.md)。
 
 ## 上游与许可证
 

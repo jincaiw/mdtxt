@@ -9,10 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-07-15
 
-### Changed
+### Added
 
-- Established mdtxt as an independent desktop identity with isolated data and
-  disabled the inherited updater until a mdtxt-owned signed update channel is ready.
+- Independent `mdtxt` desktop identity, isolated application data, Simplified
+  Chinese default interface, and complete English alternate interface.
+- Source, opt-in Live Beta, Split, and Reader workspaces using the Paper palette
+  and a compact low-distraction desktop layout.
+- Versioned per-tab document sessions, external-change comparison, atomic saves,
+  verified crash recovery, and visible post-replacement durability warnings.
+- Optional AI assistance with OS-keychain-only secrets, explicit opt-in,
+  cancellable native requests, bounded context, and review-before-apply edits.
+- HTML, native PDF, and DOCX export with safe HTML cleanup and independent
+  document metadata-language selection.
+- Windows x64, Ubuntu LTS x64, and macOS Apple Silicon preview packages with
+  aggregate checksums, SPDX SBOM, and third-party dependency inventory.
+
+### Security
+
+- Automatic updates remain disabled until mdtxt owns a signed update endpoint.
+- Release builds enforce a strict CSP, exclude the debug automation bridge,
+  reject plaintext AI-key storage, and keep untrusted HTML/Mermaid sanitized.
+
+### Known preview limitations
+
+- Packages are unsigned/not notarized and are published as a prerelease, not GA.
+- Live remains an explicitly enabled Beta; Japanese IME is outside the 0.1.0 scope.
+- Linux PDF export uses the system print dialog.
 
 ## [1.0.50] - 2026-07-13
 

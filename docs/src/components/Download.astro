@@ -1,9 +1,6 @@
 ---
-import { Image } from "astro:assets";
 import { Icon } from "astro-icon/components";
-import sceneCelebration from "../assets/scenes/scene-celebration.png";
-const releases = "https://github.com/jincaiw/Paperling/releases/latest";
-const repo = "https://github.com/jincaiw/Paperling";
+const releases = "https://github.com/jincaiw/mdtxt/releases";
 
 const platforms = [
   {
@@ -18,8 +15,8 @@ const platforms = [
   {
     icon: "simple-icons:linux",
     os: "Linux",
-    note: "Debian/Ubuntu, Fedora, or any distro via AppImage.",
-    formats: ".deb · .rpm · .AppImage",
+    note: "Ubuntu LTS and compatible x64 distributions.",
+    formats: ".deb · .AppImage",
     href: releases,
     cta: "Download for Linux",
     primary: true,
@@ -42,24 +39,11 @@ const platforms = [
     <div class="mx-auto max-w-2xl text-center" data-reveal>
       <p class="mono-label justify-center"><span class="tok-mark">$</span> download</p>
       <h2 class="font-serif-display mt-3 text-[clamp(2.4rem,6vw,4rem)]">
-        Get Paperling. It's free.
+        Get mdtxt. It's free.
       </h2>
       <p class="mt-4 text-lg text-fg-muted">
         Free and open source. Grab the latest release for your platform. No account required.
       </p>
-    </div>
-
-    <!-- Confetti send-off: the mascot celebrating your download decision.
-         Shown UNCROPPED: the scene's own paper background blends with the page. -->
-    <div class="mx-auto mt-10 max-w-3xl" data-reveal>
-      <Image
-        src={sceneCelebration}
-        alt="The Paperling mascot jumping with confetti and paper planes"
-        widths={[760, 1100, 1600]}
-        sizes="(max-width: 1024px) 100vw, 768px"
-        loading="lazy"
-        class="w-full rounded-2xl border border-line"
-      />
     </div>
 
     <div class="mt-10 grid gap-4 md:grid-cols-3">

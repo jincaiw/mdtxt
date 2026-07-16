@@ -60,9 +60,6 @@ jobs:
           - platform: windows-latest
             args: "--target x86_64-pc-windows-msvc"
             portable: true
-          - platform: windows-11-arm
-            args: "--target aarch64-pc-windows-msvc"
-            portable: false
           - platform: ubuntu-24.04
             # Ship the native Debian installer plus a portable AppImage. RPM is
             # not a v0.1.0 target and has repeatedly stalled after the Debian
@@ -122,3 +119,46 @@ jobs:
           $hash = (Get-FileHash $portable -Algorithm SHA256).Hash.ToLower()
           "$hash  $portable" | Set-Content "$portable.sha256" -NoNewline
           gh release upload $env:TAG $portable "$portable.sha256" --clobber
+
+  supply-chain:
+    name: Checksums, SBOM, and third-party licenses
+    needs: [metadata, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.tag }}
+      - id: syft
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: mdtxt-${{ needs.metadata.outputs.version }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Generate third-party license inventory
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          {
+            echo "mdtxt $VERSION third-party dependency inventory"
+            echo "Generated from the release SPDX SBOM. Refer to the SBOM for package URLs and checksums."
+            echo
+            jq -r '.packages[] | [.name, (.versionInfo // "unknown"), (.licenseDeclared // .licenseConcluded // "NOASSERTION")] | @tsv' "mdtxt-$VERSION.spdx.json" | sort -u
+          } > THIRD_PARTY_LICENSES.txt
+      - name: Generate aggregate SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+        run: |
+          mkdir release-assets
+          gh release download "$TAG" --dir release-assets
+          find release-assets -maxdepth 1 -type f ! -name '*.sha256' -print0 | sort -z | xargs -0 sha256sum | sed 's#  release-assets/#  #' > SHA256SUMS
+          test -s SHA256SUMS
+      - name: Upload release evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          gh release upload "$TAG" SHA256SUMS "mdtxt-$VERSION.spdx.json" THIRD_PARTY_LICENSES.txt --clobber
