@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 const persistence = readFileSync("src/utils/persistence.ts", "utf8");
 const tauriConfig = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
 const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
+const capability = readFileSync("src-tauri/capabilities/default.json", "utf8");
 const failures = [];
 
 const plaintextKeyWrites = [
@@ -27,6 +28,9 @@ if (tauriConfig.app?.security?.assetProtocol?.enable !== false) failures.push("T
 if (!/#\[cfg\(debug_assertions\)\][\s\S]{0,500}tauri_plugin_mcp_bridge/.test(tauriLib)) {
     failures.push("desktop automation bridge must be guarded by debug_assertions");
 }
+if (/mcp-bridge|fs:scope|fs:allow-write|tauri_plugin_fs::init/.test(capability + tauriLib)) {
+    failures.push("production WebView capability must not expose debug automation or broad filesystem writes");
+}
 
 if (failures.length) throw new Error(`Security boundary check failed: ${failures.join("; ")}`);
-console.log("Security boundaries passed: keychain-only AI secrets, opt-in AI, strict CSP, debug-only automation bridge.");
+console.log("Security boundaries passed: keychain-only AI, opt-in networking, strict CSP, native-only export writes, and no production automation permission.");

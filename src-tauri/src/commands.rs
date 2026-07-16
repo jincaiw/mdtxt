@@ -15,6 +15,7 @@ const MAX_TEXT_FILE_BYTES: u64 = 50 * 1024 * 1024;
 /// regularly; 25 MB is generous (a 4K PNG screenshot is ~5–10 MB) but blocks a
 /// runaway clipboard payload from filling the user's disk.
 const MAX_IMAGE_BYTES: usize = 25 * 1024 * 1024;
+const MAX_EXPORT_BYTES: usize = 100 * 1024 * 1024;
 
 /// Whitelist of allowed image extensions for `save_image`. Anything else is
 /// refused — prevents a malicious caller from writing an arbitrary `.exe` /
@@ -70,6 +71,12 @@ pub struct FileData {
 pub struct SaveResult {
     pub modified: u64,
     pub hash: String,
+    #[serde(rename = "durabilityWarning")]
+    pub durability_warning: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExportWriteResult {
     #[serde(rename = "durabilityWarning")]
     pub durability_warning: bool,
 }
@@ -459,6 +466,83 @@ async fn save_file_impl(
         hash: content_hash(&bytes),
         durability_warning,
     })
+}
+
+async fn write_export_bytes(
+    path: String,
+    bytes: Vec<u8>,
+    allowed_extension: &str,
+) -> Result<ExportWriteResult, CommandError> {
+    if bytes.len() > MAX_EXPORT_BYTES {
+        return Err(CommandError::TooLarge(format!(
+            "Export is {} MB; maximum is {} MB",
+            bytes.len() / (1024 * 1024),
+            MAX_EXPORT_BYTES / (1024 * 1024),
+        )));
+    }
+    let target = PathBuf::from(&path);
+    let extension = target
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    if !extension.eq_ignore_ascii_case(allowed_extension) {
+        return Err(CommandError::WriteError(format!(
+            "Export path must end in .{allowed_extension}"
+        )));
+    }
+    if let Ok(metadata) = tokio::fs::symlink_metadata(&target).await {
+        if metadata.file_type().is_symlink() {
+            return Err(CommandError::WriteError(format!(
+                "Refusing to replace symbolic link: {path}"
+            )));
+        }
+    }
+
+    let existing = tokio::fs::metadata(&target).await.ok();
+    let tmp = save_temp_path(&target)?;
+    {
+        use tokio::io::AsyncWriteExt;
+        let mut file = tokio::fs::File::create(&tmp)
+            .await
+            .map_err(|error| CommandError::WriteError(error.to_string()))?;
+        if let Some(metadata) = existing {
+            if let Err(error) = tokio::fs::set_permissions(&tmp, metadata.permissions()).await {
+                let _ = tokio::fs::remove_file(&tmp).await;
+                return Err(CommandError::WriteError(error.to_string()));
+            }
+        }
+        if let Err(error) = file.write_all(&bytes).await {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Err(CommandError::WriteError(error.to_string()));
+        }
+        if let Err(error) = file.sync_all().await {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Err(CommandError::WriteError(error.to_string()));
+        }
+    }
+    if let Err(error) = atomic_replace(&tmp, &target).await {
+        let _ = tokio::fs::remove_file(&tmp).await;
+        return Err(CommandError::WriteError(error.to_string()));
+    }
+    Ok(ExportWriteResult {
+        durability_warning: sync_parent_directory(&target, None).await.is_err(),
+    })
+}
+
+#[tauri::command]
+pub async fn write_export_text(
+    path: String,
+    content: String,
+) -> Result<ExportWriteResult, CommandError> {
+    write_export_bytes(path, content.into_bytes(), "html").await
+}
+
+#[tauri::command]
+pub async fn write_export_binary(
+    path: String,
+    bytes: Vec<u8>,
+) -> Result<ExportWriteResult, CommandError> {
+    write_export_bytes(path, bytes, "docx").await
 }
 
 /// Get just the file info without content (for status bar)
@@ -945,9 +1029,45 @@ pub fn set_ai_key(key: String) -> Result<(), String> {
 mod tests {
     use super::{
         apply_eol, content_hash, read_file, sanitize_image_name, save_file, save_file_impl,
-        save_temp_path, search_markdown_tree, validate_rel_path, CommandError, Eol, SaveFault,
+        save_temp_path, search_markdown_tree, validate_rel_path, write_export_binary,
+        write_export_text, CommandError, Eol, SaveFault,
     };
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn export_writes_are_bounded_by_format_and_use_native_atomic_replacement() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let dir = std::env::temp_dir().join(format!("mdtxt-export-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let html = dir.join("note.html");
+            let docx = dir.join("note.docx");
+
+            write_export_text(html.to_string_lossy().into_owned(), "<h1>你好</h1>".into())
+                .await
+                .unwrap();
+            write_export_binary(
+                docx.to_string_lossy().into_owned(),
+                vec![0x50, 0x4b, 0x03, 0x04],
+            )
+            .await
+            .unwrap();
+            assert_eq!(std::fs::read_to_string(&html).unwrap(), "<h1>你好</h1>");
+            assert_eq!(std::fs::read(&docx).unwrap(), [0x50, 0x4b, 0x03, 0x04]);
+
+            let wrong = write_export_text(
+                dir.join("unsafe.exe").to_string_lossy().into_owned(),
+                "no".into(),
+            )
+            .await;
+            assert!(matches!(wrong, Err(CommandError::WriteError(_))));
+            assert!(!dir.join("unsafe.exe").exists());
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
 
     #[test]
     fn search_finds_matches_recursively_and_case_insensitively() {

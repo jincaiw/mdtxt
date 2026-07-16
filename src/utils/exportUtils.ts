@@ -1,6 +1,5 @@
 import { Theme, FontFamily, FontSize } from '../context/ThemeContext';
 import { save } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 
 export type ExportMetadataLanguage = 'document' | 'zh-CN' | 'en';
@@ -491,7 +490,7 @@ export async function exportToHTML(
     });
 
     if (!filePath) return false;
-    await writeTextFile(filePath, fullHTML);
+    await invoke('write_export_text', { path: filePath, content: fullHTML });
     return true;
 }
 

@@ -35,11 +35,7 @@ pub async fn export_pdf(app: tauri::AppHandle, html: String, path: String) -> Re
     // once images are inlined as base64, so stage the HTML in a temp file and
     // load that instead (macOS follows the same route for symmetry).
     let mut temp = std::env::temp_dir();
-    temp.push(format!(
-        "paperling-export-{}-{}.html",
-        std::process::id(),
-        seq
-    ));
+    temp.push(format!("mdtxt-export-{}-{}.html", std::process::id(), seq));
     std::fs::write(&temp, &html).map_err(|e| format!("Failed to stage export HTML: {e}"))?;
 
     let url = tauri::Url::from_file_path(&temp)

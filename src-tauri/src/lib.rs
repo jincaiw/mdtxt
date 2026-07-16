@@ -5,7 +5,7 @@ mod recovery;
 
 use commands::{
     get_ai_key, get_file_info, list_directory_files, read_file, read_image_file, save_file,
-    save_image, search_files, set_ai_key,
+    save_image, search_files, set_ai_key, write_export_binary, write_export_text,
 };
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
@@ -53,7 +53,6 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // UI-automation bridge for the Tauri MCP server. Debug builds
@@ -81,6 +80,8 @@ pub fn run() {
             read_image_file,
             get_ai_key,
             set_ai_key,
+            write_export_text,
+            write_export_binary,
             get_cli_file,
             pdf::export_pdf,
             ai::ai_request,

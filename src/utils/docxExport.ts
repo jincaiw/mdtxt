@@ -1,5 +1,5 @@
 import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
 import type { Theme, FontFamily, FontSize } from "../context/ThemeContext";
 import { prepareExportHtml, resolveExportLanguage, type ExportMetadataLanguage } from "./exportUtils";
 
@@ -66,6 +66,6 @@ export async function exportToDocx(
     const bytes = out instanceof Blob
         ? new Uint8Array(await out.arrayBuffer())
         : out instanceof Uint8Array ? out : new Uint8Array(out as ArrayBuffer);
-    await writeFile(filePath, bytes);
+    await invoke("write_export_binary", { path: filePath, bytes: Array.from(bytes) });
     return true;
 }
