@@ -69,6 +69,7 @@ export class DocumentSessionController {
     private readonly listeners = new Set<SnapshotListener>();
     private activeId: string | null = null;
     private snapshot: DocumentSessionSnapshot = { activeId: null, sessions: [] };
+    private contentEmitTimer: ReturnType<typeof setTimeout> | null = null;
 
     subscribe(listener: SnapshotListener): () => void {
         this.listeners.add(listener);
@@ -164,7 +165,18 @@ export class DocumentSessionController {
     }
 
     replaceContent(id: string, content: string): DocumentSession | null {
-        return this.replace(id, (session) => replaceSessionContent(session, content));
+        const current = this.get(id);
+        if (!current) return null;
+        const next = replaceSessionContent(current, content);
+        if (next === current) return next;
+        this.sessions.set(id, next);
+
+        // Keep the editor transaction authoritative immediately, but avoid a
+        // synchronous full-workspace React render for every key. Publish the
+        // first dirty transition at once, then coalesce preview/autosave reads.
+        if (!isSessionDirty(current) && isSessionDirty(next)) this.emit();
+        else this.scheduleContentEmit();
+        return next;
     }
 
     setViewMode(id: string, viewMode: DocumentViewMode): DocumentSession | null {
@@ -207,11 +219,23 @@ export class DocumentSessionController {
     }
 
     private emit(): void {
+        if (this.contentEmitTimer !== null) {
+            clearTimeout(this.contentEmitTimer);
+            this.contentEmitTimer = null;
+        }
         this.snapshot = {
             activeId: this.activeId,
             sessions: Array.from(this.sessions.values(), summarizeSession),
         };
         this.listeners.forEach((listener) => listener());
+    }
+
+    private scheduleContentEmit(): void {
+        if (this.contentEmitTimer !== null) return;
+        this.contentEmitTimer = setTimeout(() => {
+            this.contentEmitTimer = null;
+            this.emit();
+        }, 80);
     }
 }
 

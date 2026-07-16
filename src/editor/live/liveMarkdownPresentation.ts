@@ -156,8 +156,8 @@ const liveRestrictedAttributes: Extension = [
 ];
 const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
 export const liveMarkdownPresentation: Extension = [liveMarkdownBase, liveAttributes];
-/** Restricted Live intentionally keeps only P6's low-cost source styling. */
-export const restrictedLiveMarkdownPresentation: Extension = [liveMarkdownBase, liveRestrictedAttributes];
+/** Restricted Live avoids the full-document decoration field entirely. */
+export const restrictedLiveMarkdownPresentation: Extension = [liveEditFocusPlugin, liveMarkdownTheme, liveRestrictedAttributes];
 
 /** Reconfigures the isolated Live compartment without rebuilding EditorView. */
 export function useLiveMarkdownPresentation({

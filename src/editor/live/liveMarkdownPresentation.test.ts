@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { liveMarkdownDecorations, liveMarkdownPresentation } from "./liveMarkdownPresentation";
+import { liveMarkdownDecorations, liveMarkdownPresentation, restrictedLiveMarkdownPresentation } from "./liveMarkdownPresentation";
 
 function decorationCount(state: EditorState): number {
     let count = 0;
@@ -30,5 +30,13 @@ describe("liveMarkdownPresentation", () => {
 
         expect(updated.doc.toString()).toBe("# first\n\n**two**\n\n# three\n");
         expect(decorationCount(updated)).toBeGreaterThan(2);
+    });
+
+    it("keeps restricted Live editable without mounting the whole-document decoration field", () => {
+        const source = "# large source\n\n**still text**\n";
+        const state = EditorState.create({ doc: source, extensions: restrictedLiveMarkdownPresentation });
+
+        expect(state.field(liveMarkdownDecorations, false)).toBeUndefined();
+        expect(state.doc.toString()).toBe(source);
     });
 });

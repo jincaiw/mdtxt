@@ -84,11 +84,11 @@ describe("editor selection theming", () => {
                 content="# large heading"
                 onChange={() => {}}
                 wordWrap={false}
-                performanceNotice="Word wrap paused for this large document"
+                performanceNotice="Syntax styling and word wrap paused for this large document"
             />,
         );
         await waitFor(() => expect(container.querySelector(".cm-content")).toBeTruthy());
-        expect(container.querySelector("[role='status']")).toHaveTextContent("Word wrap paused for this large document");
+        expect(container.querySelector("[role='status']")).toHaveTextContent("Syntax styling and word wrap paused for this large document");
         expect(container.querySelector(".cm-lineWrapping")).toBeNull();
     });
 });

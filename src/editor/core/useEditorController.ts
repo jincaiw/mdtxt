@@ -1,10 +1,10 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Compartment, EditorState as CMEditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import type { Scroller } from "../../utils/scrollSync";
 import { useEditorViewportBridge } from "../bridge/useEditorViewportBridge";
 import { useEditorDocumentSession } from "./useEditorDocumentSession";
-import { useCodeMirrorHost } from "./useCodeMirrorHost";
+import { LARGE_SOURCE_SYNTAX_LIMIT, sourceSyntaxExtensions, useCodeMirrorHost } from "./useCodeMirrorHost";
 import { useWikilinkCompletion } from "../interactions/useWikilinkCompletion";
 import { useAIAssistShortcut } from "../interactions/useAIAssistShortcut";
 import { useEditorReview } from "../interactions/useEditorReview";
@@ -76,6 +76,7 @@ export function useEditorController({
     const historyCompRef = useRef(new Compartment());
     const mergeCompRef = useRef(new Compartment());
     const liveCompRef = useRef(new Compartment());
+    const sourceSyntaxCompRef = useRef(new Compartment());
     const openAIBubbleRef = useRef<() => void>(() => {});
     const triggerAIBubble = useCallback(() => openAIBubbleRef.current(), []);
 
@@ -92,7 +93,7 @@ export function useEditorController({
 
     useCodeMirrorHost({
         containerRef, viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef,
-        wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef,
+        wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
         onChangeRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
         typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
         content, wordWrap, spellCheck, liveMode, liveRestricted, detectSlash, detectTable, openFind, handlePaste,
@@ -102,6 +103,14 @@ export function useEditorController({
         onStateChangeRef, documentId, sessionState, content,
     });
     useEditorPreferences({ viewRef, wrapCompRef, spellCompRef, wordWrap, spellCheck });
+    const sourceSyntaxRestricted = content.length > LARGE_SOURCE_SYNTAX_LIMIT;
+    useEffect(() => {
+        viewRef.current?.dispatch({
+            effects: sourceSyntaxCompRef.current.reconfigure(sourceSyntaxExtensions(
+                sourceSyntaxRestricted ? LARGE_SOURCE_SYNTAX_LIMIT + 1 : 0,
+            )),
+        });
+    }, [sourceSyntaxCompRef, sourceSyntaxRestricted, viewRef]);
     useLiveMarkdownPresentation({ viewRef, liveCompRef, enabled: liveMode, restricted: liveRestricted, documentId });
     useEditorViewportBridge({ viewRef, onScrollFractionRef, registerScroller });
 

@@ -110,7 +110,7 @@ const zhCN = {
     "Limited Live: ": "受限 Live：",
     "document exceeds 5 MiB": "文档超过 5 MiB",
     "document exceeds 100,000 lines": "文档超过 100,000 行",
-    "Word wrap paused for this large document": "已为此大文档暂停自动换行",
+    "Syntax styling and word wrap paused for this large document": "已为此大文档暂停语法样式和自动换行",
     "a line exceeds 32,000 characters": "单行超过 32,000 个字符",
     "too many complex blocks": "复杂块数量过多",
     "View mode toggle": "切换视图模式",

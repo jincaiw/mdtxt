@@ -350,10 +350,13 @@ function AppContent() {
     ? sessionSummaryById.get(sessionSnapshot.activeId) ?? null
     : null;
   isDirty = activeSessionSummary?.dirty ?? false;
-  const activeSessionRead = useMemo(
-    () => activeSessionSummary ? sessionController.read(activeSessionSummary.id) : null,
-    [activeSessionSummary?.id, activeSessionSummary?.version, sessionController],
-  );
+  // Read the controller's current immutable value on every React render. Its
+  // metadata notification may be deliberately coalesced during typing, so a
+  // memo keyed by the older summary version could feed stale source back into
+  // CodeMirror after an unrelated cursor/selection render.
+  const activeSessionRead = activeSessionSummary
+    ? sessionController.read(activeSessionSummary.id)
+    : null;
   const presentationSnapshot = useDocumentPresentationSnapshot(activeSessionRead);
   const presentationContent = presentationSnapshot?.value ?? "";
   const editorContent = activeSessionRead?.value ?? "";
@@ -381,7 +384,7 @@ function AppContent() {
   const largeDocumentPerformanceMode = fileSize > LIVE_LIMITS.maxBytes || editorContent.length > LIVE_LIMITS.maxBytes;
   const effectiveWordWrap = wordWrapEnabled && !largeDocumentPerformanceMode;
   const editorPerformanceNotice = largeDocumentPerformanceMode
-    ? tr("Word wrap paused for this large document")
+    ? tr("Syntax styling and word wrap paused for this large document")
     : undefined;
 
   // Heavy document consumers deliberately read this debounced, versioned

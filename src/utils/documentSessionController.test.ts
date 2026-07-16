@@ -77,6 +77,28 @@ describe("DocumentSessionController", () => {
         expect(listener).toHaveBeenCalledTimes(2);
     });
 
+    it("keeps content current while coalescing repeated dirty revision notifications", () => {
+        vi.useFakeTimers();
+        try {
+            const controller = new DocumentSessionController();
+            controller.open(input("a"));
+            controller.replaceContent("a", "first changed");
+            const listener = vi.fn();
+            controller.subscribe(listener);
+
+            controller.replaceContent("a", "second changed");
+            controller.replaceContent("a", "third changed");
+
+            expect(controller.readActive()).toMatchObject({ version: 3, value: "third changed" });
+            expect(listener).not.toHaveBeenCalled();
+            vi.advanceTimersByTime(80);
+            expect(listener).toHaveBeenCalledTimes(1);
+            expect(controller.getSnapshot().sessions[0]).toMatchObject({ version: 3, dirty: true });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("does not let old saves or async results apply to a newer revision", () => {
         const controller = new DocumentSessionController();
         controller.open(input("a"));

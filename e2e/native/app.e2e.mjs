@@ -15,7 +15,8 @@ describe("mdtxt native Tauri smoke", () => {
         // Keep the 10 MiB fixture representative of a large prose/source
         // document (~10k lines), rather than accidentally constructing more
         // than 400k tiny lines and benchmarking the separate line-count gate.
-        const line = `plain markdown input ${"x".repeat(1000)}\n`;
+        const payloadWidth = bytes <= 1024 * 1024 ? 100 : 1000;
+        const line = `plain markdown input ${"x".repeat(payloadWidth)}\n`;
         const repeated = line.repeat(Math.ceil((bytes - prefix.length) / line.length));
         const content = `${prefix}${repeated}`.slice(0, bytes - 1) + "\n";
         const timestamp = Date.now();

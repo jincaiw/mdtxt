@@ -30,6 +30,7 @@ interface UseCodeMirrorHostOptions {
     historyCompRef: RefObject<Compartment>;
     mergeCompRef: RefObject<Compartment>;
     liveCompRef: RefObject<Compartment>;
+    sourceSyntaxCompRef: RefObject<Compartment>;
     onChangeRef: RefObject<((content: string) => void) | undefined>;
     onStateChangeRef: RefObject<((documentId: string, state: CMEditorState) => void) | undefined>;
     onCursorChangeRef: RefObject<((line: number, column: number) => void) | undefined>;
@@ -53,7 +54,7 @@ interface UseCodeMirrorHostOptions {
 /** Owns the one-time CodeMirror view and its stable extension protocol. */
 export function useCodeMirrorHost({
     containerRef, viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef,
-    wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef,
+    wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
     onChangeRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
     typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
     content, wordWrap, spellCheck, liveMode, liveRestricted, detectSlash, detectTable, openFind, handlePaste,
@@ -118,7 +119,7 @@ export function useCodeMirrorHost({
                 lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(),
                 historyCompRef.current.of(history()), drawSelection(), dropCursor(), closeBrackets(),
                 autocompletion({ override: [wikiCompletionSource], icons: false, aboveCursor: false }),
-                markdown({ base: markdownLanguage }), markdownPresentationExtensions, editorTheme,
+                sourceSyntaxCompRef.current.of(sourceSyntaxExtensions(doc.length)), editorTheme,
                 wrapCompRef.current.of(wordWrap ? EditorView.lineWrapping : []),
                 spellCompRef.current.of(EditorView.contentAttributes.of(spellcheckAttributes(spellCheck))),
                 mergeCompRef.current.of([]), editingKeymap,
@@ -147,6 +148,16 @@ export function useCodeMirrorHost({
         // reconfigured by the dedicated session/preferences hooks.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+}
+
+export const LARGE_SOURCE_SYNTAX_LIMIT = 5 * 1024 * 1024;
+
+export function sourceSyntaxExtensions(documentLength: number) {
+    // Preserve exact editable source and undo history above the documented
+    // large-file threshold without forcing an eager multi-megabyte parse.
+    return documentLength > LARGE_SOURCE_SYNTAX_LIMIT
+        ? []
+        : [markdown({ base: markdownLanguage }), markdownPresentationExtensions];
 }
 
 function runAction(view: EditorView, action: (state: EditorState) => EditorResult | null): boolean {
