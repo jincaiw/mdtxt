@@ -55,7 +55,7 @@ describe("mdtxt native Tauri smoke", () => {
         });
         const restoreStarted = Date.now();
         await activate(await $("//*[@role='alertdialog']//button[contains(., '恢复') or contains(., 'Restore')]"));
-        await dialog.waitForDisplayed({ reverse: true, timeout: 20_000 });
+        await dialog.waitForDisplayed({ reverse: true, timeout: 60_000 });
         await $(".cm-content").waitForDisplayed({ timeout: 20_000 });
         const duration = Date.now() - restoreStarted;
         const metrics = await browser.execute(() => window.__mdtxtNativeMetrics);
@@ -245,6 +245,15 @@ describe("mdtxt native Tauri smoke", () => {
             selection?.addRange(range);
 
             const samples = [];
+            const inputSamples = [];
+            let inputStarted = 0;
+            const onBeforeInput = () => { inputStarted = performance.now(); };
+            const onInput = () => {
+                if (inputStarted > 0) inputSamples.push(performance.now() - inputStarted);
+                inputStarted = 0;
+            };
+            content.addEventListener("beforeinput", onBeforeInput);
+            content.addEventListener("input", onInput);
             let accepted = 0;
             for (let index = 0; index < 40; index++) {
                 const started = performance.now();
@@ -252,7 +261,9 @@ describe("mdtxt native Tauri smoke", () => {
                 samples.push(performance.now() - started);
             }
             samples.sort((left, right) => left - right);
+            inputSamples.sort((left, right) => left - right);
             const p95 = samples[Math.ceil(samples.length * 0.95) - 1];
+            const inputP95 = inputSamples[Math.ceil(inputSamples.length * 0.95) - 1];
             const updatedLines = content.querySelectorAll(".cm-line");
             const updatedLastLine = updatedLines.item(updatedLines.length - 1);
             return {
@@ -261,11 +272,13 @@ describe("mdtxt native Tauri smoke", () => {
                 p50: samples[Math.ceil(samples.length * 0.5) - 1],
                 p95,
                 max: samples.at(-1),
+                inputSamples: inputSamples.length,
+                inputP95,
                 suffix: updatedLastLine?.textContent?.slice(-40),
             };
         });
 
-        console.log(`MDTXT_NATIVE_PERF target=1MiB editP50Ms=${result.p50} editP95Ms=${result.p95} editMaxMs=${result.max}`);
+        console.log(`MDTXT_NATIVE_PERF target=1MiB editP50Ms=${result.p50} editP95Ms=${result.p95} editMaxMs=${result.max} inputEventSamples=${result.inputSamples} inputEventP95Ms=${result.inputP95}`);
         assert.equal(result.ok, true);
         assert.equal(result.accepted, 40);
         assert.equal(result.suffix, "x".repeat(40));

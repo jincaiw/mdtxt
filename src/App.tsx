@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, useSyncExternalStore, lazy, Suspense } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, useSyncExternalStore, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save, ask } from "@tauri-apps/plugin-dialog";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
@@ -349,6 +349,14 @@ function AppContent() {
   const activeSessionSummary = sessionSnapshot.activeId
     ? sessionSummaryById.get(sessionSnapshot.activeId) ?? null
     : null;
+  const recoveryRenderStartedRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (recoveryRenderStartedRef.current === null) return;
+    window.dispatchEvent(new CustomEvent("mdtxt:editor-metric", {
+      detail: { name: "restore-react-commit", duration: performance.now() - recoveryRenderStartedRef.current },
+    }));
+    recoveryRenderStartedRef.current = null;
+  }, [activeSessionSummary?.id]);
   isDirty = activeSessionSummary?.dirty ?? false;
   // Read the controller's current immutable value on every React render. Its
   // metadata notification may be deliberately coalesced during typing, so a
@@ -1424,6 +1432,7 @@ function AppContent() {
   const restoreRecoveryEntries = useCallback((entries: import("./components/RecoveryDialog").RecoveryCandidate[]) => {
     if (entries.length === 0) return;
     const restoreStarted = performance.now();
+    recoveryRenderStartedRef.current = restoreStarted;
     snapshotActiveTab();
     const ordered = orderRecoveryEntries(entries);
     const restored = ordered.map((entry) => ({
