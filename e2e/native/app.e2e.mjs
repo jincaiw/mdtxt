@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
 describe("mdtxt native Tauri smoke", () => {
+    const activate = async (element) => {
+        await browser.execute((target) => target.click(), element);
+    };
+
     it("launches the packaged WebView and renders the welcome screen", async () => {
         const title = await $("h1=mdtxt");
         await title.waitForDisplayed();
@@ -42,11 +46,12 @@ describe("mdtxt native Tauri smoke", () => {
         // same settings button is user-clickable (covered by the preceding
         // welcome-screen test). Activate the control through the DOM here so
         // this test stays focused on the settings-to-Live integration.
-        await browser.execute((element) => element.click(), settings);
+        await activate(settings);
         const moreSettings = await $("//button[contains(., '更多设置') or contains(., 'More settings')]");
-        await moreSettings.click();
+        await moreSettings.waitForDisplayed();
+        await activate(moreSettings);
         await $("[role='dialog'][aria-label='设置'], [role='dialog'][aria-label='Settings']").waitForDisplayed();
-        await $("//button[contains(., '编辑器') or normalize-space(.)='Editor']").click();
+        await activate(await $("//button[contains(., '编辑器') or normalize-space(.)='Editor']"));
 
         const switches = await $$("[role='switch']");
         let liveSwitch = null;
@@ -57,21 +62,21 @@ describe("mdtxt native Tauri smoke", () => {
             }
         }
         assert.ok(liveSwitch, "Live Beta settings switch must exist");
-        await liveSwitch.click();
-        await $("button[aria-label='关闭设置'], button[aria-label='Close settings']").click();
+        await activate(liveSwitch);
+        await activate(await $("button[aria-label='关闭设置'], button[aria-label='Close settings']"));
 
         const liveMode = await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
         await liveMode.waitForDisplayed();
         const editor = await $(".cm-content");
         await editor.setValue("# Native smoke\n\n## Modes\n\n- Source\n- Live\n- Split\n- Reader");
 
-        await liveMode.click();
+        await activate(liveMode);
         await $(".cm-editor[data-mdtxt-live='true']").waitForExist();
         assert.equal(await $(".cm-editor[data-mdtxt-live='true'] .cm-gutters").getCSSProperty("display").then((v) => v.value), "none");
 
-        await $("button[aria-label='分栏视图'], button[aria-label='Split view']").click();
+        await activate(await $("button[aria-label='分栏视图'], button[aria-label='Split view']"));
         await $(".markdown-body").waitForDisplayed();
-        await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']").click();
+        await activate(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']"));
         assert.equal(await $(".markdown-body").isDisplayed(), true);
     });
 });
