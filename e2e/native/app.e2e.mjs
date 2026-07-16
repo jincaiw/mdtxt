@@ -15,5 +15,58 @@ describe("mdtxt native Tauri smoke", () => {
         const menu = await $("[role='menu'][aria-label='Settings'], [role='menu'][aria-label='设置']");
         await menu.waitForDisplayed();
         assert.equal(await menu.isDisplayed(), true);
+        await settings.click();
+        await browser.waitUntil(async () => (await settings.getAttribute("aria-expanded")) !== "true");
+    });
+
+    it("exposes the approved workspace modes and keeps Live behind explicit opt-in", async () => {
+        const newFile = await $("//button[contains(., '新建文件') or contains(., 'New File')]");
+        await newFile.click();
+
+        await browser.pause(250);
+        const tour = await $("[role='dialog'][aria-label='欢迎导览'], [role='dialog'][aria-label='Welcome tour']");
+        if (await tour.isExisting()) {
+            await browser.keys(["Escape"]);
+            await tour.waitForDisplayed({ reverse: true });
+        }
+
+        await $("[role='group'][aria-label='切换视图模式'], [role='group'][aria-label='View mode toggle']").waitForDisplayed();
+        assert.equal(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']").getAttribute("aria-pressed"), "true");
+        assert.equal(await $("button[aria-label='分栏视图'], button[aria-label='Split view']").isDisplayed(), true);
+        assert.equal(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']").isDisplayed(), true);
+        assert.equal(await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']").isExisting(), false);
+
+        const settings = await $("button[aria-label='Settings'], button[aria-label='设置']");
+        await settings.click();
+        const moreSettings = await $("//button[contains(., '更多设置') or contains(., 'More settings')]");
+        await moreSettings.click();
+        await $("[role='dialog'][aria-label='设置'], [role='dialog'][aria-label='Settings']").waitForDisplayed();
+        await $("//button[contains(., '编辑器') or normalize-space(.)='Editor']").click();
+
+        const switches = await $$("[role='switch']");
+        let liveSwitch = null;
+        for (const candidate of switches) {
+            if ((await candidate.getText()).includes("Live Beta")) {
+                liveSwitch = candidate;
+                break;
+            }
+        }
+        assert.ok(liveSwitch, "Live Beta settings switch must exist");
+        await liveSwitch.click();
+        await $("button[aria-label='关闭设置'], button[aria-label='Close settings']").click();
+
+        const liveMode = await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
+        await liveMode.waitForDisplayed();
+        const editor = await $(".cm-content");
+        await editor.setValue("# Native smoke\n\n## Modes\n\n- Source\n- Live\n- Split\n- Reader");
+
+        await liveMode.click();
+        await $(".cm-editor[data-mdtxt-live='true']").waitForExist();
+        assert.equal(await $(".cm-editor[data-mdtxt-live='true'] .cm-gutters").getCSSProperty("display").then((v) => v.value), "none");
+
+        await $("button[aria-label='分栏视图'], button[aria-label='Split view']").click();
+        await $(".markdown-body").waitForDisplayed();
+        await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']").click();
+        assert.equal(await $(".markdown-body").isDisplayed(), true);
     });
 });

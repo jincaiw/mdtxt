@@ -219,12 +219,17 @@ jobs:
     # The native driver launches a full WebKit process under Xvfb. Bound it
     # independently so a driver teardown issue cannot stall all release proof.
     timeout-minutes: 30
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Linux WebView and WebDriver dependencies
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf webkit2gtk-driver xvfb
@@ -244,4 +249,10 @@ jobs:
         run: cargo install tauri-driver --locked
 
       - name: Run native WebView smoke tests
-        run: xvfb-run --auto-servernum bun run test:native
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            xvfb-run --auto-servernum bun run test:native
+          else
+            bun run test:native
+          fi
