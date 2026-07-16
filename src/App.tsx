@@ -128,7 +128,7 @@ import {
 } from "./utils/documentSession";
 import { DocumentSessionController } from "./utils/documentSessionController";
 import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
-import { assessLiveEligibility, selectLiveEligibilitySource } from "./editor/live/liveEligibility";
+import { assessLiveEligibility, LIVE_LIMITS, selectLiveEligibilitySource } from "./editor/live/liveEligibility";
 import { latestRecoveryBatch, orderRecoveryEntries, recoveredDraftName, selectRecoveredActive } from "./utils/recoveryModel";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
@@ -375,6 +375,14 @@ function AppContent() {
     } as const;
     return `${tr("Limited Live: ")}${liveEligibility.reasons.map((reason) => labels[reason]).join(", ")}`;
   }, [liveEligibility, tr]);
+  // Wrapping multi-megabyte documents can expand the viewport into hundreds
+  // of thousands of visual lines before the first editable frame. Pause it
+  // for this document only; the user's preference itself remains unchanged.
+  const largeDocumentPerformanceMode = fileSize > LIVE_LIMITS.maxBytes || editorContent.length > LIVE_LIMITS.maxBytes;
+  const effectiveWordWrap = wordWrapEnabled && !largeDocumentPerformanceMode;
+  const editorPerformanceNotice = largeDocumentPerformanceMode
+    ? tr("Word wrap paused for this large document")
+    : undefined;
 
   // Heavy document consumers deliberately read this debounced, versioned
   // projection rather than React's legacy editor bridge. This is the P4d-3
@@ -2315,11 +2323,12 @@ function AppContent() {
                 registerScroller={registerCodeScroller}
                 typewriterMode={typewriterModeEnabled}
                 showToolbar={toolbarVisible}
-                wordWrap={wordWrapEnabled}
+                wordWrap={effectiveWordWrap}
                 spellCheck={spellCheckEnabled}
                 liveMode={mode === "live" && liveBetaEnabled}
                 liveRestricted={liveEligibility?.restricted ?? false}
                 liveRestrictionReason={liveRestrictionReason}
+                performanceNotice={editorPerformanceNotice}
                 aiConfig={aiConfig}
                 reviewDoc={proposedDoc?.content ?? null}
                 onReviewResolve={handleReviewResolve}

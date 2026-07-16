@@ -218,7 +218,8 @@ describe("mdtxt native Tauri smoke", () => {
 
         const result = await browser.execute(() => {
             const content = document.querySelector(".cm-content");
-            const lastLine = content?.querySelector(".cm-line:last-child");
+            const lines = content?.querySelectorAll(".cm-line");
+            const lastLine = lines?.item(lines.length - 1);
             if (!(content instanceof HTMLElement) || !(lastLine instanceof HTMLElement)) {
                 return { ok: false, error: "CodeMirror content is unavailable" };
             }

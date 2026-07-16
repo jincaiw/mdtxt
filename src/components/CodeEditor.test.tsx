@@ -76,4 +76,19 @@ describe("editor selection theming", () => {
         expect(container.querySelector(".cm-editor")).toHaveAttribute("data-mdtxt-live", "restricted");
         expect(container.querySelector("[role='status']")).toHaveTextContent("Limited Live: large document");
     });
+
+    it("discloses the reversible large-document word-wrap downgrade", async () => {
+        const { container } = render(
+            <CodeEditor
+                documentId="large-source"
+                content="# large heading"
+                onChange={() => {}}
+                wordWrap={false}
+                performanceNotice="Word wrap paused for this large document"
+            />,
+        );
+        await waitFor(() => expect(container.querySelector(".cm-content")).toBeTruthy());
+        expect(container.querySelector("[role='status']")).toHaveTextContent("Word wrap paused for this large document");
+        expect(container.querySelector(".cm-lineWrapping")).toBeNull();
+    });
 });
