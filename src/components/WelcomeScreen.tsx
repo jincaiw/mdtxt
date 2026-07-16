@@ -29,7 +29,7 @@ const parentFolderOf = (path: string): string => {
     return segs.slice(-2).join("/") || segs.join("/");
 };
 
-export function WelcomeScreen({ onOpenFile, onNewFile, onOpenSettings, onFileDrop, onOpenRecent }: WelcomeScreenProps) {
+export function WelcomeScreen({ onOpenFile, onNewFile, onFileDrop, onOpenRecent }: WelcomeScreenProps) {
     const { locale, t } = useLocale();
     const [recents, setRecents] = useState<RecentFile[]>([]);
     const [missing, setMissing] = useState<Set<string>>(new Set());
@@ -135,76 +135,59 @@ export function WelcomeScreen({ onOpenFile, onNewFile, onOpenSettings, onFileDro
             // can be taller than the viewport, which causes flexbox to push
             // the top edge (the logo) above the scrollable area — invisible
             // unless the user scrolls up.
-            className={`flex-1 flex flex-col items-center justify-start py-10 px-6 no-select overflow-y-auto transition-colors ${isDragging ? "bg-[var(--bg-hover)] outline outline-2 outline-dashed outline-[var(--accent)] -outline-offset-8" : ""}`}
+            className={`flex-1 flex flex-col items-center justify-start py-8 px-6 no-select overflow-y-auto transition-colors ${isDragging ? "bg-[var(--bg-hover)] outline outline-2 outline-dashed outline-[var(--accent)] -outline-offset-8" : ""}`}
             aria-dropeffect="copy"
         >
-            <div className="flex flex-col items-center gap-8 max-w-md w-full text-center animate-fade-in-up">
-                <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--accent)]">
-                    <span className="material-symbols-outlined text-[40px]" aria-hidden="true">description</span>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+            <div className="flex w-full max-w-[360px] flex-col items-center text-center animate-fade-in-up">
+                <div className="flex flex-col items-center">
+                    <h1 className="font-serif text-[42px] font-normal leading-none tracking-[-0.03em] text-[var(--accent)]">
                         mdtxt
                     </h1>
-                    <p className="text-sm text-[var(--text-secondary)]">
-                        {t("A minimal markdown editor")}
+                    <span className="mt-2 text-[11px] tabular-nums text-[var(--text-muted)]">0.1.0</span>
+                    <p className="mt-2 text-[13px] text-[var(--text-secondary)]">
+                        {t("Focused Markdown writing")}
                     </p>
                 </div>
 
-                <div className="flex gap-2 items-center">
+                <div className="mt-7 flex w-[240px] flex-col gap-2">
                     <button
                         onClick={onOpenFile}
-                        className="btn-press flex items-center gap-2 bg-[var(--accent)] hover:opacity-90 text-[var(--accent-text)] font-medium text-sm px-5 py-2.5 rounded-[var(--radius-md)] transition-all duration-200"
+                        className="btn-press flex h-10 w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--accent)] px-5 text-[13px] font-medium text-[var(--accent-text)] transition-all duration-200 hover:opacity-90"
                     >
-                        <span className="material-symbols-outlined text-[20px]">folder_open</span>
+                        <span className="material-symbols-outlined text-[17px]">folder_open</span>
                         <span>{t("Open File")}</span>
                     </button>
                     {onNewFile && (
                         <button
                             onClick={onNewFile}
-                            className="btn-press flex items-center gap-2 bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] border border-[var(--border)] font-medium text-sm px-5 py-2.5 rounded-[var(--radius-md)] transition-all duration-200"
+                            className="btn-press flex h-10 w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg-primary)] px-5 text-[13px] font-medium text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--bg-hover)]"
                         >
-                            <span className="material-symbols-outlined text-[20px]">edit_note</span>
+                            <span className="material-symbols-outlined text-[17px]">edit_note</span>
                             <span>{t("New File")}</span>
-                        </button>
-                    )}
-                    {onOpenSettings && (
-                        <button
-                            onClick={onOpenSettings}
-                            aria-label={t("Settings")}
-                            title={t("Settings (Ctrl+,)")}
-                            className="btn-press flex items-center justify-center w-10 h-10 rounded-[var(--radius-md)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] transition-all duration-200"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">settings</span>
                         </button>
                     )}
                 </div>
 
-                <p className="text-xs text-[var(--text-muted)]">
-                    {t("Welcome drop prefix")}<code className="bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border)]">.md</code>{t("Welcome drop after file")}<kbd className="px-1 py-0.5 font-mono rounded border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]">Ctrl+P</kbd>{t("Welcome drop after palette")}<kbd className="px-1 py-0.5 font-mono rounded border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]">?</kbd>{t("Welcome drop suffix")}
-                </p>
-
                 {recents.length > 0 && onOpenRecent && (
-                    <div className="w-full mt-4 text-left">
-                        <div className="flex items-center justify-between mb-2 px-1">
-                            <div className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                    <section className="mt-7 w-full text-left" aria-label={t("Recent files")}>
+                        <div className="mb-2 flex items-center justify-between px-1">
+                            <div className="text-[11px] font-medium text-[var(--text-secondary)]">
                                 {t("Recent")}
                             </div>
                             <button
                                 onClick={handleClearAll}
                                 aria-label={t("Clear all recent files")}
                                 title={t("Clear all recents")}
-                                className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors px-1.5 py-0.5 rounded"
+                                className="rounded px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] transition-colors hover:text-[var(--danger)]"
                             >
-                                {t("Clear all")}
+                                {t("More")} ›
                             </button>
                         </div>
-                        <ul className="flex flex-col">
-                            {recents.map((f) => {
+                        <ul className="flex flex-col overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg-primary)]">
+                            {recents.slice(0, 5).map((f) => {
                                 const isMissing = missing.has(f.path);
                                 return (
-                                <li key={f.path} className="group relative">
+                                <li key={f.path} className="group relative border-b border-[var(--border-subtle)] last:border-b-0">
                                     {/* Two siblings instead of nested buttons:
                                         the previous form had a `<span
                                         role="button">` inside a `<button>`,
@@ -215,15 +198,15 @@ export function WelcomeScreen({ onOpenFile, onNewFile, onOpenSettings, onFileDro
                                     <button
                                         onClick={() => !isMissing && onOpenRecent(f.path)}
                                         disabled={isMissing}
-                                        className={`btn-press w-full flex items-center gap-3 px-3 pr-9 py-2 rounded-[var(--radius-md)] transition-colors text-left ${isMissing ? "opacity-50 cursor-not-allowed" : "hover:bg-[var(--bg-hover)]"}`}
+                                        className={`btn-press flex h-9 w-full items-center gap-2 px-2.5 pr-9 text-left transition-colors ${isMissing ? "cursor-not-allowed opacity-50" : "hover:bg-[var(--bg-hover)]"}`}
                                         title={isMissing ? `${f.path} (${t("missing")})` : f.path}
                                     >
-                                        <span className="material-symbols-outlined text-[18px] text-[var(--text-secondary)] shrink-0">
+                                        <span className="material-symbols-outlined shrink-0 text-[15px] text-[var(--text-secondary)]">
                                             {isMissing ? "broken_image" : "description"}
                                         </span>
                                         <div className="flex-1 min-w-0">
-                                            <div className={`text-sm truncate ${isMissing ? "line-through text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{f.name}</div>
-                                            <div className="text-[11px] text-[var(--text-muted)] truncate">{parentFolderOf(f.path)}</div>
+                                            <div className={`truncate text-[11px] ${isMissing ? "line-through text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{f.name}</div>
+                                            <div className="sr-only">{parentFolderOf(f.path)}</div>
                                         </div>
                                         <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">{isMissing ? t("missing") : formatRelative(f.openedAt, locale)}</span>
                                     </button>
@@ -240,8 +223,16 @@ export function WelcomeScreen({ onOpenFile, onNewFile, onOpenSettings, onFileDro
                                 );
                             })}
                         </ul>
-                    </div>
+                    </section>
                 )}
+
+                <div className="mt-7 flex min-h-16 w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--border)] text-[11px] text-[var(--text-muted)]">
+                    <span className="material-symbols-outlined text-[16px]" aria-hidden="true">description</span>
+                    <span className="flex flex-col items-start gap-0.5">
+                        <span className="text-[var(--text-secondary)]">{t("Drop files here to open")}</span>
+                        <span className="text-[10px]">{t("Supports .md, .txt, and .markdown")}</span>
+                    </span>
+                </div>
             </div>
         </main>
     );

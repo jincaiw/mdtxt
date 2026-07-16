@@ -112,10 +112,10 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
             >
                 {/* Left: Icon & Title */}
                 <div className="flex min-w-0 items-center gap-2 no-drag">
-                    <div className="flex items-center justify-center w-5 h-5">
+                    {hasFile && <div className="flex items-center justify-center w-5 h-5">
                         <img src="/icon.svg" alt="mdtxt" className="w-full h-full" />
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] min-w-0">
+                    </div>}
+                    {hasFile && <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] min-w-0">
                         {parentFolder && (
                             <>
                                 <span className="opacity-60 hidden md:inline">{parentFolder} /</span>
@@ -124,13 +124,10 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                         <span className="text-[var(--text-primary)] font-semibold tracking-tight truncate max-w-[28vw]">
                             {fileName || "mdtxt"}
                         </span>
-                        {!fileName && (
-                            <span className="text-[var(--text-muted)] text-xs ml-1 hidden sm:inline">— {t("drop a .md file or Ctrl+O")}</span>
-                        )}
                         {isDirty && (
                             <span className="text-[var(--status-unsaved)] ml-1 italic text-xs">— {t("Edited")}</span>
                         )}
-                    </div>
+                    </div>}
 
                     {/* Open File / New Button - shown when a file is already open */}
                     {hasFile && onOpenFile && (
@@ -182,6 +179,7 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                 </div>
 
                 <div className="flex items-center justify-center px-3">
+                    {!hasFile && <span className="text-[12px] font-medium tracking-tight text-[var(--text-primary)]">mdtxt</span>}
                     {hasFile && mode && onSetMode && (
                         <ModeToggle mode={mode} onSetMode={onSetMode} liveEnabled={liveEnabled} />
                     )}
