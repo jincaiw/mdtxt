@@ -79,4 +79,63 @@ describe("mdtxt native Tauri smoke", () => {
         await activate(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']"));
         assert.equal(await $(".markdown-body").isDisplayed(), true);
     });
+
+    it("round-trips a verified native recovery entry into an unsaved draft", async () => {
+        const candidate = {
+            documentId: `native-recovery-${Date.now()}`,
+            path: null,
+            name: "Native Recovery Probe.md",
+            content: "# Native recovery\n\nWindows and Linux keep these bytes intact.\n",
+            version: 7,
+            context: {
+                recoverySessionId: `native-session-${Date.now()}`,
+                tabIndex: 0,
+                wasActive: true,
+                cursorLine: 3,
+            },
+        };
+
+        const written = await browser.executeAsync((entry, done) => {
+            const invoke = window.__TAURI_INTERNALS__?.invoke;
+            if (!invoke) {
+                done({ ok: false, error: "Tauri invoke bridge is unavailable" });
+                return;
+            }
+            invoke("list_recoveries")
+                .then((existing) => Promise.all(existing.map((item) => invoke("discard_recovery", { documentId: item.documentId }))))
+                .then(() => invoke("write_recovery", entry))
+                .then(() => done({ ok: true }))
+                .catch((error) => done({ ok: false, error: String(error) }));
+        }, candidate);
+        assert.deepEqual(written, { ok: true });
+
+        await browser.refresh();
+        const dialog = await $("[role='alertdialog']");
+        await dialog.waitForDisplayed({ timeout: 10_000 });
+        assert.equal(await dialog.getText().then((text) => text.includes(candidate.name)), true);
+
+        const restore = await $("//li[contains(., 'Native Recovery Probe.md')]//button[contains(., '恢复') or contains(., 'Restore')]");
+        await activate(restore);
+        await dialog.waitForDisplayed({ reverse: true });
+
+        const recovered = await $(".cm-content");
+        await recovered.waitForDisplayed();
+        const recoveredText = await browser.execute(
+            (element) => [...element.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\n"),
+            recovered,
+        );
+        assert.equal(recoveredText.replaceAll("\u00a0", " "), candidate.content.trimEnd());
+
+        await browser.executeAsync((done) => {
+            const invoke = window.__TAURI_INTERNALS__?.invoke;
+            if (!invoke) {
+                done();
+                return;
+            }
+            invoke("list_recoveries")
+                .then((existing) => Promise.all(existing.map((item) => invoke("discard_recovery", { documentId: item.documentId }))))
+                .then(() => done())
+                .catch(() => done());
+        });
+    });
 });

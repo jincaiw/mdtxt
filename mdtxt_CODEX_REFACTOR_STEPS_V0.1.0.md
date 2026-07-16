@@ -41,7 +41,7 @@
 | P6 Live Beta | 进行中，未验收 | `9232178`、`39b4604`、`752a41a` 建立最小、可逆的 Lezer/Decoration/Compartment 路径；`d63cb43` 改用 Lezer 识别受限 Live 复杂节点，`2d115f2` 使文档增长后的降级判定随展示快照更新，`6630642` 固定单实例依赖树并记录状态基准；`caa0a96` 的 GitHub Ubuntu WebKit 原生启动/设置菜单冒烟通过 | 完成真实 IME/选择/撤销验证、受限 Live 与原生性能证据；状态基准与启动冒烟均不含 IME 路径，显式 Beta 开关也不等于退出 |
 | P7 复杂 Widgets | 未开始 | 不提前实现 | 依赖 P6 退出与焦点/降级协议 |
 | P8 文件安全、冲突与恢复 | 进行中，未验收 | `20017a3` 起；原子替换、修订与哈希防护、可见冲突入口、校验恢复、失败注入、恢复键跨启动隔离及会话恢复顺序/活动标签/光标行的自动化协议均已落地；macOS 已有隔离 Debug 两标签 AC-007 原生恢复证据；以 `docs/audits/p8-file-safety-tracking.md` 为唯一证据表 | 完成 Windows/Linux 恢复与文件系统矩阵，并对每个 post-rename 不确定性提供可见告警；macOS Debug 证据不外推为其他平台或发布包通过 |
-| P10a 平台证据基座 | 三平台 Debug 构建基座完成，目标平台功能证据未完成；不计入发布工程完成 | `019c86e` 建立手动三平台 Debug 包和 SHA-256 清单采集，`edf96d7` 对齐 CI 目标；独立远端 `jincaiw/mdtxt` 已建立；`fbf1b22` 的 [Platform Evidence Build #29478008425](https://github.com/jincaiw/mdtxt/actions/runs/29478008425) 在 macOS ARM64、Windows x64 与 Ubuntu 24.04 全部通过 | 继续完成三平台安装/启动和 P6/P8 功能矩阵；不得将包构建或非交互原生冒烟宣称为平台功能通过 |
+| P10a 平台证据基座 | 三平台 Debug 构建基座完成，目标平台功能证据未完成；不计入发布工程完成 | `019c86e` 建立手动三平台 Debug 包和 SHA-256 清单采集，`edf96d7` 对齐 CI 目标；独立远端 `jincaiw/mdtxt` 已建立；A3 对齐提交 `99cc34b` 的 [Platform Evidence Build #29481051915](https://github.com/jincaiw/mdtxt/actions/runs/29481051915) 在 macOS ARM64、Windows x64 与 Ubuntu 24.04 全部通过，下载后的 DMG/MSI/NSIS/DEB/AppImage 哈希与清单一致；`523793e` 的 [CI #29481353041](https://github.com/jincaiw/mdtxt/actions/runs/29481353041) 还通过了 Windows/Ubuntu 原生 WebView 四模式工作区冒烟 | 继续完成三平台安装、IME、恢复和 P6/P8 功能矩阵；不得将包构建或非交互原生冒烟宣称为平台功能通过 |
 | P9、P10b、P11 | 未开始 | 不提前实现产品整合或正式发布 | 依赖 P7、P8 的验收结果 |
 
 截至本次定稿，最低本地门禁已通过：`bun run release:check`、前端测试与构建、`cargo fmt --check`、Clippy 和 Rust 测试。后续每一个阶段都必须重新执行与该阶段相称的门禁，不能借用历史通过结果。
