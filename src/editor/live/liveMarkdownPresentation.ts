@@ -181,10 +181,32 @@ export function useLiveMarkdownPresentation({
     documentId: string;
 }) {
     useEffect(() => {
-        viewRef.current?.dispatch({
-            effects: liveCompRef.current.reconfigure(enabled
-                ? (restricted ? restrictedLiveMarkdownPresentation : liveMarkdownPresentation)
-                : []),
+        const view = viewRef.current;
+        if (!view) return;
+        const current = view.dom.getAttribute("data-mdtxt-live");
+
+        if (enabled && restricted) {
+            // A compartment reconfiguration is not constant-time for a very
+            // large CodeMirror document, even when the replacement extension
+            // contains attributes only. Restricted Live deliberately retains
+            // Source behavior, so expose its state directly on the owned DOM
+            // nodes without touching EditorState.
+            if (current === "true") {
+                view.dispatch({ effects: liveCompRef.current.reconfigure([]) });
+            }
+            view.dom.setAttribute("data-mdtxt-live", "restricted");
+            view.contentDOM.setAttribute("data-mdtxt-live", "restricted");
+            return;
+        }
+
+        if (!enabled && current === "restricted") {
+            view.dom.removeAttribute("data-mdtxt-live");
+            view.contentDOM.removeAttribute("data-mdtxt-live");
+            return;
+        }
+
+        view.dispatch({
+            effects: liveCompRef.current.reconfigure(enabled ? liveMarkdownPresentation : []),
         });
     }, [documentId, enabled, liveCompRef, restricted, viewRef]);
 }

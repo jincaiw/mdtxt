@@ -17,7 +17,7 @@ import { getOriginalDoc } from "@codemirror/merge";
 import { handleTab, handleEnter, wrapSelection, insertLink, type EditorResult, type EditorState } from "../../utils/editorActions";
 import { applyEditorResult, editorTheme, markdownPresentationExtensions, toEditorActionState } from "./editorPresentation";
 import { spellcheckAttributes } from "../extensions/useEditorPreferences";
-import { liveMarkdownPresentation, restrictedLiveMarkdownPresentation } from "../live/liveMarkdownPresentation";
+import { liveMarkdownPresentation } from "../live/liveMarkdownPresentation";
 import type { DocumentTextChange } from "../../utils/documentSessionController";
 
 interface UseCodeMirrorHostOptions {
@@ -143,7 +143,11 @@ export function useCodeMirrorHost({
                 wrapCompRef.current.of(wordWrap ? EditorView.lineWrapping : []),
                 spellCompRef.current.of(EditorView.contentAttributes.of(spellcheckAttributes(spellCheck))),
                 mergeCompRef.current.of([]), editingKeymap,
-                liveCompRef.current.of(liveMode ? (liveRestricted ? restrictedLiveMarkdownPresentation : liveMarkdownPresentation) : []),
+                // Restricted Live is a DOM marker applied by
+                // useLiveMarkdownPresentation. Keeping this compartment empty
+                // avoids a full CodeMirror configuration transaction for a
+                // multi-megabyte Source document.
+                liveCompRef.current.of(liveMode && !liveRestricted ? liveMarkdownPresentation : []),
                 keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
                 updateListener,
                 EditorView.domEventHandlers({ paste: handlePaste }),
