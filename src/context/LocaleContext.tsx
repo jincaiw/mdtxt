@@ -91,6 +91,7 @@ const zhCN = {
     "Live Beta mode": "Live Beta 模式",
     "Live Beta (Source-compatible)": "Live Beta（与源码兼容）",
     "Live": "Live",
+    "Live Beta": "Live Beta",
     "Limited Live: ": "受限 Live：",
     "document exceeds 5 MiB": "文档超过 5 MiB",
     "document exceeds 100,000 lines": "文档超过 100,000 行",

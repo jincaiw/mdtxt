@@ -40,7 +40,7 @@ export function ModeToggle({ mode, onSetMode, liveEnabled = false }: ModeToggleP
                     className={`${buttonBase} ${modeClass(mode === "live")}`}
                 >
                     <span className="material-symbols-outlined text-[15px]">auto_fix_high</span>
-                    <span>Live Beta</span>
+                    <span>{t("Live Beta")}</span>
                 </button>}
 
                 <button
