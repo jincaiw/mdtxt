@@ -248,11 +248,31 @@ jobs:
       - name: Install Tauri WebDriver bridge
         run: cargo install tauri-driver --locked
 
-      - name: Run native WebView smoke tests
-        shell: bash
+      - name: Run native WebView smoke tests on Linux
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            xvfb-run --auto-servernum bun run test:native
-          else
+          xvfb-run --auto-servernum bun run test:native
+
+      # WebView2 occasionally fails before a WebDriver session exists with
+      # `DevToolsActivePort file doesn't exist`. WebdriverIO's HTTP retry keeps
+      # the same half-started app/profile and therefore cannot recover. Restart
+      # the complete test process instead; the second build is incremental.
+      - name: Run native WebView smoke tests on Windows
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $passed = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Write-Host "Native WebView attempt $attempt of 3"
             bun run test:native
-          fi
+            if ($LASTEXITCODE -eq 0) {
+              $passed = $true
+              break
+            }
+            Get-Process mdtxt, msedgewebview2 -ErrorAction SilentlyContinue |
+              Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+          }
+          if (-not $passed) {
+            throw 'Windows native WebView smoke failed after three clean attempts.'
+          }
