@@ -86,6 +86,14 @@ export const liveMarkdownDecorations = StateField.define<DecorationSet>({
 });
 
 export const liveMarkdownTheme = EditorView.baseTheme({
+    "&[data-mdtxt-live] .cm-scroller": {
+        fontFamily: "var(--font-body)", lineHeight: "var(--line-height)",
+    },
+    "&[data-mdtxt-live] .cm-content": {
+        width: "100%", maxWidth: "860px", margin: "0 auto", padding: "48px 36px 120px",
+    },
+    "&[data-mdtxt-live] .cm-gutters": { display: "none" },
+    "&[data-mdtxt-live] .cm-activeLine": { backgroundColor: "var(--live-active-line)" },
     ".cm-live-heading-1": { fontSize: "1.55em", fontWeight: "750", lineHeight: "1.45" },
     ".cm-live-heading-2": { fontSize: "1.32em", fontWeight: "720", lineHeight: "1.45" },
     ".cm-live-heading-3": { fontSize: "1.16em", fontWeight: "700" },
@@ -135,10 +143,21 @@ const liveEditFocusPlugin = ViewPlugin.fromClass(class {
     }
 });
 
-export const liveMarkdownPresentation: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
-const liveRestrictedAttributes = EditorView.contentAttributes.of({ "data-mdtxt-live": "restricted" });
+// Put the mode marker on both the editor root and content node. The root
+// attribute drives layout selectors (scroller, gutters and active line), while
+// the content attribute remains a cheap integration-test/runtime probe.
+const liveAttributes: Extension = [
+    EditorView.editorAttributes.of({ "data-mdtxt-live": "true" }),
+    EditorView.contentAttributes.of({ "data-mdtxt-live": "true" }),
+];
+const liveRestrictedAttributes: Extension = [
+    EditorView.editorAttributes.of({ "data-mdtxt-live": "restricted" }),
+    EditorView.contentAttributes.of({ "data-mdtxt-live": "restricted" }),
+];
+const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
+export const liveMarkdownPresentation: Extension = [liveMarkdownBase, liveAttributes];
 /** Restricted Live intentionally keeps only P6's low-cost source styling. */
-export const restrictedLiveMarkdownPresentation: Extension = [liveMarkdownPresentation, liveRestrictedAttributes];
+export const restrictedLiveMarkdownPresentation: Extension = [liveMarkdownBase, liveRestrictedAttributes];
 
 /** Reconfigures the isolated Live compartment without rebuilding EditorView. */
 export function useLiveMarkdownPresentation({

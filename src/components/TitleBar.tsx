@@ -3,6 +3,7 @@ import type { MouseEvent } from "react";
 import { Window } from "@tauri-apps/api/window";
 import { SettingsMenu } from "./SettingsMenu";
 import { ExportMenu } from "./ExportMenu";
+import { ModeToggle, type ViewMode } from "./ModeToggle";
 import { useLocale } from "../context/LocaleContext";
 
 interface TitleBarProps {
@@ -18,9 +19,12 @@ interface TitleBarProps {
     aiActive?: boolean;
     isFullscreen?: boolean;
     onToggleFullscreen?: () => void;
+    mode?: ViewMode;
+    onSetMode?: (mode: ViewMode) => void;
+    liveEnabled?: boolean;
 }
 
-function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getExportHtml, onExportSuccess, onExportError, onToggleAI, aiActive, isFullscreen, onToggleFullscreen }: TitleBarProps) {
+function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getExportHtml, onExportSuccess, onExportError, onToggleAI, aiActive, isFullscreen, onToggleFullscreen, mode, onSetMode, liveEnabled }: TitleBarProps) {
     const { t } = useLocale();
     const handleMinimize = async () => {
         try {
@@ -104,10 +108,10 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
         <>
             <header
                 onMouseDown={handleTitleBarMouseDown}
-                className="h-12 shrink-0 flex items-center justify-between px-4 bg-[var(--bg-titlebar)] border-b border-[var(--border)] no-select drag-region transition-colors"
+                className="h-11 shrink-0 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-3 bg-[var(--bg-titlebar)] border-b border-[var(--border)] no-select drag-region transition-colors"
             >
                 {/* Left: Icon & Title */}
-                <div className="flex items-center gap-3 no-drag">
+                <div className="flex min-w-0 items-center gap-2 no-drag">
                     <div className="flex items-center justify-center w-5 h-5">
                         <img src="/icon.svg" alt="mdtxt" className="w-full h-full" />
                     </div>
@@ -177,14 +181,20 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                     )}
                 </div>
 
+                <div className="flex items-center justify-center px-3">
+                    {hasFile && mode && onSetMode && (
+                        <ModeToggle mode={mode} onSetMode={onSetMode} liveEnabled={liveEnabled} />
+                    )}
+                </div>
+
                 {/* Right: Settings & Window Controls */}
-                <div className="flex items-center gap-1 no-drag">
+                <div className="flex items-center justify-self-end gap-0.5 no-drag">
                     <SettingsMenu />
                     <div className="w-[1px] h-4 bg-[var(--border)] mx-1"></div>
                     <button
                         onClick={handleMinimize}
                         aria-label={t("Minimize")}
-                        className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                        className="flex items-center justify-center w-7 h-7 rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                     >
                         <span className="material-symbols-outlined text-[18px]">remove</span>
                     </button>
@@ -192,14 +202,14 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                         onClick={handleMaximize}
                         aria-label={t(isFullscreen ? "Exit fullscreen" : "Maximize")}
                         title={isFullscreen ? "Exit fullscreen (F11)" : "Maximize"}
-                        className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                        className="flex items-center justify-center w-7 h-7 rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                     >
                         <span className="material-symbols-outlined text-[16px]">{isFullscreen ? "fullscreen_exit" : "crop_square"}</span>
                     </button>
                     <button
                         onClick={handleCloseClick}
                         aria-label={t("Close")}
-                        className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-[var(--danger)] text-[var(--text-secondary)] hover:text-[var(--accent-text)] transition-colors"
+                        className="flex items-center justify-center w-7 h-7 rounded-[var(--radius-sm)] hover:bg-[var(--danger)] text-[var(--text-secondary)] hover:text-[var(--accent-text)] transition-colors"
                     >
                         <span className="material-symbols-outlined text-[18px]">close</span>
                     </button>

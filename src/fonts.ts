@@ -1,6 +1,6 @@
 /**
  * Local-only font loading. Every font face the app uses is bundled with the
- * app — no requests to fonts.googleapis.com / fonts.gstatic.com — so Paperling
+ * app — no requests to fonts.googleapis.com / fonts.gstatic.com — so mdtxt
  * looks identical with or without an internet connection.
  *
  * We import the `latin-*` CSS files from each @fontsource package because they
@@ -33,7 +33,7 @@ import "@fontsource/inter/latin-800.css";
 // near-instant) woff2 loads, and once shown it never reflows again.
 import jetbrainsMono400Url from "@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2?url";
 import jetbrainsMono500Url from "@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2?url";
-import materialSymbolsUrl from "./assets/fonts/material-symbols-paperling.woff2?url";
+import materialSymbolsUrl from "./assets/fonts/material-symbols-mdtxt.ttf?url";
 
 const jetbrainsMonoFaces = `
 @font-face {
@@ -51,19 +51,19 @@ const jetbrainsMonoFaces = `
     src: url(${jetbrainsMono500Url}) format('woff2');
 }`;
 
-// A static subset containing only Paperling's shipped icon ligatures. The
-// upstream variable font is about 4.2 MB; this ~20 KB asset keeps current icon
-// markup and offline behavior without thousands of unused glyphs or axes.
-// Derived from the Apache-2.0 Material Symbols font (see NOTICE).
+// A static subset containing mdtxt's shipped icon ligatures. The upstream
+// font is much larger; this compact asset keeps the current icon-name markup
+// and offline behavior. Derived from the Apache-2.0 Material Symbols font
+// (see NOTICE).
 const materialSymbolsFace = `
 @font-face {
     font-family: 'Material Symbols Outlined';
     font-style: normal;
     font-display: block;
     font-weight: 400;
-    // The explicit revision also makes a dev-server replacement invalidate a
-    // previously cached font while production still uses Vite's content hash.
-    src: url(${materialSymbolsUrl}?v=2) format('woff2');
+    /* The explicit revision also makes a dev-server replacement invalidate a
+       previously cached font while production still uses Vite's content hash. */
+    src: url(${materialSymbolsUrl}?v=6) format('truetype');
 }`;
 
 if (typeof document !== "undefined") {
@@ -77,6 +77,7 @@ if (typeof document !== "undefined") {
     if (document.fonts && typeof document.fonts.load === "function") {
         document.fonts.load("400 14px 'JetBrains Mono'").catch(() => {});
         document.fonts.load("500 14px 'JetBrains Mono'").catch(() => {});
+        document.fonts.load("400 24px 'Material Symbols Outlined'").catch(() => {});
     }
 }
 

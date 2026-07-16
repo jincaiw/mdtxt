@@ -12,7 +12,7 @@ import { TitleBar } from "./components/TitleBar";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { CodeEditor } from "./components/CodeEditor";
 import { StatusBar } from "./components/StatusBar";
-import { ModeToggle, type ViewMode } from "./components/ModeToggle";
+import type { ViewMode } from "./components/ModeToggle";
 import { ToastStack } from "./components/Toast";
 import { SplitDivider } from "./components/SplitDivider";
 import { type PaletteCommand } from "./components/CommandPalette";
@@ -2238,6 +2238,9 @@ function AppContent() {
         aiActive={showAIPanel}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
+        mode={mode}
+        onSetMode={setMode}
+        liveEnabled={liveBetaEnabled}
       />
 
       {/* Tab bar — always shown once a file is open (even with one tab), with a
@@ -2370,8 +2373,6 @@ function AppContent() {
               )}
             </div>
           </div>
-
-          <ModeToggle mode={mode} onSetMode={setMode} aiPanelOpen={showAIPanel} liveEnabled={liveBetaEnabled} />
 
           {/* Sidebar Panels — only mount when actually open so they don't
               load their module until first use. */}

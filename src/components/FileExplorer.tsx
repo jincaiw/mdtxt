@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { attachFocusTrap } from "../utils/focusTrap";
-import mascotCarry from "../assets/mascot/mascot-carry.png";
-import mascotShrug from "../assets/mascot/mascot-shrug.png";
 import { useLocale } from "../context/LocaleContext";
 
 interface FileEntry {
@@ -185,12 +183,16 @@ export function FileExplorer({
                     </div>
                 ) : error ? (
                     <div className="flex flex-col items-center justify-center gap-3 py-10 text-sm" role="alert">
-                        <img src={mascotShrug} alt="" aria-hidden="true" draggable={false} className="w-20 h-20 object-contain select-none opacity-90" />
+                        <span className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--danger)]" aria-hidden="true">
+                            <span className="material-symbols-outlined text-[24px]">error</span>
+                        </span>
                         <span className="text-[var(--danger)]">{error}</span>
                     </div>
                 ) : files.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-3 py-10 text-sm text-[var(--text-secondary)]">
-                        <img src={mascotCarry} alt="" aria-hidden="true" draggable={false} className="w-20 h-20 object-contain select-none opacity-90" />
+                        <span className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-muted)]" aria-hidden="true">
+                            <span className="material-symbols-outlined text-[24px]">folder_open</span>
+                        </span>
                         <span>{t("Folder is empty")}</span>
                     </div>
                 ) : (

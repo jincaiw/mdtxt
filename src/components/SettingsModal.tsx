@@ -483,8 +483,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 <p>{t("Built with Tauri + React + TypeScript.")}</p>
                                 <p>{t("Keyboard shortcuts prefix")}<kbd className="px-1 font-mono rounded border border-[var(--border)] bg-[var(--bg-input)]">?</kbd>{t("Keyboard shortcuts suffix")}</p>
 
-                                {/* Replay the first-run tour. The mascot makes the row instantly
-                                    recognizable as "that welcome thing". App.tsx listens for the event. */}
+                                {/* App.tsx listens for the replay event. */}
                                 <button
                                     type="button"
                                     onClick={() => {

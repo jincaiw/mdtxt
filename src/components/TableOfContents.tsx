@@ -1,7 +1,5 @@
 import { useMemo, useEffect, useRef, useState } from "react";
 import { attachFocusTrap } from "../utils/focusTrap";
-import mascotReading from "../assets/mascot/mascot-reading.png";
-import mascotMagnify from "../assets/mascot/mascot-magnify.png";
 import { useLocale } from "../context/LocaleContext";
 
 interface TocItem {
@@ -161,13 +159,17 @@ export function TableOfContents({
             <nav className="flex-1 min-h-0 overflow-y-auto" aria-label={t("Document headings")}>
                 {headings.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-[var(--text-secondary)] text-sm gap-2 px-4 text-center">
-                        <img src={mascotReading} alt="" aria-hidden="true" draggable={false} className="w-20 h-20 object-contain select-none opacity-90" />
+                        <span className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-muted)]" aria-hidden="true">
+                            <span className="material-symbols-outlined text-[24px]">menu_book</span>
+                        </span>
                         <span>{t("No headings yet.")}</span>
                         <span className="text-[11px] text-[var(--text-muted)]">{t("Heading hint prefix")}<code className="font-mono">#</code>{t("Heading hint suffix")}</span>
                     </div>
                 ) : visible.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 gap-2 text-[var(--text-secondary)] text-sm">
-                        <img src={mascotMagnify} alt="" aria-hidden="true" draggable={false} className="w-20 h-20 object-contain select-none opacity-90" />
+                        <span className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-secondary)] text-[var(--text-muted)]" aria-hidden="true">
+                            <span className="material-symbols-outlined text-[24px]">search</span>
+                        </span>
                         <span>{t("No matches")}</span>
                     </div>
                 ) : (

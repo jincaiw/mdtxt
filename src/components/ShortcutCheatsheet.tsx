@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { attachFocusTrap } from "../utils/focusTrap";
-import iconKeyboard from "../assets/mascot/icon-keyboard.png";
 import { useLocale } from "../context/LocaleContext";
 
 interface ShortcutCheatsheetProps {
@@ -165,7 +164,9 @@ export function ShortcutCheatsheet({ isOpen, onClose }: ShortcutCheatsheetProps)
                 className="relative z-10 w-[640px] max-h-[80vh] flex flex-col bg-[var(--bg-primary)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-2xl overflow-hidden animate-fade-in"
             >
                 <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border)]">
-                    <img src={iconKeyboard} alt="" aria-hidden="true" draggable={false} className="w-8 h-8 object-contain select-none" />
+                    <span className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] bg-[var(--bg-secondary)] text-[var(--accent)]" aria-hidden="true">
+                        <span className="material-symbols-outlined text-[18px]">keyboard</span>
+                    </span>
                     <h2 id="cheatsheet-title" className="text-base font-semibold text-[var(--text-primary)]">{t("Keyboard Shortcuts")}</h2>
                     <input
                         type="text"

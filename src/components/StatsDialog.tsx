@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { computeStats } from "../utils/documentStats";
 import { attachFocusTrap } from "../utils/focusTrap";
-import iconClock from "../assets/mascot/icon-clock.png";
 import { useLocale } from "../context/LocaleContext";
 
 interface StatsDialogProps {
@@ -65,7 +64,9 @@ export function StatsDialog({ isOpen, content, onClose }: StatsDialogProps) {
             >
                 <header className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
                     <div className="flex items-center gap-3">
-                        <img src={iconClock} alt="" aria-hidden="true" draggable={false} className="w-8 h-8 object-contain select-none" />
+                        <span className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] bg-[var(--bg-secondary)] text-[var(--accent)]" aria-hidden="true">
+                            <span className="material-symbols-outlined text-[18px]">analytics</span>
+                        </span>
                         <h2 className="text-base font-semibold text-[var(--text-primary)]">{t("Document statistics")}</h2>
                     </div>
                     <button

@@ -48,6 +48,7 @@
 
   --selection-bg: #404040;
   --selection-text: #ffffff;
+  --live-active-line: rgba(255, 255, 255, 0.08);
 }
 
 /* Light Theme — a soft, warm-neutral light. The faint warmth gives it a gentle
@@ -97,6 +98,7 @@
 
   --selection-bg: #171717;
   --selection-text: #ffffff;
+  --live-active-line: rgba(239, 212, 137, 0.38);
 }
 
 /* Paper Theme */
@@ -144,6 +146,7 @@
 
   --selection-bg: #5c4033;
   --selection-text: #faf8f3;
+  --live-active-line: rgba(239, 212, 137, 0.52);
 }
 
 /* Dracula Theme */
@@ -191,6 +194,7 @@
 
   --selection-bg: #44475a;
   --selection-text: #f8f8f2;
+  --live-active-line: rgba(189, 147, 249, 0.15);
 }
 
 
@@ -209,6 +213,11 @@
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
+
+  --shadow-control: 0 1px 2px rgba(61, 48, 41, 0.12);
+  --shadow-popover: 0 14px 36px rgba(61, 48, 41, 0.16);
+  --shadow-dialog: 0 24px 64px rgba(61, 48, 41, 0.2);
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 /* ===== Font Family Variables ===== */
@@ -282,13 +291,20 @@ body,
 }
 
 body {
-  font-family: var(--font-body);
+  font-family: var(--font-ui);
   font-size: var(--font-size-base);
   background-color: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-ui);
 }
 
 /* ===== Accessibility ===== */
@@ -388,9 +404,8 @@ select:focus-visible,
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   /* The vendored subset maps the existing icon-name markup through required
-     ligatures. The upstream package set this implicitly; keep it explicit now
-     that Paperling owns the compact font face. */
-  font-feature-settings: 'rlig' 1;
+     ligatures. Keep both features explicit for mdtxt's compact font face. */
+  font-feature-settings: 'liga' 1, 'rlig' 1;
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   vertical-align: middle;
 }

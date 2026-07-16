@@ -1,7 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import iconPalette from "../assets/mascot/icon-command-palette.png";
-import iconFolder from "../assets/mascot/icon-folder.png";
-import iconBook from "../assets/mascot/icon-book.png";
 import { useLocale } from "../context/LocaleContext";
 
 interface TourProps {
@@ -17,10 +14,7 @@ interface Step {
     target?: string;
     /** Where the card sits relative to the (padded) target rect. */
     placement: "center" | "left-of" | "below" | "above";
-    image: string;
-    imageAlt: string;
-    /** Tailwind height class for the mascot image. */
-    imageClass: string;
+    icon: string;
     title: string;
     body: string;
 }
@@ -29,9 +23,7 @@ const STEPS: Step[] = [
     {
         id: "welcome",
         placement: "center",
-        image: iconPalette,
-        imageAlt: "Command palette illustration",
-        imageClass: "h-24",
+        icon: "tour",
         title: "Hey, welcome to mdtxt!",
         body: "Welcome to mdtxt. Want a quick look around? It takes about 15 seconds, and you can replay it anytime from the command palette.",
     },
@@ -39,9 +31,7 @@ const STEPS: Step[] = [
         id: "explorer",
         target: "[data-tour='file-explorer']",
         placement: "above",
-        image: iconFolder,
-        imageAlt: "A folder of paper files",
-        imageClass: "h-20",
+        icon: "folder_open",
         title: "Your folder, one click away",
         body: "This opens the file explorer. It lists every markdown file next to the one you're editing, so you can jump between notes without leaving mdtxt. (Ctrl+Shift+E)",
     },
@@ -49,27 +39,21 @@ const STEPS: Step[] = [
         id: "toc",
         target: "[data-tour='toc']",
         placement: "above",
-        image: iconBook,
-        imageAlt: "An open book outline",
-        imageClass: "h-20",
+        icon: "menu_book",
         title: "Outline of your doc",
         body: "This is the table of contents. Every heading you write shows up here, and it tracks where you are as you scroll. Click any heading to jump straight to it. (Ctrl+Shift+O)",
     },
     {
         id: "palette",
         placement: "center",
-        image: iconPalette,
-        imageAlt: "Command palette illustration",
-        imageClass: "h-24",
+        icon: "search",
         title: "One box for everything",
         body: "Press Ctrl+P after the tour to open the command palette. Files, views, themes, AI: it's all in there.",
     },
     {
         id: "done",
         placement: "center",
-        image: iconBook,
-        imageAlt: "An open document illustration",
-        imageClass: "h-20",
+        icon: "check",
         title: "That's it, you're ready!",
         body: "Want to see it all in action? Open the interactive guide: a real document with live math, diagrams, tables and more, all ready for you to poke at. You can also replay this tour anytime from the command palette.",
     },
@@ -237,12 +221,9 @@ export function Tour({ onClose, onOpenTutorial }: TourProps) {
                     // one row without their labels wrapping to two lines.
                     className="w-[400px] max-w-[calc(100vw-2rem)] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl shadow-2xl p-6 flex flex-col items-center gap-4 text-center animate-fade-in"
                 >
-                    <img
-                        src={step.image}
-                        alt={step.imageAlt}
-                        draggable={false}
-                        className={`${step.imageClass} w-auto object-contain`}
-                    />
+                    <span className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--accent)]" aria-hidden="true">
+                        <span className="material-symbols-outlined text-[30px]">{step.icon}</span>
+                    </span>
                     <div className="flex flex-col gap-1.5">
                         <h2 className="text-lg font-bold tracking-tight text-[var(--text-primary)]">{t(step.title)}</h2>
                         <p className="text-sm leading-relaxed text-[var(--text-secondary)]">{t(step.body)}</p>

@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useDropdownKeyboard } from '../hooks/useDropdownKeyboard';
-import iconExportPdf from '../assets/mascot/icon-export-pdf.png';
-import iconPaperPlane from '../assets/mascot/icon-paper-plane.png';
 import { useLocale } from '../context/LocaleContext';
 
 // The export module isn't needed for first paint, so we import it on demand to
@@ -146,7 +144,7 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: Expo
                         onClick={() => handleExport('html')}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-[var(--bg-hover)] transition-colors"
                     >
-                        <img src={iconPaperPlane} alt="" aria-hidden="true" draggable={false} className="w-6 h-6 object-contain select-none" />
+                        <span className="material-symbols-outlined text-[22px] w-6 text-center text-[var(--accent)]" aria-hidden="true">ios_share</span>
                         <span>HTML</span>
                     </button>
                     <button
@@ -154,7 +152,7 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: Expo
                         onClick={() => handleExport('pdf')}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-[var(--bg-hover)] transition-colors"
                     >
-                        <img src={iconExportPdf} alt="" aria-hidden="true" draggable={false} className="w-6 h-6 object-contain select-none" />
+                        <span className="material-symbols-outlined text-[22px] w-6 text-center text-[var(--accent)]" aria-hidden="true">description</span>
                         <span>PDF</span>
                     </button>
                     <button

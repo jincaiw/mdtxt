@@ -47,6 +47,8 @@ describe("editor selection theming", () => {
             return element!;
         });
         expect(content.querySelector(".cm-live-heading-1")).toBeTruthy();
+        expect(container.querySelector(".cm-editor")).toHaveAttribute("data-mdtxt-live", "true");
+        expect(content).toHaveAttribute("data-mdtxt-live", "true");
 
         rerender(<CodeEditor documentId="test" content="# heading" onChange={() => {}} liveMode={false} />);
         await waitFor(() => expect(content.querySelector(".cm-live-heading-1")).toBeNull());
@@ -71,6 +73,7 @@ describe("editor selection theming", () => {
         });
 
         expect(content.textContent).toBe("# large heading");
+        expect(container.querySelector(".cm-editor")).toHaveAttribute("data-mdtxt-live", "restricted");
         expect(container.querySelector("[role='status']")).toHaveTextContent("Limited Live: large document");
     });
 });

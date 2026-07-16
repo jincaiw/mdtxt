@@ -1,6 +1,5 @@
 import { useRef } from "react";
 import { Modal } from "./Modal";
-import mascotSad from "../assets/mascot/mascot-sad.png";
 import { useLocale } from "../context/LocaleContext";
 
 interface UnsavedChangesDialogProps {
@@ -37,13 +36,9 @@ export function UnsavedChangesDialog({
             {/* Header */}
             <div className="px-5 pt-5 pb-3">
                 <div className="flex items-center gap-3">
-                    <img
-                        src={mascotSad}
-                        alt=""
-                        aria-hidden="true"
-                        draggable={false}
-                        className="w-12 h-12 object-contain select-none shrink-0"
-                    />
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--bg-hover)] text-[var(--status-unsaved)]" aria-hidden="true">
+                        <span className="material-symbols-outlined text-[22px]">warning</span>
+                    </span>
                     <div>
                         <h2 id="unsaved-dialog-title" className="text-base font-semibold text-[var(--text-primary)]">
                             {t("Unsaved Changes")}

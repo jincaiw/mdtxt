@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import iconCheckBadge from '../assets/mascot/icon-check-badge.png';
 import type { ToastItem, ToastType } from '../hooks/useToast';
 
 // Re-exported for the handful of call sites that import the type from here.
@@ -8,7 +7,7 @@ export type { ToastType };
 function icon(type: ToastType) {
     switch (type) {
         case 'success':
-            return <img src={iconCheckBadge} alt="" aria-hidden="true" draggable={false} className="w-5 h-5 object-contain select-none" />;
+            return <span className="material-symbols-outlined text-[18px] text-[var(--status-saved)]" aria-hidden="true">check</span>;
         case 'error':
             return (
                 <svg className="w-4 h-4 text-[var(--danger)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
