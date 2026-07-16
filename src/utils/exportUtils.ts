@@ -3,6 +3,16 @@ import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 
+export type ExportMetadataLanguage = 'document' | 'zh-CN' | 'en';
+
+export function resolveExportLanguage(htmlContent: string, preference: ExportMetadataLanguage): 'zh-CN' | 'en' {
+    if (preference !== 'document') return preference;
+    const text = htmlContent.replace(/<[^>]*>/g, ' ').slice(0, 32_000);
+    const chinese = (text.match(/[\u3400-\u9fff]/g) ?? []).length;
+    const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+    return chinese > 0 && chinese >= latin ? 'zh-CN' : 'en';
+}
+
 // Theme color definitions for export
 const themeColors: Record<Theme, Record<string, string>> = {
     dark: {
@@ -424,22 +434,24 @@ export function generateHTML(
     theme: Theme,
     font: FontFamily,
     fontSize: FontSize,
-    includeFooter: boolean = true
+    includeFooter: boolean = true,
+    metadataLanguage: ExportMetadataLanguage = 'document',
 ): string {
     const css = generateExportCSS(theme, font, fontSize);
     const safeTitle = escapeHtml(title);
-    const date = new Date().toLocaleDateString('en-US', {
+    const exportLanguage = resolveExportLanguage(htmlContent, metadataLanguage);
+    const date = new Date().toLocaleDateString(exportLanguage === 'zh-CN' ? 'zh-CN' : 'en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
     });
 
     const footer = includeFooter
-        ? `<footer class="export-footer">Exported from mdtxt on ${date}</footer>`
+        ? `<footer class="export-footer">${exportLanguage === 'zh-CN' ? `由 mdtxt 导出于 ${date}` : `Exported from mdtxt on ${date}`}</footer>`
         : '';
 
     return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${exportLanguage}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -465,11 +477,12 @@ export async function exportToHTML(
     fileName: string,
     theme: Theme,
     font: FontFamily,
-    fontSize: FontSize
+    fontSize: FontSize,
+    metadataLanguage: ExportMetadataLanguage = 'document',
 ): Promise<boolean> {
     const title = fileName.replace(/\.(md|markdown)$/i, '');
     const cleaned = await prepareExportHtml(htmlContent);
-    const fullHTML = generateHTML(cleaned, title, theme, font, fontSize);
+    const fullHTML = generateHTML(cleaned, title, theme, font, fontSize, true, metadataLanguage);
 
     // Use Tauri save dialog
     const filePath = await save({
@@ -615,7 +628,8 @@ export async function exportToPDF(
     fileName: string,
     _theme: Theme,
     font: FontFamily,
-    fontSize: FontSize
+    fontSize: FontSize,
+    metadataLanguage: ExportMetadataLanguage = 'document',
 ): Promise<PdfExportResult> {
     if (!htmlContent || htmlContent.trim() === '') {
         console.error('No HTML content to export!');
@@ -627,7 +641,7 @@ export async function exportToPDF(
     // Same cleanup as HTML export — strips UI chrome (copy buttons, heading
     // anchor icons) and inlines blob: images as data: URIs.
     const cleaned = await prepareExportHtml(htmlContent);
-    const fullHTML = generateHTML(cleaned, title, 'light', font, fontSize, true);
+    const fullHTML = generateHTML(cleaned, title, 'light', font, fontSize, true, metadataLanguage);
 
     const canSaveSilently =
         typeof navigator !== 'undefined' &&

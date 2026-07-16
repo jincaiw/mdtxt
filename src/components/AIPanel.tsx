@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { streamChat, buildAskMessages, buildAgentMessages, parseEdits, AI_MAX_DOCUMENT_CONTEXT_CHARS, type ChatMessage } from "../utils/aiChat";
 import type { AIConfig } from "../utils/aiAssist";
 import { useLocale } from "../context/LocaleContext";
+import { localizeAIError } from "../utils/aiErrors";
 
 interface AIPanelProps {
     isOpen: boolean;
@@ -65,7 +66,7 @@ export function AIPanel({ isOpen, onClose, note, documentId, documentVersion, fi
     const send = useCallback(async () => {
         const text = input.trim();
         if (!text || busy) return;
-        if (!configured) { setError("Configure an AI endpoint in Settings → AI first."); return; }
+        if (!configured) { setError(t("Configure an AI endpoint in Settings → AI first.")); return; }
         setError(null);
         setInput("");
 
@@ -121,14 +122,14 @@ export function AIPanel({ isOpen, onClose, note, documentId, documentVersion, fi
                 // No edit blocks → it was an answer; the streamed text stays as-is.
             }
         } catch (e) {
-            if ((e as Error).name !== "AbortError") setError((e as Error).message);
+            if ((e as Error).name !== "AbortError") setError(localizeAIError(e, t));
             // Drop the empty assistant bubble if nothing streamed in.
             setMessages((prev) => (prev[assistantIdx]?.content ? prev : prev.slice(0, assistantIdx)));
         } finally {
             setBusy(false);
             abortRef.current = null;
         }
-    }, [input, busy, configured, messages, note, documentId, documentVersion, selectionText, aiConfig, mode, onProposeEdit]);
+    }, [input, busy, configured, messages, note, documentId, documentVersion, selectionText, aiConfig, mode, onProposeEdit, t]);
 
     const stop = useCallback(() => abortRef.current?.abort(), []);
     const clear = useCallback(() => { abortRef.current?.abort(); setMessages([]); setError(null); }, []);

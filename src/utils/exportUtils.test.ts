@@ -32,6 +32,15 @@ describe("generateHTML", () => {
         expect(generateHTML("<p>x</p>", "t", "dark", "inter", "medium", false)).not.toContain("Exported from mdtxt");
     });
 
+    it("infers metadata language from document text and allows an explicit override", () => {
+        const chinese = generateHTML("<p>这是中文文档</p>", "t", "paper", "inter", "medium");
+        expect(chinese).toContain('<html lang="zh-CN">');
+        expect(chinese).toContain("由 mdtxt 导出于");
+        const forcedEnglish = generateHTML("<p>这是中文文档</p>", "t", "paper", "inter", "medium", true, "en");
+        expect(forcedEnglish).toContain('<html lang="en">');
+        expect(forcedEnglish).toContain("Exported from mdtxt on");
+    });
+
     it("applies theme-specific colors", () => {
         expect(generateHTML("<p>x</p>", "t", "dark", "inter", "medium")).toContain("#0a0a0a");
         expect(generateHTML("<p>x</p>", "t", "paper", "inter", "medium")).toContain("#f5f0e6");

@@ -1,7 +1,7 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import type { Theme, FontFamily, FontSize } from "../context/ThemeContext";
-import { prepareExportHtml } from "./exportUtils";
+import { prepareExportHtml, resolveExportLanguage, type ExportMetadataLanguage } from "./exportUtils";
 
 type HtmlToDocx = (
     html: string,
@@ -36,12 +36,14 @@ export async function exportToDocx(
     _theme: Theme,
     _font: FontFamily,
     _fontSize: FontSize,
+    metadataLanguage: ExportMetadataLanguage = "document",
 ): Promise<boolean> {
     if (!htmlContent || htmlContent.trim() === "") return false;
 
     const title = fileName.replace(/\.(md|markdown)$/i, "");
     const cleaned = await prepareExportHtml(htmlContent);
-    const docHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body><article>${cleaned}</article></body></html>`;
+    const language = resolveExportLanguage(cleaned, metadataLanguage);
+    const docHtml = `<!DOCTYPE html><html lang="${language}"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body><article>${cleaned}</article></body></html>`;
     const filePath = await save({
         defaultPath: `${title}.docx`,
         filters: [{ name: "Word Document", extensions: ["docx"] }],
@@ -54,6 +56,7 @@ export async function exportToDocx(
     const out = await convert(docHtml, null, {
         title,
         creator: "mdtxt",
+        lang: language,
         footer: false,
         pageNumber: false,
         font: "Calibri",

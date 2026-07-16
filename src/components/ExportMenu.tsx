@@ -31,11 +31,22 @@ interface ExportMenuProps {
 }
 
 type ExportFormat = 'html' | 'pdf' | 'docx';
+type ExportMetadataLanguage = import('../utils/exportUtils').ExportMetadataLanguage;
+
+const EXPORT_LANGUAGE_KEY = 'mdtxt:exportMetadataLanguage';
+const getInitialExportLanguage = (): ExportMetadataLanguage => {
+    try {
+        const stored = localStorage.getItem(EXPORT_LANGUAGE_KEY);
+        if (stored === 'zh-CN' || stored === 'en' || stored === 'document') return stored;
+    } catch { /* storage unavailable */ }
+    return 'document';
+};
 
 export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: ExportMenuProps) {
     const { t } = useLocale();
     const [isOpen, setIsOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [metadataLanguage, setMetadataLanguage] = useState<ExportMetadataLanguage>(getInitialExportLanguage);
     const { theme, font, fontSize } = useTheme();
     const menuRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
@@ -79,18 +90,18 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: Expo
             if (format === 'html') {
                 const mod = await loadExportModule();
                 // exportToHTML returns false when the save dialog is cancelled.
-                if (await mod.exportToHTML(htmlContent, fileName, theme, font, fontSize)) {
+                if (await mod.exportToHTML(htmlContent, fileName, theme, font, fontSize, metadataLanguage)) {
                     onSuccess?.('HTML');
                 }
             } else if (format === 'docx') {
                 // exportToDocx returns false on a cancelled save dialog.
                 const mod = await loadDocxExportModule();
-                if (await mod.exportToDocx(htmlContent, fileName, theme, font, fontSize)) {
+                if (await mod.exportToDocx(htmlContent, fileName, theme, font, fontSize, metadataLanguage)) {
                     onSuccess?.('DOCX');
                 }
             } else {
                 const mod = await loadExportModule();
-                const result = await mod.exportToPDF(htmlContent, fileName, theme, font, fontSize);
+                const result = await mod.exportToPDF(htmlContent, fileName, theme, font, fontSize, metadataLanguage);
                 // Only the native save path (Windows/macOS) can confirm a
                 // written file. The Linux print-dialog fallback ('printing') is
                 // its own visible feedback, so we don't claim success there.
@@ -138,7 +149,24 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: Expo
 
             {/* Simple Dropdown Menu */}
             {isOpen && !disabled && (
-                <div ref={panelRef} onKeyDown={onMenuKeyDown} role="menu" aria-label={t("Export formats")} className="absolute left-0 top-full mt-1 w-40 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden z-[70] animate-fade-in-down">
+                <div ref={panelRef} onKeyDown={onMenuKeyDown} role="menu" aria-label={t("Export formats")} className="absolute left-0 top-full mt-1 w-56 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden z-[70] animate-fade-in-down">
+                    <label className="block px-3 py-2 border-b border-[var(--border-subtle)]">
+                        <span className="block mb-1 text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t("Metadata language")}</span>
+                        <select
+                            value={metadataLanguage}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => {
+                                const next = event.target.value as ExportMetadataLanguage;
+                                setMetadataLanguage(next);
+                                try { localStorage.setItem(EXPORT_LANGUAGE_KEY, next); } catch { /* storage unavailable */ }
+                            }}
+                            className="w-full px-2 py-1 text-xs bg-[var(--bg-input)] border border-[var(--border)] rounded-[var(--radius-sm)] text-[var(--text-primary)]"
+                        >
+                            <option value="document">{t("Follow document")}</option>
+                            <option value="zh-CN">{t("Simplified Chinese")}</option>
+                            <option value="en">{t("English")}</option>
+                        </select>
+                    </label>
                     <button
                         role="menuitem"
                         onClick={() => handleExport('html')}

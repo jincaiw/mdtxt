@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { runAIAction, type AIAction, type AIConfig } from "../utils/aiAssist";
 import { useLocale } from "../context/LocaleContext";
+import { localizeAIError } from "../utils/aiErrors";
 
 interface AIBubbleProps {
     /** Anchor pixel position (top-left of selection or caret). Null hides bubble. */
@@ -87,7 +88,7 @@ export function AIBubble({ anchor, selectedText, config, onReplace, onInsert, on
             setResult(out);
         } catch (e) {
             if ((e as Error).name === "AbortError") return;
-            setError((e as Error).message);
+            setError(localizeAIError(e, t));
         } finally {
             setBusy(null);
         }

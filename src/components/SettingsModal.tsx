@@ -15,6 +15,7 @@ import { AI_PROVIDERS, matchProvider, type AIProvider } from "../utils/aiProvide
 import { attachFocusTrap } from "../utils/focusTrap";
 import { isValidEndpoint, runAIAction } from "../utils/aiAssist";
 import { useLocale } from "../context/LocaleContext";
+import { localizeAIError } from "../utils/aiErrors";
 
 // Platform-aware AI shortcut hint (Windows/Linux: Alt+J; macOS: ⌘J). Windows
 // can't use Ctrl+J because WebView2 reserves it for its Downloads UI.
@@ -143,8 +144,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             await runAIAction("continue", "Reply with: OK", ai);
             setAiTest({ state: "ok" });
         } catch (e) {
-            setAiTest({ state: "error", msg: (e as Error).message });
+            setAiTest({ state: "error", msg: localizeAIError(e, t) });
         }
+    };
+
+    const clearAIConfiguration = () => {
+        const cleared = { endpoint: "", model: "", apiKey: "" };
+        setAi(cleared);
+        setAiTest({ state: "idle" });
+        persistAIConfig(cleared);
     };
 
     const fire = (event: string, enabled: boolean) =>
@@ -477,6 +485,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                         {aiTest.state === "error" && (
                                             <span className="text-[12px] text-[var(--danger)] truncate" title={aiTest.msg}>{aiTest.msg}</span>
                                         )}
+                                        <button
+                                            type="button"
+                                            onClick={clearAIConfiguration}
+                                            disabled={!ai.endpoint && !ai.model && !ai.apiKey}
+                                            className="ml-auto px-3 py-1.5 text-sm rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--danger)] hover:bg-[var(--danger)]/10 disabled:opacity-40 transition-colors"
+                                        >
+                                            {t("Clear AI configuration")}
+                                        </button>
                                     </div>
                                     <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{t("AI privacy notice")}</p>
                                 </div>

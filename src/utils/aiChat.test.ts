@@ -42,10 +42,10 @@ describe("streamChat", () => {
         expect(out).toBe("whole reply");
     });
 
-    it("maps a non-OK status to the existing error message using the body", async () => {
+    it("maps a non-OK status without exposing the provider response body", async () => {
         streamResponse(500, ["upstream exploded"]);
         await expect(streamChat(messages, cfg)).rejects.toThrow(
-            "AI service unavailable (500). Try again later.\nupstream exploded"
+            "AI service unavailable (500). Try again later."
         );
     });
 

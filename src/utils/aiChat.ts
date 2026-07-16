@@ -16,14 +16,14 @@ export interface ChatMessage {
 const AI_CONNECT_TIMEOUT_MS = 120_000;
 
 function mapHttpError(status: number, body: string): string {
-    const detail = body.trim().slice(0, 200);
+    void body;
     let msg: string;
     if (status === 401 || status === 403) msg = "API key invalid or unauthorized — check Settings → AI.";
     else if (status === 404) msg = "Endpoint not found (404) — check the URL in Settings → AI.";
     else if (status === 429) msg = "Rate limited (429) — wait a moment and try again.";
     else if (status >= 500) msg = `AI service unavailable (${status}). Try again later.`;
     else msg = `AI request failed (${status}).`;
-    return detail ? `${msg}\n${detail}` : msg;
+    return msg;
 }
 
 /** Pull assistant text from a non-streamed completion (OpenAI or Ollama shape). */

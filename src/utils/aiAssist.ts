@@ -96,10 +96,8 @@ export async function runAIAction(
 
     const ok = res.status >= 200 && res.status < 300;
     if (!ok) {
-        // Map common HTTP statuses to actionable messages instead of dumping a
-        // raw status + body the user can't interpret (AI-04). The body snippet
-        // is appended on a second line for debugging when present.
-        const detail = res.body.trim().slice(0, 200);
+        // Map common HTTP statuses without displaying the response body. Error
+        // bodies can contain provider/account details and are not safe UI copy.
         let msg: string;
         if (res.status === 401 || res.status === 403) {
             msg = "API key invalid or unauthorized — check Settings → AI.";
@@ -112,7 +110,7 @@ export async function runAIAction(
         } else {
             msg = `AI request failed (${res.status}).`;
         }
-        throw new Error(detail ? `${msg}\n${detail}` : msg);
+        throw new Error(msg);
     }
 
     const data = JSON.parse(res.body);
