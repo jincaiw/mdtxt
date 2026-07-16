@@ -37,7 +37,12 @@ describe("mdtxt native Tauri smoke", () => {
         assert.equal(await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']").isExisting(), false);
 
         const settings = await $("button[aria-label='Settings'], button[aria-label='设置']");
-        await settings.click();
+        // Linux WebKitWebDriver can report the title-bar drag region as the
+        // click target once a document toolbar is present, even though the
+        // same settings button is user-clickable (covered by the preceding
+        // welcome-screen test). Activate the control through the DOM here so
+        // this test stays focused on the settings-to-Live integration.
+        await browser.execute((element) => element.click(), settings);
         const moreSettings = await $("//button[contains(., '更多设置') or contains(., 'More settings')]");
         await moreSettings.click();
         await $("[role='dialog'][aria-label='设置'], [role='dialog'][aria-label='Settings']").waitForDisplayed();
