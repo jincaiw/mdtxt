@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
-import { syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import liveBetaFixture from "./fixtures/markdown/live-beta.md?raw";
 
@@ -15,7 +15,11 @@ describe("Live Beta source round-trip baseline", () => {
         const state = EditorState.create({ doc: editorFixture, extensions: [markdown({ base: markdownLanguage })] });
 
         expect(state.doc.toString()).toBe(editorFixture);
-        expect(syntaxTree(state).length).toBe(editorFixture.length);
+        // Lezer parsing is time-sliced and may not synchronously finish even
+        // this fixture on a loaded runner. Ask for the complete tree before
+        // asserting coverage instead of turning runner speed into a false
+        // round-trip failure.
+        expect(ensureSyntaxTree(state, editorFixture.length, 1_000)?.length).toBe(editorFixture.length);
         expect(editorFixture).toContain("# Live Beta 标题 / Heading");
         expect(editorFixture).toContain("**粗体**");
         expect(editorFixture).toContain("*斜体*");
