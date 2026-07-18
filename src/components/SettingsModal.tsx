@@ -16,6 +16,7 @@ import { attachFocusTrap } from "../utils/focusTrap";
 import { isValidEndpoint, runAIAction } from "../utils/aiAssist";
 import { useLocale } from "../context/LocaleContext";
 import { localizeAIError } from "../utils/aiErrors";
+import appPackage from "../../package.json";
 
 // Platform-aware AI shortcut hint (Windows/Linux: Alt+J; macOS: ⌘J). Windows
 // can't use Ctrl+J because WebView2 reserves it for its Downloads UI.
@@ -505,6 +506,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     <img src="/icon.svg" alt="mdtxt" className="w-10 h-10" />
                                     <div>
                                         <div className="text-[var(--text-primary)] font-semibold">mdtxt</div>
+                                        <div className="text-[11px] tabular-nums text-[var(--text-muted)]">v{appPackage.version}</div>
                                         <div className="text-[11px]">{t("A minimal markdown editor")}</div>
                                     </div>
                                 </div>
