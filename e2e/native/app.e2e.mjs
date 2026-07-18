@@ -62,58 +62,48 @@ describe("mdtxt native Tauri smoke", () => {
         console.log(`MDTXT_X11_FOCUS target=${windowId} actual=${actualFocus.stdout.trim()}`);
     };
 
-    const sendLinuxNativeKey = (key) => {
-        // Window 0 is xdotool's explicit XTEST path: deliver the event like a
-        // physical keyboard to the current X11 focus. A nonzero window would
-        // use XSendEvent, which is not acceptable as native input evidence.
-        const keyResult = spawnSync("xdotool", ["key", "--window", "0", "--clearmodifiers", key], {
-            encoding: "utf8",
-        });
+    const runLinuxXtest = (commands, description) => {
+        // xte is a small XTEST client independent of WebDriver and WebKit. It
+        // sends the same server-level key events as a physical keyboard; it
+        // neither mutates contenteditable nor falls back to XSendEvent.
+        const result = spawnSync("xte", commands, { encoding: "utf8" });
         assert.equal(
-            keyResult.status,
+            result.status,
             0,
-            `xdotool ${key} failed (${keyResult.status}): ${keyResult.stderr || keyResult.stdout}`,
+            `xte ${description} failed (${result.status}): ${result.stderr || result.stdout}`,
+        );
+    };
+
+    const sendLinuxNativeKey = (key) => {
+        const tokens = key.split("+");
+        const keyName = tokens.pop();
+        const modifiers = tokens.map((token) => ({
+            ctrl: "Control_L",
+            shift: "Shift_L",
+            alt: "Alt_L",
+        })[token] ?? token);
+        runLinuxXtest(
+            [
+                ...modifiers.map((modifier) => `keydown ${modifier}`),
+                `key ${keyName}`,
+                ...modifiers.reverse().map((modifier) => `keyup ${modifier}`),
+            ],
+            key,
         );
     };
 
     const sendLinuxNativeText = (text, delay = 1) => {
         focusLinuxAppWindow();
         sendLinuxNativeKey("ctrl+End");
-        const typeResult = spawnSync(
-            "xdotool",
-            ["type", "--window", "0", "--clearmodifiers", "--delay", String(delay), "--", text],
-            { encoding: "utf8" },
-        );
-        assert.equal(
-            typeResult.status,
-            0,
-            `xdotool typing failed (${typeResult.status}): ${typeResult.stderr || typeResult.stdout}`,
+        const delayMicros = Math.max(0, Math.round(delay * 1000));
+        runLinuxXtest(
+            [...text].flatMap((character) => [
+                `key ${character}`,
+                ...(delayMicros > 0 ? [`usleep ${delayMicros}`] : []),
+            ]),
+            `typing ${text.length} characters`,
         );
     };
-
-    const setLinuxIbusEngine = (engine) => {
-        const setEngine = spawnSync("ibus", ["engine", engine], { encoding: "utf8" });
-        assert.equal(
-            setEngine.status,
-            0,
-            `ibus could not activate ${engine} (${setEngine.status}): ${setEngine.stderr || setEngine.stdout}`,
-        );
-        const activeEngine = spawnSync("ibus", ["engine"], { encoding: "utf8" });
-        assert.equal(
-            activeEngine.status,
-            0,
-            `ibus could not report its active engine (${activeEngine.status}): ${activeEngine.stderr || activeEngine.stdout}`,
-        );
-        assert.equal(activeEngine.stdout.trim(), engine);
-    };
-
-    afterEach(() => {
-        if (process.env.MDTXT_E2E_IBUS_ENGINE === "libpinyin") {
-            // Fixture setup and later performance tests must not inherit an
-            // unfinished Chinese preedit from the dedicated IME case.
-            setLinuxIbusEngine("xkb:us::eng");
-        }
-    });
 
     const editorText = () => browser.execute(() => {
         const content = document.querySelector(".cm-content");
@@ -182,6 +172,33 @@ describe("mdtxt native Tauri smoke", () => {
             .then(() => done({ ok: true, bytes: new TextEncoder().encode(content).byteLength }))
             .catch((error) => done({ ok: false, error: String(error) }));
     }, targetBytes, name);
+
+    const stageExactRecovery = async (content, name) => browser.executeAsync((entryContent, entryName, done) => {
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (!invoke) {
+            done({ ok: false, error: "Tauri invoke bridge is unavailable" });
+            return;
+        }
+        const timestamp = Date.now();
+        const entry = {
+            documentId: `native-exact-${timestamp}`,
+            path: null,
+            name: entryName,
+            content: entryContent,
+            version: 1,
+            context: {
+                recoverySessionId: `native-exact-session-${timestamp}`,
+                tabIndex: 0,
+                wasActive: true,
+                cursorLine: 1,
+            },
+        };
+        invoke("list_recoveries")
+            .then((existing) => Promise.all(existing.map((item) => invoke("discard_recovery", { documentId: item.documentId }))))
+            .then(() => invoke("write_recovery", entry))
+            .then(() => done({ ok: true }))
+            .catch((error) => done({ ok: false, error: String(error) }));
+    }, content, name);
 
     const restoreStagedRecovery = async () => {
         await browser.refresh();
@@ -306,17 +323,26 @@ describe("mdtxt native Tauri smoke", () => {
     it("composes Chinese through the Ubuntu IBus engine without corrupting Source or Live", async function () {
         if (process.env.MDTXT_E2E_IBUS_ENGINE !== "libpinyin") this.skip();
 
+        // This case runs in its own application process with libpinyin active
+        // before GTK/WebKit creates the input context. Stage the English
+        // fixture through the native recovery API so no WebDriver setup keys
+        // can accidentally enter an IBus preedit.
+        const fixture = "# IBus native IME\n\n";
+        assert.deepEqual(
+            await stageExactRecovery(fixture, "Native IBus IME.md"),
+            { ok: true },
+        );
+        await browser.execute(() => {
+            localStorage.setItem("mdtxt:liveBeta", "true");
+            localStorage.setItem("mdtxt:tourDone", "true");
+        });
+        await restoreStagedRecovery();
         const sourceMode = await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']");
         await activate(sourceMode);
         const editor = await $(".cm-content");
         await editor.waitForDisplayed();
-        await editor.setValue("# IBus native IME\n\n");
         await dismissTourIfPresent();
-        // Keep WebDriver's English fixture preparation outside the IME path.
-        // Activating libpinyin before setValue causes those setup keystrokes
-        // to become one long, uncommitted native preedit and invalidates both
-        // the composition and subsequent performance evidence.
-        setLinuxIbusEngine("libpinyin");
+        assert.equal(await editorText(), fixture);
 
         const prepared = await browser.execute(() => {
             const content = document.querySelector(".cm-content");
@@ -615,7 +641,7 @@ describe("mdtxt native Tauri smoke", () => {
             };
         });
 
-        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=x11-xdotool inputEvent=${result.inputEvent} beforeInputSamples=${result.beforeInputSamples} inputEventSamples=${result.inputEventSamples} keydownMutationSamples=${result.keydownMutationSamples} inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
+        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=x11-xte-xtest inputEvent=${result.inputEvent} beforeInputSamples=${result.beforeInputSamples} inputEventSamples=${result.inputEventSamples} keydownMutationSamples=${result.keydownMutationSamples} inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
         assert.equal(result.ok, true);
         assert.equal(result.inputSamples, 40);
         assert.equal(result.suffix, "x".repeat(40));

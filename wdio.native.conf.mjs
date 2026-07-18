@@ -54,7 +54,11 @@ export const config = {
     framework: "mocha",
     connectionRetryTimeout: 120_000,
     connectionRetryCount: 3,
-    mochaOpts: { ui: "bdd", timeout: 120_000 },
+    mochaOpts: {
+        ui: "bdd",
+        timeout: 120_000,
+        ...(process.env.MDTXT_E2E_GREP ? { grep: process.env.MDTXT_E2E_GREP } : {}),
+    },
     onPrepare: () => {
         if (process.env.MDTXT_E2E_SKIP_BUILD === "true") return;
         const result = spawnSync("bun", ["run", "tauri", "--", "build", "--debug", "--no-bundle"], {
