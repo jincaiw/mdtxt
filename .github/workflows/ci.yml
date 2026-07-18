@@ -253,15 +253,16 @@ jobs:
         run: |
           xvfb-run --auto-servernum bun run test:native
 
-      # Restart the complete harness after a pre-session failure; WebdriverIO's
-      # HTTP retry cannot recover a stopped tauri-driver process.
+      # Current EdgeDriver cannot launch this Tauri WebView2 host reliably.
+      # The harness starts the app with a remote-debugging port and attaches
+      # EdgeDriver to it, following Microsoft's supported WebView2 attach flow.
       - name: Run native WebView smoke tests on Windows
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
           $passed = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            Write-Host "Native WebView attempt $attempt of 3"
+          for ($attempt = 1; $attempt -le 2; $attempt++) {
+            Write-Host "Native WebView attempt $attempt of 2"
             bun run test:native
             if ($LASTEXITCODE -eq 0) {
               $passed = $true
@@ -273,5 +274,5 @@ jobs:
           }
 
           if (-not $passed) {
-            throw 'Windows native WebView smoke failed after three clean attempts.'
+            throw 'Windows native WebView smoke failed after two clean attempts.'
           }
