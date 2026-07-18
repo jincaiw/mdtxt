@@ -10,6 +10,9 @@ const binary = process.env.MDTXT_E2E_BINARY
 const tauriDriver = process.env.TAURI_DRIVER ?? resolve(homedir(), ".cargo", "bin", process.platform === "win32" ? "tauri-driver.exe" : "tauri-driver");
 const edgeDriver = process.env.EDGE_DRIVER ?? "msedgedriver.exe";
 const windowsDebugPort = 9222;
+const windowsUserDataFolder = process.platform === "win32"
+    ? resolve(process.env.RUNNER_TEMP ?? process.env.TEMP ?? root, `mdtxt-webview2-${process.pid}`)
+    : undefined;
 let driver;
 let application;
 let shuttingDown = false;
@@ -63,8 +66,8 @@ export const config = {
         }],
     reporters: ["spec"],
     framework: "mocha",
-    connectionRetryTimeout: 45_000,
-    connectionRetryCount: 0,
+    connectionRetryTimeout: process.platform === "win32" ? 45_000 : 120_000,
+    connectionRetryCount: process.platform === "win32" ? 0 : 3,
     mochaOpts: { ui: "bdd", timeout: 120_000 },
     onPrepare: () => {
         const result = spawnSync("bun", ["run", "tauri", "--", "build", "--debug", "--no-bundle"], {
@@ -81,7 +84,11 @@ export const config = {
                 env: {
                     ...process.env,
                     TAURI_WEBVIEW_AUTOMATION: "true",
-                    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${windowsDebugPort}`,
+                    WEBVIEW2_USER_DATA_FOLDER: windowsUserDataFolder,
+                    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: [
+                        `--remote-debugging-port=${windowsDebugPort}`,
+                        `--user-data-dir="${windowsUserDataFolder}"`,
+                    ].join(" "),
                 },
                 stdio: ["ignore", process.stdout, process.stderr],
             });
