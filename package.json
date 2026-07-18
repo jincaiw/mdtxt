@@ -20,6 +20,7 @@
     "test": "vitest run",
     "benchmark:live-editor": "bun scripts/benchmark-live-editor.ts",
     "test:native": "wdio run wdio.native.conf.mjs",
+    "test:native:windows": "bun scripts/windows-native-smoke.mjs",
     "test:watch": "vitest",
     "tauri": "tauri"
   },

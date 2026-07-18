@@ -246,33 +246,30 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Install Tauri WebDriver bridge
+        if: matrix.platform == 'ubuntu-24.04'
         run: cargo install tauri-driver --locked
+
+      - name: Build native debug binary
+        if: matrix.platform == 'ubuntu-24.04'
+        run: bun run tauri -- build --debug --no-bundle
+
+      # execute_js returns through Tauri's global invoke API. Enable that API
+      # only in this ephemeral Debug evidence build; the checked-in production
+      # config and every release bundle keep withGlobalTauri=false.
+      - name: Build Windows automation debug binary
+        if: matrix.platform == 'windows-latest'
+        run: bun run tauri -- build --debug --no-bundle --config '{"app":{"withGlobalTauri":true}}'
 
       - name: Run native WebView smoke tests on Linux
         if: matrix.platform == 'ubuntu-24.04'
+        env:
+          MDTXT_E2E_SKIP_BUILD: 'true'
         run: |
           xvfb-run --auto-servernum bun run test:native
 
-      # Current EdgeDriver cannot launch this Tauri WebView2 host reliably.
-      # The harness starts the app with a remote-debugging port and attaches
-      # EdgeDriver to it, following Microsoft's supported WebView2 attach flow.
+      # Current EdgeDriver cannot launch or attach to this Tauri/Wry WebView2
+      # host. The Debug-only localhost MCP bridge supplies DOM/IPC observation,
+      # while Win32 SendInput supplies real OS keyboard events.
       - name: Run native WebView smoke tests on Windows
         if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          $passed = $false
-          for ($attempt = 1; $attempt -le 2; $attempt++) {
-            Write-Host "Native WebView attempt $attempt of 2"
-            bun run test:native
-            if ($LASTEXITCODE -eq 0) {
-              $passed = $true
-              break
-            }
-            Get-Process mdtxt, msedgewebview2, tauri-driver -ErrorAction SilentlyContinue |
-              Stop-Process -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 2
-          }
-
-          if (-not $passed) {
-            throw 'Windows native WebView smoke failed after two clean attempts.'
-          }
+        run: bun run test:native:windows
