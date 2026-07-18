@@ -264,8 +264,6 @@ async function run() {
         window.__mdtxtNativeInputSamples = {
             beforeinput: [],
             input: [],
-            keydownMutation: [],
-            keydownStarts: [],
         };
         const record = (eventName) => {
             const started = performance.now();
@@ -275,26 +273,11 @@ async function run() {
         };
         const onBeforeInput = () => record("beforeinput");
         const onInput = () => record("input");
-        const onKeyDown = (event) => {
-            if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
-                window.__mdtxtNativeInputSamples.keydownStarts.push(performance.now());
-            }
-        };
-        const mutationObserver = new MutationObserver(() => {
-            const started = window.__mdtxtNativeInputSamples.keydownStarts.shift();
-            if (started !== undefined) {
-                window.__mdtxtNativeInputSamples.keydownMutation.push(performance.now() - started);
-            }
-        });
         content.addEventListener("beforeinput", onBeforeInput, true);
         content.addEventListener("input", onInput, true);
-        content.addEventListener("keydown", onKeyDown, true);
-        mutationObserver.observe(content, { childList: true, characterData: true, subtree: true });
         window.__mdtxtNativeInputCleanup = () => {
             content.removeEventListener("beforeinput", onBeforeInput, true);
             content.removeEventListener("input", onInput, true);
-            content.removeEventListener("keydown", onKeyDown, true);
-            mutationObserver.disconnect();
         };
         return { ok: true };
     `), { ok: true });
@@ -306,25 +289,19 @@ async function run() {
         const eventSamples = window.__mdtxtNativeInputSamples ?? {
             beforeinput: [],
             input: [],
-            keydownMutation: [],
         };
         window.__mdtxtNativeInputCleanup?.();
         delete window.__mdtxtNativeInputCleanup;
         delete window.__mdtxtNativeInputSamples;
         const inputEvent = eventSamples.beforeinput.length === 40
             ? "beforeinput"
-            : eventSamples.input.length === 40
-                ? "input"
-                : "keydown-mutation";
-        const samples = (inputEvent === "keydown-mutation"
-            ? eventSamples.keydownMutation
-            : eventSamples[inputEvent]).sort((left, right) => left - right);
+            : "input";
+        const samples = eventSamples[inputEvent].sort((left, right) => left - right);
         const activeLine = content?.querySelector(".cm-activeLine");
         return {
             inputEvent,
             beforeInputSamples: eventSamples.beforeinput.length,
             inputEventSamples: eventSamples.input.length,
-            keydownMutationSamples: eventSamples.keydownMutation.length,
             inputSamples: samples.length,
             inputP50: samples[Math.ceil(samples.length * 0.5) - 1],
             inputP95: samples[Math.ceil(samples.length * 0.95) - 1],
@@ -332,7 +309,7 @@ async function run() {
             suffix: activeLine?.textContent?.slice(-40),
         };
     `);
-    console.log(`MDTXT_NATIVE_PERF platform=windows target=1MiB inputMethod=win32-sendinput inputEvent=${inputResult.inputEvent} beforeInputSamples=${inputResult.beforeInputSamples} inputEventSamples=${inputResult.inputEventSamples} keydownMutationSamples=${inputResult.keydownMutationSamples} inputProcessingSamples=${inputResult.inputSamples} inputProcessingP50Ms=${inputResult.inputP50} inputProcessingP95Ms=${inputResult.inputP95} inputProcessingMaxMs=${inputResult.inputMax}`);
+    console.log(`MDTXT_NATIVE_PERF platform=windows target=1MiB inputMethod=win32-sendinput inputEvent=${inputResult.inputEvent} beforeInputSamples=${inputResult.beforeInputSamples} inputEventSamples=${inputResult.inputEventSamples} inputProcessingSamples=${inputResult.inputSamples} inputProcessingP50Ms=${inputResult.inputP50} inputProcessingP95Ms=${inputResult.inputP95} inputProcessingMaxMs=${inputResult.inputMax}`);
     assert.equal(inputResult.inputSamples, 40);
     assert.equal(inputResult.suffix, "x".repeat(40));
     assert.ok(inputResult.inputP95 <= 16, `1 MiB native WebView input-processing P95 was ${inputResult.inputP95} ms`);
