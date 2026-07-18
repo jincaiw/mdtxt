@@ -26,11 +26,14 @@ describe("mdtxt native Tauri smoke", () => {
             `xdotool could not activate mdtxt window ${windowId} (${activateWindow.status}): ${activateWindow.stderr || activateWindow.stdout}`,
         );
         // Activating the Tauri top-level window does not by itself move X11
-        // keyboard focus into WebKit's content child. Click the center of the
-        // editor surface through XTEST before issuing native keys.
+        // keyboard focus into WebKit's content child. Click a stable point on
+        // the first visible CodeMirror line through XTEST before issuing
+        // native keys. A click in the large blank scroll area is not enough:
+        // GTK can keep IBus preedit in its out-of-process panel without ever
+        // delivering composition or keyboard events to `.cm-content`.
         const clickEditor = spawnSync(
             "xdotool",
-            ["mousemove", "--window", windowId, "400", "300", "click", "1"],
+            ["mousemove", "--window", windowId, "80", "115", "click", "1"],
             { encoding: "utf8" },
         );
         assert.equal(
