@@ -263,6 +263,11 @@ async function run() {
     });
     console.log("MDTXT_NATIVE_WINDOWS phase=restore-1MiB");
     await restoreStagedRecovery();
+    // Recovery resolves when the editable CodeMirror host is mounted. WebView2
+    // can still be completing deferred syntax/layout work for the 1 MiB DOM;
+    // keep that settling outside the input-processing measurement so the
+    // fixed five-second bridge window does not race background initialization.
+    await wait(2_000);
     console.log("MDTXT_NATIVE_WINDOWS phase=prepare-native-input");
     assert.deepEqual(await execute(`
         const content = document.querySelector(".cm-content");
