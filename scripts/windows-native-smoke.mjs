@@ -172,6 +172,22 @@ async function discardRecovery(documentId) {
     `);
 }
 
+async function discardAllRecoveries() {
+    return execute(`
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (!invoke) throw new Error("Tauri invoke bridge is unavailable");
+        const existing = await invoke("list_recoveries");
+        await Promise.all(existing.map((entry) =>
+            invoke("discard_recovery", { documentId: entry.documentId })
+        ));
+        return existing.map((entry) => ({
+            documentId: entry.documentId,
+            name: entry.name,
+            bytes: new TextEncoder().encode(entry.content).byteLength,
+        }));
+    `);
+}
+
 async function restoreStagedRecovery() {
     await reload();
     await waitForScript(
@@ -355,6 +371,8 @@ async function run() {
         return true;
     `);
     await reload();
+    const staleRecoveries = await discardAllRecoveries();
+    console.log(`MDTXT_NATIVE_WINDOWS staleRecoveriesBefore10MiB=${JSON.stringify(staleRecoveries)}`);
 
     const target10MiB = 10 * 1024 * 1024;
     console.log("MDTXT_NATIVE_WINDOWS phase=stage-10MiB");

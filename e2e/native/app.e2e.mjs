@@ -25,6 +25,19 @@ describe("mdtxt native Tauri smoke", () => {
             0,
             `xdotool could not activate mdtxt window ${windowId} (${activateWindow.status}): ${activateWindow.stderr || activateWindow.stdout}`,
         );
+        // Activating the Tauri top-level window does not by itself move X11
+        // keyboard focus into WebKit's content child. Click the center of the
+        // editor surface through XTEST before issuing native keys.
+        const clickEditor = spawnSync(
+            "xdotool",
+            ["mousemove", "--window", windowId, "400", "300", "click", "1"],
+            { encoding: "utf8" },
+        );
+        assert.equal(
+            clickEditor.status,
+            0,
+            `xdotool could not click mdtxt editor (${clickEditor.status}): ${clickEditor.stderr || clickEditor.stdout}`,
+        );
     };
 
     const sendLinuxNativeKey = (key) => {
@@ -243,13 +256,13 @@ describe("mdtxt native Tauri smoke", () => {
             events: window.__mdtxtImeEvents ?? [],
             text: document.querySelector(".cm-activeLine")?.textContent ?? "",
         }));
-        assert.equal(preedit.events.some((event) => event.type === "compositionstart"), true);
         const screenshot = spawnSync("scrot", ["/tmp/mdtxt-ibus-preedit.png"], { encoding: "utf8" });
         assert.equal(
             screenshot.status,
             0,
             `scrot failed (${screenshot.status}): ${screenshot.stderr || screenshot.stdout}`,
         );
+        assert.equal(preedit.events.some((event) => event.type === "compositionstart"), true);
 
         sendLinuxNativeKey("space");
         await browser.pause(500);
