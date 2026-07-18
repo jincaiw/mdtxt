@@ -175,7 +175,9 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.pause(250);
         const tour = await $("[role='dialog'][aria-label='欢迎导览'], [role='dialog'][aria-label='Welcome tour']");
         if (await tour.isExisting()) {
-            await browser.keys(["Escape"]);
+            const skipTour = await $("//button[contains(., '直接开始写作') or contains(., 'Just start writing')]");
+            await skipTour.waitForDisplayed();
+            await activate(skipTour);
             await tour.waitForDisplayed({ reverse: true });
         }
         await browser.execute(() => localStorage.setItem("mdtxt:tourDone", "true"));
