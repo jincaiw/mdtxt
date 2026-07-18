@@ -103,19 +103,29 @@ function runCommand(command, args, description) {
 async function focusEditorWindow() {
     let search;
     for (let attempt = 0; attempt < 100; attempt += 1) {
-        search = spawnSync(
-            "xdotool",
+        for (const args of [
             ["search", "--onlyvisible", "--pid", String(application.pid)],
-            { encoding: "utf8" },
-        );
-        if (search.status === 0 && search.stdout.trim()) break;
-        search = spawnSync(
-            "xdotool",
+            ["search", "--onlyvisible", "--class", "mdtxt"],
+            ["search", "--onlyvisible", "--classname", "mdtxt"],
             ["search", "--onlyvisible", "--name", "mdtxt"],
+            ["search", "--onlyvisible", "--name", "Native IBus IME"],
+        ]) {
+            search = spawnSync("xdotool", args, { encoding: "utf8" });
+            if (search.status === 0 && search.stdout.trim()) break;
+        }
+        if (search?.status === 0 && search.stdout.trim()) break;
+        await wait(100);
+    }
+    if (search?.status !== 0 || !search.stdout.trim()) {
+        const tree = spawnSync("xwininfo", ["-root", "-tree"], { encoding: "utf8" });
+        const visible = spawnSync(
+            "xdotool",
+            ["search", "--onlyvisible", "--name", ".*"],
             { encoding: "utf8" },
         );
-        if (search.status === 0 && search.stdout.trim()) break;
-        await wait(100);
+        console.error(`MDTXT_X11_DIAGNOSTIC applicationPid=${application.pid}`);
+        console.error(`MDTXT_X11_TREE\n${tree.stdout || tree.stderr}`);
+        console.error(`MDTXT_X11_VISIBLE\n${visible.stdout || visible.stderr}`);
     }
     assert.equal(
         search?.status,

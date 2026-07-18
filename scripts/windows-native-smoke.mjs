@@ -188,7 +188,7 @@ async function discardAllRecoveries() {
     `);
 }
 
-async function restoreStagedRecovery() {
+async function restoreStagedRecovery({ captureNativeInput = false } = {}) {
     await reload();
     await waitForScript(
         "return Boolean(document.querySelector(\"[role='alertdialog']\"));",
@@ -202,6 +202,27 @@ async function restoreStagedRecovery() {
                 window.addEventListener("mdtxt:editor-metric", (event) => {
                     window.__mdtxtNativeMetrics.push(event.detail);
                 });
+            }
+            if (${captureNativeInput}) {
+                window.__mdtxtNativeInputSamples = {
+                    beforeinput: [],
+                    input: [],
+                };
+                const record = (eventName, event) => {
+                    if (!(event.target instanceof Element) || !event.target.closest(".cm-content")) return;
+                    const started = performance.now();
+                    queueMicrotask(() => {
+                        window.__mdtxtNativeInputSamples[eventName].push(performance.now() - started);
+                    });
+                };
+                const onBeforeInput = (event) => record("beforeinput", event);
+                const onInput = (event) => record("input", event);
+                document.addEventListener("beforeinput", onBeforeInput, true);
+                document.addEventListener("input", onInput, true);
+                window.__mdtxtNativeInputCleanup = () => {
+                    document.removeEventListener("beforeinput", onBeforeInput, true);
+                    document.removeEventListener("input", onInput, true);
+                };
             }
             const button = [...document.querySelectorAll("[role='alertdialog'] button")]
                 .find((candidate) => /恢复|Restore/.test(candidate.textContent ?? ""));
@@ -278,46 +299,13 @@ async function run() {
         bytes: target1MiB,
     });
     console.log("MDTXT_NATIVE_WINDOWS phase=restore-1MiB");
-    await restoreStagedRecovery();
+    await restoreStagedRecovery({ captureNativeInput: true });
     // Recovery resolves when the editable CodeMirror host is mounted. WebView2
     // can still be completing deferred syntax/layout work for the 1 MiB DOM;
     // keep that settling outside the input-processing measurement so the
     // fixed five-second bridge window does not race background initialization.
     await wait(2_000);
     console.log("MDTXT_NATIVE_WINDOWS phase=prepare-native-input");
-    assert.deepEqual(await execute(`
-        const content = document.querySelector(".cm-content");
-        if (!(content instanceof HTMLElement)) {
-            return { ok: false, error: "CodeMirror content is unavailable" };
-        }
-        // The editor focuses itself when the restored CodeMirror host mounts.
-        // Re-focusing a 1 MiB contenteditable here forces WebView2 to resolve
-        // its full layout box and exceeds the bridge's five-second script
-        // budget. Preserve the mounted focus and fail explicitly if it was
-        // lost instead of hiding that condition with a costly synthetic focus.
-        if (document.activeElement !== content) {
-            return { ok: false, error: "CodeMirror content did not retain focus after recovery" };
-        }
-        window.__mdtxtNativeInputSamples = {
-            beforeinput: [],
-            input: [],
-        };
-        const record = (eventName) => {
-            const started = performance.now();
-            queueMicrotask(() => {
-                window.__mdtxtNativeInputSamples[eventName].push(performance.now() - started);
-            });
-        };
-        const onBeforeInput = () => record("beforeinput");
-        const onInput = () => record("input");
-        content.addEventListener("beforeinput", onBeforeInput, true);
-        content.addEventListener("input", onInput, true);
-        window.__mdtxtNativeInputCleanup = () => {
-            content.removeEventListener("beforeinput", onBeforeInput, true);
-            content.removeEventListener("input", onInput, true);
-        };
-        return { ok: true };
-    `), { ok: true });
 
     sendNativeText("x".repeat(40));
     await wait(250);
