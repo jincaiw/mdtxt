@@ -253,45 +253,23 @@ jobs:
         run: |
           xvfb-run --auto-servernum bun run test:native
 
-      # WebView2 occasionally fails before a WebDriver session exists with
-      # `DevToolsActivePort file doesn't exist`. WebdriverIO's HTTP retry keeps
-      # the same half-started app/profile and therefore cannot recover. Restart
-      # the complete test process instead; the second build is incremental.
+      # Restart the complete harness after a pre-session failure; WebdriverIO's
+      # HTTP retry cannot recover a stopped tauri-driver process.
       - name: Run native WebView smoke tests on Windows
         if: matrix.platform == 'windows-latest'
         shell: pwsh
-        env:
-          WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: --remote-debugging-port=0
         run: |
-          $watchLog = Join-Path $env:RUNNER_TEMP 'mdtxt-webview2-discovery.log'
-          $watchErrorLog = Join-Path $env:RUNNER_TEMP 'mdtxt-webview2-discovery-error.log'
-          $watcher = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
-            '-NoProfile',
-            '-ExecutionPolicy', 'Bypass',
-            '-File', (Join-Path $env:GITHUB_WORKSPACE 'scripts\watch-webview2-devtools.ps1'),
-            '-TempRoot', $env:TEMP,
-            '-RunnerTempRoot', $env:RUNNER_TEMP,
-            '-DebugRoot', (Join-Path $env:GITHUB_WORKSPACE 'src-tauri\target\debug')
-          ) -RedirectStandardOutput $watchLog -RedirectStandardError $watchErrorLog -PassThru
-
           $passed = $false
-          try {
-            for ($attempt = 1; $attempt -le 3; $attempt++) {
-              Write-Host "Native WebView attempt $attempt of 3"
-              bun run test:native
-              if ($LASTEXITCODE -eq 0) {
-                $passed = $true
-                break
-              }
-              Get-Process mdtxt, msedgewebview2 -ErrorAction SilentlyContinue |
-                Stop-Process -Force -ErrorAction SilentlyContinue
-              Start-Sleep -Seconds 2
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Write-Host "Native WebView attempt $attempt of 3"
+            bun run test:native
+            if ($LASTEXITCODE -eq 0) {
+              $passed = $true
+              break
             }
-          } finally {
-            Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue
-            Wait-Process -Id $watcher.Id -Timeout 10 -ErrorAction SilentlyContinue
-            if (Test-Path $watchLog) { Get-Content $watchLog }
-            if (Test-Path $watchErrorLog) { Get-Content $watchErrorLog }
+            Get-Process mdtxt, msedgewebview2, tauri-driver -ErrorAction SilentlyContinue |
+              Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
           }
 
           if (-not $passed) {
