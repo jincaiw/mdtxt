@@ -104,14 +104,15 @@ export const config = {
         // Upstream tauri-driver on Linux rejects that extra capability.
         ...(useManagedWindowsDriver ? { browserName: "tauri" } : {}),
         maxInstances: 1,
-        "tauri:options": { application: binary },
-        ...(windowsUserDataFolder ? {
-            // Tell EdgeDriver to watch the same default profile that Wry gives
-            // WebView2 instead of an unrelated temporary user-data directory.
-            "ms:edgeOptions": {
-                webviewOptions: { userDataFolder: windowsUserDataFolder },
-            },
-        } : {}),
+        // tauri-driver owns the conversion to ms:edgeOptions. Supplying those
+        // options at the top level is ineffective because its conversion
+        // replaces them; WebView2 options must remain inside tauri:options.
+        "tauri:options": {
+            application: binary,
+            ...(windowsUserDataFolder
+                ? { webviewOptions: { userDataFolder: windowsUserDataFolder } }
+                : {}),
+        },
     }],
     reporters: ["spec"],
     framework: "mocha",
