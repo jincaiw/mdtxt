@@ -10,8 +10,11 @@ const binary = process.env.MDTXT_E2E_BINARY
     ?? resolve(root, "src-tauri", "target", "debug", process.platform === "win32" ? "mdtxt.exe" : "mdtxt");
 const tauriDriver = process.env.TAURI_DRIVER ?? resolve(homedir(), ".cargo", "bin", process.platform === "win32" ? "tauri-driver.exe" : "tauri-driver");
 const useManagedWindowsDriver = process.platform === "win32";
-const windowsUserDataFolder = process.env.LOCALAPPDATA
-    ? join(process.env.LOCALAPPDATA, "app.mdtxt.desktop")
+// Wry does not configure a custom WebView2 data directory for this window.
+// WebView2 therefore creates its default profile beside the executable as
+// `<executable>.WebView2` (including the `.exe` suffix).
+const windowsUserDataFolder = process.platform === "win32"
+    ? `${binary}.WebView2`
     : undefined;
 let driver;
 let shuttingDown = false;
@@ -103,9 +106,8 @@ export const config = {
         maxInstances: 1,
         "tauri:options": { application: binary },
         ...(windowsUserDataFolder ? {
-            // Tauri 2 pins WebView2 to %LOCALAPPDATA%/<identifier>. Tell
-            // EdgeDriver to watch that same profile for DevToolsActivePort
-            // instead of an unrelated temporary user-data directory.
+            // Tell EdgeDriver to watch the same default profile that Wry gives
+            // WebView2 instead of an unrelated temporary user-data directory.
             "ms:edgeOptions": {
                 webviewOptions: { userDataFolder: windowsUserDataFolder },
             },
