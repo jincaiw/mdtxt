@@ -1,116 +1,9 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 
 describe("mdtxt native Tauri smoke", () => {
     const activate = async (element) => {
         await browser.execute((target) => target.click(), element);
     };
-
-    const focusLinuxAppWindow = () => {
-        const search = spawnSync("xdotool", ["search", "--onlyvisible", "--name", "mdtxt"], {
-            encoding: "utf8",
-        });
-        const windowId = search.stdout.trim().split(/\s+/).filter(Boolean).at(-1);
-        assert.equal(
-            search.status,
-            0,
-            `xdotool could not find the mdtxt X11 window (${search.status}): ${search.stderr || search.stdout}`,
-        );
-        assert.ok(windowId, "xdotool returned no visible mdtxt X11 window");
-        const activateWindow = spawnSync("xdotool", ["windowactivate", "--sync", windowId], {
-            encoding: "utf8",
-        });
-        assert.equal(
-            activateWindow.status,
-            0,
-            `xdotool could not activate mdtxt window ${windowId} (${activateWindow.status}): ${activateWindow.stderr || activateWindow.stdout}`,
-        );
-        // Openbox's EWMH activation raises the window but does not
-        // consistently update X11's keyboard focus under Xvfb. Set it
-        // explicitly before the XTEST click so subsequent keys reach GTK's
-        // focused WebKit widget and its IBus input context.
-        const focusWindow = spawnSync("xdotool", ["windowfocus", "--sync", windowId], {
-            encoding: "utf8",
-        });
-        assert.equal(
-            focusWindow.status,
-            0,
-            `xdotool could not focus mdtxt window ${windowId} (${focusWindow.status}): ${focusWindow.stderr || focusWindow.stdout}`,
-        );
-        // Activating the Tauri top-level window does not by itself move X11
-        // keyboard focus into WebKit's content child. Click a stable point on
-        // the first visible CodeMirror line through XTEST before issuing
-        // native keys. A click in the large blank scroll area is not enough:
-        // GTK can keep IBus preedit in its out-of-process panel without ever
-        // delivering composition or keyboard events to `.cm-content`.
-        const clickEditor = spawnSync(
-            "xdotool",
-            ["mousemove", "--window", windowId, "80", "115", "click", "1"],
-            { encoding: "utf8" },
-        );
-        assert.equal(
-            clickEditor.status,
-            0,
-            `xdotool could not click mdtxt editor (${clickEditor.status}): ${clickEditor.stderr || clickEditor.stdout}`,
-        );
-        const actualFocus = spawnSync("xdotool", ["getwindowfocus"], { encoding: "utf8" });
-        assert.equal(
-            actualFocus.status,
-            0,
-            `xdotool could not read X11 keyboard focus (${actualFocus.status}): ${actualFocus.stderr || actualFocus.stdout}`,
-        );
-        console.log(`MDTXT_X11_FOCUS target=${windowId} actual=${actualFocus.stdout.trim()}`);
-    };
-
-    const runLinuxXtest = (commands, description) => {
-        // xte is a small XTEST client independent of WebDriver and WebKit. It
-        // sends the same server-level key events as a physical keyboard; it
-        // neither mutates contenteditable nor falls back to XSendEvent.
-        const result = spawnSync("xte", commands, { encoding: "utf8" });
-        assert.equal(
-            result.status,
-            0,
-            `xte ${description} failed (${result.status}): ${result.stderr || result.stdout}`,
-        );
-    };
-
-    const sendLinuxNativeKey = (key) => {
-        const tokens = key.split("+");
-        const keyName = tokens.pop();
-        const modifiers = tokens.map((token) => ({
-            ctrl: "Control_L",
-            shift: "Shift_L",
-            alt: "Alt_L",
-        })[token] ?? token);
-        runLinuxXtest(
-            [
-                ...modifiers.map((modifier) => `keydown ${modifier}`),
-                `key ${keyName}`,
-                ...modifiers.reverse().map((modifier) => `keyup ${modifier}`),
-            ],
-            key,
-        );
-    };
-
-    const sendLinuxNativeText = (text, delay = 1) => {
-        focusLinuxAppWindow();
-        sendLinuxNativeKey("ctrl+End");
-        const delayMicros = Math.max(0, Math.round(delay * 1000));
-        runLinuxXtest(
-            [...text].flatMap((character) => [
-                `key ${character}`,
-                ...(delayMicros > 0 ? [`usleep ${delayMicros}`] : []),
-            ]),
-            `typing ${text.length} characters`,
-        );
-    };
-
-    const editorText = () => browser.execute(() => {
-        const content = document.querySelector(".cm-content");
-        return content
-            ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\n")
-            : null;
-    });
 
     const dismissTourIfPresent = async () => {
         // The tour is mounted by a hasFile/booting effect after the editor
@@ -172,33 +65,6 @@ describe("mdtxt native Tauri smoke", () => {
             .then(() => done({ ok: true, bytes: new TextEncoder().encode(content).byteLength }))
             .catch((error) => done({ ok: false, error: String(error) }));
     }, targetBytes, name);
-
-    const stageExactRecovery = async (content, name) => browser.executeAsync((entryContent, entryName, done) => {
-        const invoke = window.__TAURI_INTERNALS__?.invoke;
-        if (!invoke) {
-            done({ ok: false, error: "Tauri invoke bridge is unavailable" });
-            return;
-        }
-        const timestamp = Date.now();
-        const entry = {
-            documentId: `native-exact-${timestamp}`,
-            path: null,
-            name: entryName,
-            content: entryContent,
-            version: 1,
-            context: {
-                recoverySessionId: `native-exact-session-${timestamp}`,
-                tabIndex: 0,
-                wasActive: true,
-                cursorLine: 1,
-            },
-        };
-        invoke("list_recoveries")
-            .then((existing) => Promise.all(existing.map((item) => invoke("discard_recovery", { documentId: item.documentId }))))
-            .then(() => invoke("write_recovery", entry))
-            .then(() => done({ ok: true }))
-            .catch((error) => done({ ok: false, error: String(error) }));
-    }, content, name);
 
     const restoreStagedRecovery = async () => {
         await browser.refresh();
@@ -318,114 +184,6 @@ describe("mdtxt native Tauri smoke", () => {
         await $(".markdown-body").waitForDisplayed();
         await activate(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']"));
         assert.equal(await $(".markdown-body").isDisplayed(), true);
-    });
-
-    it("composes Chinese through the Ubuntu IBus engine without corrupting Source or Live", async function () {
-        if (process.env.MDTXT_E2E_IBUS_ENGINE !== "libpinyin") this.skip();
-
-        // This case runs in its own application process with libpinyin active
-        // before GTK/WebKit creates the input context. Stage the English
-        // fixture through the native recovery API so no WebDriver setup keys
-        // can accidentally enter an IBus preedit.
-        const fixture = "# IBus native IME\n\n";
-        assert.deepEqual(
-            await stageExactRecovery(fixture, "Native IBus IME.md"),
-            { ok: true },
-        );
-        await browser.execute(() => {
-            localStorage.setItem("mdtxt:liveBeta", "true");
-            localStorage.setItem("mdtxt:tourDone", "true");
-        });
-        await restoreStagedRecovery();
-        const sourceMode = await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']");
-        await activate(sourceMode);
-        const editor = await $(".cm-content");
-        await editor.waitForDisplayed();
-        await dismissTourIfPresent();
-        assert.equal(await editorText(), fixture);
-
-        const prepared = await browser.execute(() => {
-            const content = document.querySelector(".cm-content");
-            if (!(content instanceof HTMLElement)) return { ok: false };
-            content.focus();
-            window.__mdtxtImeEvents = [];
-            for (const type of ["compositionstart", "compositionupdate", "compositionend"]) {
-                content.addEventListener(type, (event) => {
-                    window.__mdtxtImeEvents.push({ type, data: event.data });
-                });
-            }
-            return { ok: document.activeElement === content };
-        });
-        assert.deepEqual(prepared, { ok: true });
-
-        // Keep the preedit visible long enough to capture the real X11 root
-        // window, including IBus's out-of-process candidate panel.
-        sendLinuxNativeText("zhongwen", 35);
-        await browser.pause(350);
-        const preedit = await browser.execute(() => ({
-            events: window.__mdtxtImeEvents ?? [],
-            text: document.querySelector(".cm-activeLine")?.textContent ?? "",
-        }));
-        const screenshot = spawnSync("scrot", ["/tmp/mdtxt-ibus-preedit.png"], { encoding: "utf8" });
-        assert.equal(
-            screenshot.status,
-            0,
-            `scrot failed (${screenshot.status}): ${screenshot.stderr || screenshot.stdout}`,
-        );
-        assert.equal(preedit.events.some((event) => event.type === "compositionstart"), true);
-
-        sendLinuxNativeKey("space");
-        await browser.pause(500);
-        const committed = await browser.execute(() => ({
-            events: window.__mdtxtImeEvents ?? [],
-            text: document.querySelector(".cm-content")
-                ? [...document.querySelectorAll(".cm-content .cm-line")].map((line) => line.textContent ?? "").join("\n")
-                : "",
-        }));
-        assert.equal(committed.events.some((event) => event.type === "compositionend"), true);
-        const sourceChinese = committed.text.match(/[\u3400-\u9fff]{2,}/u)?.[0];
-        assert.ok(sourceChinese, `IBus did not commit multi-character Chinese: ${committed.text}`);
-        assert.equal(committed.text.includes("zhongwen"), false);
-
-        sendLinuxNativeKey("ctrl+z");
-        await browser.pause(200);
-        assert.equal((await editorText()).includes(sourceChinese), false);
-        sendLinuxNativeKey("ctrl+shift+z");
-        await browser.pause(200);
-        assert.equal((await editorText()).includes(sourceChinese), true);
-
-        const liveMode = await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
-        await activate(liveMode);
-        await $(".cm-editor[data-mdtxt-live='true']").waitForExist();
-        await browser.execute(() => document.querySelector(".cm-content")?.focus());
-        sendLinuxNativeText("wancheng", 35);
-        sendLinuxNativeKey("space");
-        await browser.pause(500);
-        const liveText = await editorText();
-        const allChinese = liveText.match(/[\u3400-\u9fff]{2,}/gu) ?? [];
-        assert.ok(allChinese.length >= 2, `Live did not commit a second Chinese phrase: ${liveText}`);
-        assert.equal(liveText.includes("wancheng"), false);
-
-        // Exercise the native clipboard path while Chinese text is selected,
-        // then prove a tab/mode round-trip preserves the exact document bytes.
-        sendLinuxNativeKey("ctrl+a");
-        sendLinuxNativeKey("ctrl+c");
-        sendLinuxNativeKey("End");
-        sendLinuxNativeKey("Return");
-        sendLinuxNativeKey("ctrl+v");
-        await browser.pause(300);
-        const copiedText = await editorText();
-        assert.ok(copiedText.endsWith(liveText), "Native Chinese clipboard paste did not preserve the document text");
-
-        const firstTab = await $("[role='tab'][aria-selected='true']");
-        const firstTabName = await firstTab.getAttribute("title");
-        await activate(await $("button[aria-label='新建标签页'], button[aria-label='New tab']"));
-        await activate(await $(`[role='tab'][title=${JSON.stringify(firstTabName)}]`));
-        assert.equal(await editorText(), copiedText);
-        await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
-        assert.equal(await editorText(), copiedText);
-
-        console.log(`MDTXT_NATIVE_IME platform=ubuntu engine=ibus-libpinyin sourcePhrase=${sourceChinese} compositionEvents=${committed.events.length} liveChineseRuns=${allChinese.length} clipboard=passed undoRedo=passed modeTabRoundTrip=passed screenshot=/tmp/mdtxt-ibus-preedit.png`);
     });
 
     it("round-trips a verified native recovery entry into an unsaved draft", async () => {
@@ -593,18 +351,15 @@ describe("mdtxt native Tauri smoke", () => {
         });
         assert.deepEqual(prepared, { ok: true });
 
-        // Drive the active X11 window through the operating-system input path.
-        // WebKitWebDriver occasionally mutates contenteditable directly without
-        // dispatching any keyboard/input events, which cannot prove native
-        // editor latency even when the resulting text is correct.
-        // `content.focus()` above already transfers DOM focus. A WebDriver
-        // click on a 1 MiB contenteditable asks WebKit to target the midpoint
-        // of its 300k-pixel layout box and is intercepted by the viewport.
-        // Keep the click out of the measurement path and verify the focused
-        // element directly before handing input to X11.
+        // Measure inside the packaged Linux WebKit view through its W3C key
+        // endpoint. Real IBus/XTEST input runs separately without a WebDriver
+        // automation session, because WebKitGTK suppresses external XTEST
+        // events while that session owns the page.
         const focused = await browser.execute(() => document.activeElement?.classList.contains("cm-content") === true);
-        assert.equal(focused, true, "CodeMirror content did not retain focus before X11 input");
-        sendLinuxNativeText("x".repeat(40));
+        assert.equal(focused, true, "CodeMirror content did not retain focus before WebKit input");
+        const editor = await $(".cm-content");
+        await editor.addValue("x".repeat(40));
+        await browser.pause(100);
 
         const result = await browser.execute(() => {
             const content = document.querySelector(".cm-content");
@@ -641,7 +396,7 @@ describe("mdtxt native Tauri smoke", () => {
             };
         });
 
-        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=x11-xte-xtest inputEvent=${result.inputEvent} beforeInputSamples=${result.beforeInputSamples} inputEventSamples=${result.inputEventSamples} keydownMutationSamples=${result.keydownMutationSamples} inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
+        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=webkit-webdriver-w3c-native-view inputEvent=${result.inputEvent} beforeInputSamples=${result.beforeInputSamples} inputEventSamples=${result.inputEventSamples} keydownMutationSamples=${result.keydownMutationSamples} inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
         assert.equal(result.ok, true);
         assert.equal(result.inputSamples, 40);
         assert.equal(result.suffix, "x".repeat(40));

@@ -251,7 +251,10 @@ jobs:
 
       - name: Build native debug binary
         if: matrix.platform == 'ubuntu-24.04'
-        run: bun run tauri -- build --debug --no-bundle
+        run: >
+          bun run tauri -- build --debug --no-bundle
+          --config
+          '{"app":{"withGlobalTauri":true,"security":{"capabilities":["default",{"identifier":"native-automation","description":"Ephemeral CI-only Debug bridge result channel.","windows":["main"],"permissions":["mcp-bridge:default"]}]}}}'
 
       # execute_js returns through Tauri's global invoke API. Enable that API
       # and the bridge's command permission only in this ephemeral Debug
@@ -289,15 +292,13 @@ jobs:
             ibus engine xkb:us::eng
             test "$(ibus engine)" = "xkb:us::eng"
             bun run test:native
-            # GTK/WebKit binds the IBus engine when its input context is
-            # created. Launch the IME proof in a fresh application process
-            # after selecting libpinyin, and stage its English fixture through
-            # the native recovery API instead of WebDriver key input.
+            # Run the real IBus/XTEST proof outside WebKitWebDriver. Linux
+            # WebKitGTK suppresses external XTEST events while an automation
+            # session owns the page; the Debug-only localhost bridge observes
+            # the ordinary packaged WebView without injecting input.
             ibus engine libpinyin
             test "$(ibus engine)" = "libpinyin"
-            MDTXT_E2E_IBUS_ENGINE=libpinyin \
-              MDTXT_E2E_GREP="composes Chinese through the Ubuntu IBus engine" \
-              bun run test:native
+            bun scripts/linux-native-ime.mjs
           '
 
       - name: Upload Ubuntu IBus preedit evidence
