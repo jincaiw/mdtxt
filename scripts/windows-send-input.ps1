@@ -95,7 +95,9 @@ public static class MdtxtNativeInput
         short mapping = VkKeyScanW(character);
         if (mapping == -1)
         {
-            throw new InvalidOperationException($"No virtual-key mapping for U+{(int)character:X4}.");
+            throw new InvalidOperationException(
+                String.Format("No virtual-key mapping for U+{0:X4}.", (int)character)
+            );
         }
 
         ushort virtualKey = (ushort)(mapping & 0xff);
@@ -103,7 +105,11 @@ public static class MdtxtNativeInput
         if (modifiers != 0)
         {
             throw new InvalidOperationException(
-                $"The native smoke only accepts unmodified characters; '{character}' requires modifier mask {modifiers}."
+                String.Format(
+                    "The native smoke only accepts unmodified characters; '{0}' requires modifier mask {1}.",
+                    character,
+                    modifiers
+                )
             );
         }
 
@@ -131,7 +137,12 @@ public static class MdtxtNativeInput
         if (sent != inputs.Length)
         {
             throw new InvalidOperationException(
-                $"SendInput delivered {sent} of {inputs.Length} keyboard records. Win32={Marshal.GetLastWin32Error()}."
+                String.Format(
+                    "SendInput delivered {0} of {1} keyboard records. Win32={2}.",
+                    sent,
+                    inputs.Length,
+                    Marshal.GetLastWin32Error()
+                )
             );
         }
     }

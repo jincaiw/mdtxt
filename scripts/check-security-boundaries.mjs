@@ -4,6 +4,12 @@ const persistence = readFileSync("src/utils/persistence.ts", "utf8");
 const tauriConfig = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
 const tauriLib = readFileSync("src-tauri/src/lib.rs", "utf8");
 const capability = readFileSync("src-tauri/capabilities/default.json", "utf8");
+const ciWorkflow = readFileSync(".github/workflows/ci.yml", "utf8");
+const productionWorkflows = [
+    ".github/workflows/platform-evidence.yml",
+    ".github/workflows/test-build.yml",
+    ".github/workflows/release.yml",
+].map((path) => readFileSync(path, "utf8")).join("\n");
 const failures = [];
 
 const plaintextKeyWrites = [
@@ -30,6 +36,15 @@ if (!/#\[cfg\(debug_assertions\)\][\s\S]{0,500}tauri_plugin_mcp_bridge/.test(tau
 }
 if (/mcp-bridge|fs:scope|fs:allow-write|tauri_plugin_fs::init/.test(capability + tauriLib)) {
     failures.push("production WebView capability must not expose debug automation or broad filesystem writes");
+}
+if (tauriConfig.app?.withGlobalTauri !== false) {
+    failures.push("production WebView must not expose the global Tauri API");
+}
+if (!/Build Windows automation debug binary[\s\S]{0,1200}--debug --no-bundle[\s\S]{0,1200}"withGlobalTauri":true[\s\S]{0,1200}"mcp-bridge:default"/.test(ciWorkflow)) {
+    failures.push("Windows automation permission must remain explicit and confined to a non-bundled Debug CI build");
+}
+if (/withGlobalTauri|mcp-bridge:default/.test(productionWorkflows)) {
+    failures.push("build, platform-evidence, and release workflows must not enable the automation bridge result channel");
 }
 
 if (failures.length) throw new Error(`Security boundary check failed: ${failures.join("; ")}`);
