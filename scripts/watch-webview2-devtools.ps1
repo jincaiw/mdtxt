@@ -16,8 +16,11 @@ $watchers = @()
 
 try {
   foreach ($root in $roots) {
-    if (-not $root -or -not (Test-Path -LiteralPath $root)) {
+    if (-not $root) {
       continue
+    }
+    if (-not (Test-Path -LiteralPath $root)) {
+      New-Item -ItemType Directory -Path $root -Force | Out-Null
     }
 
     Write-Output "Watching WebView2 discovery files under: $root"

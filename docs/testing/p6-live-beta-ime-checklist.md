@@ -30,4 +30,5 @@ in the P6 tracking record for every candidate build.
 | Commit | OS/WebView | IME | Mode and node | Result | Issue link / notes |
 | --- | --- | --- | --- | --- | --- |
 | `f0839d8` | macOS Darwin 25.5.0 / WKWebView | Accessibility value injection (not an IME) | Live heading, emphasis and task list; undo/redo and Source fallback | Basic source editing passed | This does **not** validate Pinyin composition or candidate-window positioning; keep macOS IME status unverified. |
+| `007843b` | macOS 26.5.2 (25F84) / WKWebView; Debug bundle SHA-256 `0d21df9b078036cad6ed86a13ca6b02652295c62354660fa4eb0d56399774235` | Apple Pinyin – Simplified | Source and Live plain Chinese lines; selection/clipboard, undo/redo, mode and tab switching | **Passed** | `anquanceshi` committed as `安全测试`; Live committed `完成` and Source round-tripped `安全测试完成`; copied Chinese remained exact across two lines; undo/redo and tab switching preserved source; `houxuan` preedit displayed its native candidate strip directly below the caret. ABC was restored after the run. |
 | | | | | | |

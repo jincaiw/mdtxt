@@ -1,6 +1,6 @@
 # mdtxt 0.1.0 实施计划（评估优化定稿）
 
-> 状态：**Final v1.0，证据更新至 2026-07-16**（P6 Beta 与 P8 文件安全并行实施中；P10a 三平台 Debug 构建已在 mdtxt 专属远端通过；本版为后续执行唯一计划）
+> 状态：**Final v1.0，证据更新至 2026-07-18**（A3 已再次确认为唯一 UI 基线；P6 macOS 简体拼音门禁已通过，Windows/Linux 仍按平台保持未验证；P8 文件安全并行实施中；本版为后续执行唯一计划）
 > 适用仓库：当前工作树及 mdtxt 专属远端
 > 工作分支：`codex/refactor-mdtxt-0.1.0`
 > 目标：将既有 Paperling 渐进迁移为独立、双语、跨平台的 `mdtxt` 0.1.0。
@@ -38,7 +38,7 @@
 | P3 双语底座 | 完成 | `96a9931`，默认中文、双语键、硬编码门禁 | 新增文字必须双语 |
 | P4 文档会话 | 完成 | `8a087ec`、`a8c782c`、`36a2ac4` 至 `c748e70`；控制器、每标签 `EditorState`、版本化保存、展示投影与 metadata-only tabs；浏览器双标签/Reader/Source 回归无控制台告警 | P5 仅拆分编辑器模块，不改变会话边界 |
 | P5 编辑器模块拆分 | 完成 | `d68ec3d` 至 `c162371`；presentation、viewport、document session、completion、AI review、preferences、overlays、paste、host 与 controller 分层；`CodeEditor.tsx` 收缩为 30 行挂载容器；全量 38 测试文件/296 测试、构建与发布预检通过 | P6 以该稳定 host 为唯一接入点 |
-| P6 Live Beta | 进行中，未验收 | `9232178`、`39b4604`、`752a41a` 建立最小、可逆的 Lezer/Decoration/Compartment 路径；`d63cb43` 改用 Lezer 识别受限 Live 复杂节点，`2d115f2` 使文档增长后的降级判定随展示快照更新，`6630642` 固定单实例依赖树并记录状态基准；`caa0a96` 的 GitHub Ubuntu WebKit 原生启动/设置菜单冒烟通过 | 完成真实 IME/选择/撤销验证、受限 Live 与原生性能证据；状态基准与启动冒烟均不含 IME 路径，显式 Beta 开关也不等于退出 |
+| P6 Live Beta | 进行中，未验收 | 最小、可逆的 Lezer/Decoration/Compartment 路径与受限 Live 已落地；`007843b` 的当前 Debug bundle 已通过 macOS 简体拼音组合/候选/提交、选择/剪贴板、撤销重做、模式/标签切换；同提交的 Ubuntu 原生冒烟通过 1 MiB 输入与 10 MiB Source/受限 Live 测量 | 补齐 Windows Microsoft Pinyin、Linux IBus/Fcitx5 及 Windows 原生性能证据；不得把 macOS/Ubuntu 结果外推为其他平台，显式 Beta 开关也不等于退出 |
 | P7 复杂 Widgets | 未开始 | 不提前实现 | 依赖 P6 退出与焦点/降级协议 |
 | P8 文件安全、冲突与恢复 | 进行中，未验收 | `20017a3` 起；原子替换、修订与哈希防护、可见冲突入口、校验恢复、失败注入、恢复键跨启动隔离及会话恢复顺序/活动标签/光标行的自动化协议均已落地；macOS 已有隔离 Debug 两标签 AC-007 原生恢复证据；以 `docs/audits/p8-file-safety-tracking.md` 为唯一证据表 | 完成 Windows/Linux 恢复与文件系统矩阵，并对每个 post-rename 不确定性提供可见告警；macOS Debug 证据不外推为其他平台或发布包通过 |
 | P10a 平台证据基座 | 三平台 Debug 构建基座完成，目标平台功能证据未完成；不计入发布工程完成 | `019c86e` 建立手动三平台 Debug 包和 SHA-256 清单采集，`edf96d7` 对齐 CI 目标；独立远端 `jincaiw/mdtxt` 已建立；A3 对齐提交 `99cc34b` 的 [Platform Evidence Build #29481051915](https://github.com/jincaiw/mdtxt/actions/runs/29481051915) 在 macOS ARM64、Windows x64 与 Ubuntu 24.04 全部通过，下载后的 DMG/MSI/NSIS/DEB/AppImage 哈希与清单一致；`523793e` 的 [CI #29481353041](https://github.com/jincaiw/mdtxt/actions/runs/29481353041) 还通过了 Windows/Ubuntu 原生 WebView 四模式工作区冒烟 | 继续完成三平台安装、IME、恢复和 P6/P8 功能矩阵；不得将包构建或非交互原生冒烟宣称为平台功能通过 |
