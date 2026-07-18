@@ -6,18 +6,44 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.execute((target) => target.click(), element);
     };
 
-    const sendLinuxNativeText = (text) => {
-        const keyResult = spawnSync("xdotool", ["key", "--clearmodifiers", "ctrl+End"], {
+    const focusLinuxAppWindow = () => {
+        const search = spawnSync("xdotool", ["search", "--onlyvisible", "--name", "mdtxt"], {
+            encoding: "utf8",
+        });
+        const windowId = search.stdout.trim().split(/\s+/).filter(Boolean).at(-1);
+        assert.equal(
+            search.status,
+            0,
+            `xdotool could not find the mdtxt X11 window (${search.status}): ${search.stderr || search.stdout}`,
+        );
+        assert.ok(windowId, "xdotool returned no visible mdtxt X11 window");
+        const activateWindow = spawnSync("xdotool", ["windowactivate", "--sync", windowId], {
+            encoding: "utf8",
+        });
+        assert.equal(
+            activateWindow.status,
+            0,
+            `xdotool could not activate mdtxt window ${windowId} (${activateWindow.status}): ${activateWindow.stderr || activateWindow.stdout}`,
+        );
+    };
+
+    const sendLinuxNativeKey = (key) => {
+        const keyResult = spawnSync("xdotool", ["key", "--clearmodifiers", key], {
             encoding: "utf8",
         });
         assert.equal(
             keyResult.status,
             0,
-            `xdotool Ctrl+End failed (${keyResult.status}): ${keyResult.stderr || keyResult.stdout}`,
+            `xdotool ${key} failed (${keyResult.status}): ${keyResult.stderr || keyResult.stdout}`,
         );
+    };
+
+    const sendLinuxNativeText = (text, delay = 1) => {
+        focusLinuxAppWindow();
+        sendLinuxNativeKey("ctrl+End");
         const typeResult = spawnSync(
             "xdotool",
-            ["type", "--clearmodifiers", "--delay", "1", "--", text],
+            ["type", "--clearmodifiers", "--delay", String(delay), "--", text],
             { encoding: "utf8" },
         );
         assert.equal(
@@ -26,6 +52,13 @@ describe("mdtxt native Tauri smoke", () => {
             `xdotool typing failed (${typeResult.status}): ${typeResult.stderr || typeResult.stdout}`,
         );
     };
+
+    const editorText = () => browser.execute(() => {
+        const content = document.querySelector(".cm-content");
+        return content
+            ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\n")
+            : null;
+    });
 
     const stageSizedRecovery = async (targetBytes, name) => browser.executeAsync((bytes, entryName, done) => {
         const invoke = window.__TAURI_INTERNALS__?.invoke;
@@ -177,6 +210,99 @@ describe("mdtxt native Tauri smoke", () => {
         await $(".markdown-body").waitForDisplayed();
         await activate(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']"));
         assert.equal(await $(".markdown-body").isDisplayed(), true);
+    });
+
+    it("composes Chinese through the Ubuntu IBus engine without corrupting Source or Live", async function () {
+        if (process.env.MDTXT_E2E_IBUS_ENGINE !== "libpinyin") this.skip();
+
+        const sourceMode = await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']");
+        await activate(sourceMode);
+        const editor = await $(".cm-content");
+        await editor.waitForDisplayed();
+        await editor.setValue("# IBus native IME\n\n");
+
+        const prepared = await browser.execute(() => {
+            const content = document.querySelector(".cm-content");
+            if (!(content instanceof HTMLElement)) return { ok: false };
+            content.focus();
+            window.__mdtxtImeEvents = [];
+            for (const type of ["compositionstart", "compositionupdate", "compositionend"]) {
+                content.addEventListener(type, (event) => {
+                    window.__mdtxtImeEvents.push({ type, data: event.data });
+                });
+            }
+            return { ok: document.activeElement === content };
+        });
+        assert.deepEqual(prepared, { ok: true });
+
+        // Keep the preedit visible long enough to capture the real X11 root
+        // window, including IBus's out-of-process candidate panel.
+        sendLinuxNativeText("zhongwen", 35);
+        await browser.pause(350);
+        const preedit = await browser.execute(() => ({
+            events: window.__mdtxtImeEvents ?? [],
+            text: document.querySelector(".cm-activeLine")?.textContent ?? "",
+        }));
+        assert.equal(preedit.events.some((event) => event.type === "compositionstart"), true);
+        const screenshot = spawnSync("scrot", ["/tmp/mdtxt-ibus-preedit.png"], { encoding: "utf8" });
+        assert.equal(
+            screenshot.status,
+            0,
+            `scrot failed (${screenshot.status}): ${screenshot.stderr || screenshot.stdout}`,
+        );
+
+        sendLinuxNativeKey("space");
+        await browser.pause(500);
+        const committed = await browser.execute(() => ({
+            events: window.__mdtxtImeEvents ?? [],
+            text: document.querySelector(".cm-content")
+                ? [...document.querySelectorAll(".cm-content .cm-line")].map((line) => line.textContent ?? "").join("\n")
+                : "",
+        }));
+        assert.equal(committed.events.some((event) => event.type === "compositionend"), true);
+        const sourceChinese = committed.text.match(/[\u3400-\u9fff]{2,}/u)?.[0];
+        assert.ok(sourceChinese, `IBus did not commit multi-character Chinese: ${committed.text}`);
+        assert.equal(committed.text.includes("zhongwen"), false);
+
+        sendLinuxNativeKey("ctrl+z");
+        await browser.pause(200);
+        assert.equal((await editorText()).includes(sourceChinese), false);
+        sendLinuxNativeKey("ctrl+shift+z");
+        await browser.pause(200);
+        assert.equal((await editorText()).includes(sourceChinese), true);
+
+        const liveMode = await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
+        await activate(liveMode);
+        await $(".cm-editor[data-mdtxt-live='true']").waitForExist();
+        await browser.execute(() => document.querySelector(".cm-content")?.focus());
+        sendLinuxNativeText("wancheng", 35);
+        sendLinuxNativeKey("space");
+        await browser.pause(500);
+        const liveText = await editorText();
+        const allChinese = liveText.match(/[\u3400-\u9fff]{2,}/gu) ?? [];
+        assert.ok(allChinese.length >= 2, `Live did not commit a second Chinese phrase: ${liveText}`);
+        assert.equal(liveText.includes("wancheng"), false);
+
+        // Exercise the native clipboard path while Chinese text is selected,
+        // then prove a tab/mode round-trip preserves the exact document bytes.
+        sendLinuxNativeKey("ctrl+a");
+        sendLinuxNativeKey("ctrl+c");
+        sendLinuxNativeKey("End");
+        sendLinuxNativeKey("Return");
+        sendLinuxNativeKey("ctrl+v");
+        await browser.pause(300);
+        const copiedText = await editorText();
+        assert.ok(copiedText.endsWith(liveText), "Native Chinese clipboard paste did not preserve the document text");
+
+        const firstTab = await $("[role='tab'][aria-selected='true']");
+        const firstTabName = await firstTab.getAttribute("title");
+        await activate(await $("button[aria-label='新建标签页'], button[aria-label='New tab']"));
+        await activate(await $(`[role='tab'][title=${JSON.stringify(firstTabName)}]`));
+        assert.equal(await editorText(), copiedText);
+        await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
+        assert.equal(await editorText(), copiedText);
+
+        console.log(`MDTXT_NATIVE_IME platform=ubuntu engine=ibus-libpinyin sourcePhrase=${sourceChinese} compositionEvents=${committed.events.length} liveChineseRuns=${allChinese.length} clipboard=passed undoRedo=passed modeTabRoundTrip=passed screenshot=/tmp/mdtxt-ibus-preedit.png`);
     });
 
     it("round-trips a verified native recovery entry into an unsaved draft", async () => {
