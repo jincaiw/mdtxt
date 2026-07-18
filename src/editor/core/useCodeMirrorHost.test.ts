@@ -20,10 +20,13 @@ describe("large Source performance policy", () => {
         expect(restricted.doc.toString()).toBe(source);
     });
 
-    it("finishes the initial Lezer tree for ordinary-size source before first input", () => {
+    it("finishes the initial Lezer tree before first input", () => {
+        // Keep this a deterministic mechanism test under parallel CI load.
+        // The native smoke benchmark owns the 1 MiB latency acceptance.
+        const documentSize = 128 * 1024;
         const source = `${"# heading\n\nplain text\n".repeat(
-            Math.ceil((1024 * 1024) / 22),
-        )}`.slice(0, 1024 * 1024);
+            Math.ceil(documentSize / 22),
+        )}`.slice(0, documentSize);
         const state = EditorState.create({ doc: source, extensions: sourceSyntaxExtensions(source.length) });
 
         expect(source.length).toBeLessThan(EAGER_SOURCE_SYNTAX_LIMIT);

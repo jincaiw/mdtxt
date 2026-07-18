@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { connect } from "node:net";
 import { join, resolve } from "node:path";
@@ -14,6 +15,8 @@ const windowsUserDataFolder = process.env.LOCALAPPDATA
     : undefined;
 let driver;
 let shuttingDown = false;
+let devToolsPortSync;
+let devToolsPortMirrored = false;
 
 function waitForDriver(timeoutMs = 15_000) {
     const deadline = Date.now() + timeoutMs;
@@ -36,6 +39,47 @@ function stopDriver() {
     driver?.kill();
 }
 
+function startWindowsDevToolsPortSync() {
+    if (!windowsUserDataFolder) return;
+    const source = join(windowsUserDataFolder, "EBWebView", "DevToolsActivePort");
+    const destination = join(windowsUserDataFolder, "DevToolsActivePort");
+    rmSync(destination, { force: true });
+    devToolsPortMirrored = false;
+    devToolsPortSync = setInterval(() => {
+        if (!existsSync(source)) return;
+        try {
+            // WebView2 appends EBWebView to Tauri's configured UDF, while
+            // EdgeDriver 150 still watches the configured parent directory.
+            // Mirror the live discovery file so the real EdgeDriver session
+            // can attach; no renderer input or product code is bypassed.
+            copyFileSync(source, destination);
+            if (!devToolsPortMirrored) {
+                console.log(`Mirrored WebView2 discovery file: ${source} -> ${destination}`);
+                devToolsPortMirrored = true;
+            }
+        } catch {
+            // The browser can replace this tiny file between exists/copy.
+            // The next 50 ms probe retries it.
+        }
+    }, 50);
+    devToolsPortSync.unref();
+}
+
+function stopWindowsDevToolsPortSync() {
+    if (devToolsPortSync) clearInterval(devToolsPortSync);
+    devToolsPortSync = undefined;
+    if (windowsUserDataFolder) {
+        rmSync(join(windowsUserDataFolder, "DevToolsActivePort"), { force: true });
+    }
+}
+
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    process.once(signal, () => {
+        if (!useManagedWindowsDriver) stopDriver();
+        process.exit(1);
+    });
+}
+
 export const config = {
     host: "127.0.0.1",
     port: 4444,
@@ -53,7 +97,9 @@ export const config = {
         },
     ]] : [],
     capabilities: [{
-        browserName: "tauri",
+        // The managed Tauri service identifies its provider with browserName.
+        // Upstream tauri-driver on Linux rejects that extra capability.
+        ...(useManagedWindowsDriver ? { browserName: "tauri" } : {}),
         maxInstances: 1,
         "tauri:options": { application: binary },
         ...(windowsUserDataFolder ? {
@@ -79,7 +125,10 @@ export const config = {
         if (result.status !== 0) throw new Error(`Tauri debug build failed with status ${result.status}`);
     },
     beforeSession: async () => {
-        if (useManagedWindowsDriver) return;
+        if (useManagedWindowsDriver) {
+            startWindowsDevToolsPortSync();
+            return;
+        }
         shuttingDown = false;
         driver = spawn(tauriDriver, [], { stdio: ["ignore", process.stdout, process.stderr] });
         driver.once("error", (error) => { throw error; });
@@ -89,9 +138,11 @@ export const config = {
         await waitForDriver();
     },
     afterSession: () => {
-        if (!useManagedWindowsDriver) stopDriver();
+        if (useManagedWindowsDriver) stopWindowsDevToolsPortSync();
+        else stopDriver();
     },
     onComplete: () => {
-        if (!useManagedWindowsDriver) stopDriver();
+        if (useManagedWindowsDriver) stopWindowsDevToolsPortSync();
+        else stopDriver();
     },
 };
