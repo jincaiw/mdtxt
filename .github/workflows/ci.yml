@@ -254,11 +254,15 @@ jobs:
         run: bun run tauri -- build --debug --no-bundle
 
       # execute_js returns through Tauri's global invoke API. Enable that API
-      # only in this ephemeral Debug evidence build; the checked-in production
-      # config and every release bundle keep withGlobalTauri=false.
+      # and the bridge's command permission only in this ephemeral Debug
+      # evidence build; the checked-in production config and every release
+      # bundle keep withGlobalTauri=false and omit mcp-bridge permissions.
       - name: Build Windows automation debug binary
         if: matrix.platform == 'windows-latest'
-        run: bun run tauri -- build --debug --no-bundle --config '{"app":{"withGlobalTauri":true}}'
+        run: >
+          bun run tauri -- build --debug --no-bundle
+          --config
+          '{"app":{"withGlobalTauri":true,"security":{"capabilities":["default",{"identifier":"native-automation","description":"Ephemeral CI-only Debug bridge result channel.","windows":["main"],"permissions":["mcp-bridge:default"]}]}}}'
 
       - name: Run native WebView smoke tests on Linux
         if: matrix.platform == 'ubuntu-24.04'
