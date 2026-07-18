@@ -392,14 +392,14 @@ describe("mdtxt native Tauri smoke", () => {
                 inputP50: inputSamples[Math.ceil(inputSamples.length * 0.5) - 1],
                 inputP95,
                 inputMax: inputSamples.at(-1),
-                suffix: activeLine?.textContent?.slice(-40),
+                activeLineText: activeLine?.textContent,
             };
         });
 
         console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=webkit-webdriver-w3c-native-view inputEvent=${result.inputEvent} beforeInputSamples=${result.beforeInputSamples} inputEventSamples=${result.inputEventSamples} keydownMutationSamples=${result.keydownMutationSamples} inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
         assert.equal(result.ok, true);
         assert.equal(result.inputSamples, 40);
-        assert.equal(result.suffix, "x".repeat(40));
+        assert.equal(result.activeLineText?.startsWith("x".repeat(40)), true);
         assert.ok(result.inputP95 <= 16, `1 MiB native WebView input-processing P95 was ${result.inputP95} ms`);
     });
 });
