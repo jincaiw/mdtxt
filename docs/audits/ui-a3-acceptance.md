@@ -1,6 +1,7 @@
 # Desktop UI A3 Acceptance Baseline
 
-Status: approved by the product owner on 2026-07-16.
+Status: approved by the product owner on 2026-07-16 and reconfirmed as the
+unique implementation baseline on 2026-07-18.
 
 The accepted desktop direction is the final A3 concept set:
 
