@@ -14,15 +14,44 @@ const binary = process.env.MDTXT_E2E_BINARY
 const bridgePort = Number(process.env.MDTXT_MCP_BRIDGE_PORT ?? 9223);
 const powershell = resolve(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 const sendInputScript = resolve(root, "scripts", "windows-send-input.ps1");
-const userDataFolder = resolve(process.env.RUNNER_TEMP ?? process.env.TEMP ?? root, `mdtxt-mcp-${process.pid}`);
+const userDataFolderBase = resolve(process.env.RUNNER_TEMP ?? process.env.TEMP ?? root, `mdtxt-mcp-${process.pid}`);
 
 let application;
 let bridge;
+let launchSequence = 0;
 let requestSequence = 0;
 const pending = new Map();
 const stagedRecoveryIds = [];
 
 const wait = (milliseconds) => new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
+
+async function launchApplication() {
+    application = spawn(binary, [], {
+        cwd: root,
+        env: {
+            ...process.env,
+            TAURI_WEBVIEW_AUTOMATION: "true",
+            WEBVIEW2_USER_DATA_FOLDER: `${userDataFolderBase}-${++launchSequence}`,
+        },
+        stdio: ["ignore", process.stdout, process.stderr],
+    });
+    application.once("error", (error) => {
+        throw error;
+    });
+    await connectBridge();
+}
+
+async function stopApplication() {
+    bridge?.close();
+    bridge = undefined;
+    if (application && application.exitCode === null) {
+        spawnSync("taskkill.exe", ["/PID", String(application.pid), "/T", "/F"], {
+            stdio: "ignore",
+        });
+    }
+    application = undefined;
+    await wait(500);
+}
 
 function waitForPort(port, timeoutMs = 30_000) {
     const deadline = Date.now() + timeoutMs;
@@ -212,20 +241,7 @@ function sendNativeText(text) {
 }
 
 async function run() {
-    application = spawn(binary, [], {
-        cwd: root,
-        env: {
-            ...process.env,
-            TAURI_WEBVIEW_AUTOMATION: "true",
-            WEBVIEW2_USER_DATA_FOLDER: userDataFolder,
-        },
-        stdio: ["ignore", process.stdout, process.stderr],
-    });
-    application.once("error", (error) => {
-        throw error;
-    });
-
-    await connectBridge();
+    await launchApplication();
     await waitForScript(
         "return document.querySelector('h1')?.textContent === 'mdtxt';",
         "mdtxt welcome screen",
@@ -317,6 +333,24 @@ async function run() {
     console.log("MDTXT_NATIVE_WINDOWS phase=discard-1MiB");
     await discardRecovery(stagedRecoveryIds.at(-1));
 
+    // Isolate the 10 MiB open measurement from the dirty 1 MiB editor. A
+    // reload of that editor legitimately writes a fresh recovery entry and
+    // would make the next recovery dialog restore two large drafts, which is
+    // not the single-document PRD scenario measured below.
+    console.log("MDTXT_NATIVE_WINDOWS phase=restart-before-10MiB");
+    await stopApplication();
+    await launchApplication();
+    await waitForScript(
+        "return document.querySelector('h1')?.textContent === 'mdtxt';",
+        "mdtxt welcome screen after input measurement",
+    );
+    await execute(`
+        localStorage.setItem("mdtxt:liveBeta", "true");
+        localStorage.setItem("mdtxt:tourDone", "true");
+        return true;
+    `);
+    await reload();
+
     const target10MiB = 10 * 1024 * 1024;
     console.log("MDTXT_NATIVE_WINDOWS phase=stage-10MiB");
     assert.deepEqual(await stageSizedRecovery(target10MiB, "Windows Native 10 MiB.md"), {
@@ -361,15 +395,10 @@ async function run() {
 try {
     await run();
 } finally {
-    bridge?.close();
     for (const request of pending.values()) {
         clearTimeout(request.timer);
         request.reject(new Error("Windows native smoke stopped"));
     }
     pending.clear();
-    if (application && application.exitCode === null) {
-        spawnSync("taskkill.exe", ["/PID", String(application.pid), "/T", "/F"], {
-            stdio: "ignore",
-        });
-    }
+    await stopApplication();
 }

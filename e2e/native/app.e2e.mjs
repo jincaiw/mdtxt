@@ -17,13 +17,17 @@ describe("mdtxt native Tauri smoke", () => {
             `xdotool could not find the mdtxt X11 window (${search.status}): ${search.stderr || search.stdout}`,
         );
         assert.ok(windowId, "xdotool returned no visible mdtxt X11 window");
-        const activateWindow = spawnSync("xdotool", ["windowactivate", "--sync", windowId], {
+        // GitHub's Xvfb session intentionally has no EWMH window manager, so
+        // `_NET_ACTIVE_WINDOW` cannot be used. `windowfocus` calls
+        // XSetInputFocus directly and still proves that native keyboard input
+        // is delivered to the real Tauri window.
+        const focusWindow = spawnSync("xdotool", ["windowfocus", "--sync", windowId], {
             encoding: "utf8",
         });
         assert.equal(
-            activateWindow.status,
+            focusWindow.status,
             0,
-            `xdotool could not activate mdtxt window ${windowId} (${activateWindow.status}): ${activateWindow.stderr || activateWindow.stdout}`,
+            `xdotool could not focus mdtxt window ${windowId} (${focusWindow.status}): ${focusWindow.stderr || focusWindow.stdout}`,
         );
     };
 
