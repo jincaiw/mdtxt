@@ -63,7 +63,10 @@ describe("mdtxt native Tauri smoke", () => {
     };
 
     const sendLinuxNativeKey = (key) => {
-        const keyResult = spawnSync("xdotool", ["key", "--clearmodifiers", key], {
+        // Window 0 is xdotool's explicit XTEST path: deliver the event like a
+        // physical keyboard to the current X11 focus. A nonzero window would
+        // use XSendEvent, which is not acceptable as native input evidence.
+        const keyResult = spawnSync("xdotool", ["key", "--window", "0", "--clearmodifiers", key], {
             encoding: "utf8",
         });
         assert.equal(
@@ -78,7 +81,7 @@ describe("mdtxt native Tauri smoke", () => {
         sendLinuxNativeKey("ctrl+End");
         const typeResult = spawnSync(
             "xdotool",
-            ["type", "--clearmodifiers", "--delay", String(delay), "--", text],
+            ["type", "--window", "0", "--clearmodifiers", "--delay", String(delay), "--", text],
             { encoding: "utf8" },
         );
         assert.equal(
