@@ -74,6 +74,10 @@ describe("mdtxt native Tauri smoke", () => {
     });
 
     const dismissTourIfPresent = async () => {
+        // The tour is mounted by a hasFile/booting effect after the editor
+        // itself becomes visible. Let that effect settle before deciding the
+        // native input surface is unobstructed.
+        await browser.pause(300);
         const dismissed = await browser.execute(() => {
             const dialog = document.querySelector(
                 "[role='dialog'][aria-label='欢迎导览'], [role='dialog'][aria-label='Welcome tour']",
