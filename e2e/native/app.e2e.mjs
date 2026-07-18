@@ -178,6 +178,7 @@ describe("mdtxt native Tauri smoke", () => {
             await browser.keys(["Escape"]);
             await tour.waitForDisplayed({ reverse: true });
         }
+        await browser.execute(() => localStorage.setItem("mdtxt:tourDone", "true"));
 
         await $("[role='group'][aria-label='切换视图模式'], [role='group'][aria-label='View mode toggle']").waitForDisplayed();
         assert.equal(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']").getAttribute("aria-pressed"), "true");
