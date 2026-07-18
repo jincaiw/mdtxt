@@ -268,7 +268,7 @@ describe("mdtxt native Tauri smoke", () => {
         assert.deepEqual(staged, { ok: true, bytes: targetBytes });
         await restoreStagedRecovery();
 
-        const result = await browser.execute(() => {
+        const prepared = await browser.execute(() => {
             const content = document.querySelector(".cm-content");
             const lines = content?.querySelectorAll(".cm-line");
             const lastLine = lines?.item(lines.length - 1);
@@ -283,44 +283,55 @@ describe("mdtxt native Tauri smoke", () => {
             selection?.removeAllRanges();
             selection?.addRange(range);
 
-            const samples = [];
-            const inputSamples = [];
+            window.__mdtxtNativeInputSamples = [];
             let inputStarted = 0;
             const onBeforeInput = () => { inputStarted = performance.now(); };
             const onInput = () => {
-                if (inputStarted > 0) inputSamples.push(performance.now() - inputStarted);
+                if (inputStarted > 0) window.__mdtxtNativeInputSamples.push(performance.now() - inputStarted);
                 inputStarted = 0;
             };
             content.addEventListener("beforeinput", onBeforeInput);
             content.addEventListener("input", onInput);
-            let accepted = 0;
-            for (let index = 0; index < 40; index++) {
-                const started = performance.now();
-                if (document.execCommand("insertText", false, "x")) accepted++;
-                samples.push(performance.now() - started);
-            }
-            samples.sort((left, right) => left - right);
+            window.__mdtxtNativeInputCleanup = () => {
+                content.removeEventListener("beforeinput", onBeforeInput);
+                content.removeEventListener("input", onInput);
+            };
+            return { ok: true };
+        });
+        assert.deepEqual(prepared, { ok: true });
+
+        // Use the W3C WebDriver key-input path. The previous benchmark called
+        // deprecated document.execCommand forty times in one renderer task,
+        // which measured a synthetic script loop rather than native keyboard
+        // input. Event durations are still sampled inside the native WebView,
+        // so WebDriver transport latency is not mistaken for editor latency.
+        const editor = await $(".cm-content");
+        await editor.addValue("x".repeat(40));
+
+        const result = await browser.execute(() => {
+            const content = document.querySelector(".cm-content");
+            const inputSamples = window.__mdtxtNativeInputSamples ?? [];
+            window.__mdtxtNativeInputCleanup?.();
+            delete window.__mdtxtNativeInputCleanup;
+            delete window.__mdtxtNativeInputSamples;
             inputSamples.sort((left, right) => left - right);
-            const p95 = samples[Math.ceil(samples.length * 0.95) - 1];
             const inputP95 = inputSamples[Math.ceil(inputSamples.length * 0.95) - 1];
             const updatedLines = content.querySelectorAll(".cm-line");
             const updatedLastLine = updatedLines.item(updatedLines.length - 1);
             return {
                 ok: true,
-                accepted,
-                p50: samples[Math.ceil(samples.length * 0.5) - 1],
-                p95,
-                max: samples.at(-1),
                 inputSamples: inputSamples.length,
+                inputP50: inputSamples[Math.ceil(inputSamples.length * 0.5) - 1],
                 inputP95,
+                inputMax: inputSamples.at(-1),
                 suffix: updatedLastLine?.textContent?.slice(-40),
             };
         });
 
-        console.log(`MDTXT_NATIVE_PERF target=1MiB editP50Ms=${result.p50} editP95Ms=${result.p95} editMaxMs=${result.max} inputEventSamples=${result.inputSamples} inputEventP95Ms=${result.inputP95}`);
+        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=w3c-keys inputEventSamples=${result.inputSamples} inputEventP50Ms=${result.inputP50} inputEventP95Ms=${result.inputP95} inputEventMaxMs=${result.inputMax}`);
         assert.equal(result.ok, true);
-        assert.equal(result.accepted, 40);
+        assert.equal(result.inputSamples, 40);
         assert.equal(result.suffix, "x".repeat(40));
-        assert.ok(result.p95 <= 16, `1 MiB native WebView edit P95 was ${result.p95} ms`);
+        assert.ok(result.inputP95 <= 16, `1 MiB native WebView input-event P95 was ${result.inputP95} ms`);
     });
 });
