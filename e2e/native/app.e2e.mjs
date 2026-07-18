@@ -80,7 +80,7 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.pause(300);
         const dismissed = await browser.execute(() => {
             const dialog = document.querySelector(
-                "[role='dialog'][aria-label='欢迎导览'], [role='dialog'][aria-label='Welcome tour']",
+                "[role='dialog'][aria-label='欢迎引导'], [role='dialog'][aria-label='Welcome tour']",
             );
             if (!dialog) return false;
             const button = [...dialog.querySelectorAll("button")]
@@ -93,7 +93,7 @@ describe("mdtxt native Tauri smoke", () => {
         });
         if (dismissed) {
             await browser.waitUntil(async () => browser.execute(() => !document.querySelector(
-                "[role='dialog'][aria-label='欢迎导览'], [role='dialog'][aria-label='Welcome tour']",
+                "[role='dialog'][aria-label='欢迎引导'], [role='dialog'][aria-label='Welcome tour']",
             )));
         }
         assert.equal(await browser.execute(() => document.querySelectorAll("[role='dialog']").length), 0);
@@ -199,7 +199,7 @@ describe("mdtxt native Tauri smoke", () => {
         await newFile.click();
 
         await browser.pause(250);
-        const tour = await $("[role='dialog'][aria-label='欢迎导览'], [role='dialog'][aria-label='Welcome tour']");
+        const tour = await $("[role='dialog'][aria-label='欢迎引导'], [role='dialog'][aria-label='Welcome tour']");
         if (await tour.isExisting()) {
             const skipTour = await $("//button[contains(., '直接开始写作') or contains(., 'Just start writing')]");
             await skipTour.waitForDisplayed();
