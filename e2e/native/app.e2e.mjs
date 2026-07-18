@@ -286,6 +286,8 @@ describe("mdtxt native Tauri smoke", () => {
             window.__mdtxtNativeInputSamples = {
                 beforeinput: [],
                 input: [],
+                keydownMutation: [],
+                keydownStarts: [],
             };
             const recordInputProcessing = (eventName) => {
                 const started = performance.now();
@@ -302,11 +304,26 @@ describe("mdtxt native Tauri smoke", () => {
             };
             const onBeforeInput = () => recordInputProcessing("beforeinput");
             const onInput = () => recordInputProcessing("input");
+            const onKeyDown = (event) => {
+                if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
+                    window.__mdtxtNativeInputSamples.keydownStarts.push(performance.now());
+                }
+            };
+            const mutationObserver = new MutationObserver(() => {
+                const started = window.__mdtxtNativeInputSamples.keydownStarts.shift();
+                if (started !== undefined) {
+                    window.__mdtxtNativeInputSamples.keydownMutation.push(performance.now() - started);
+                }
+            });
             content.addEventListener("beforeinput", onBeforeInput, true);
             content.addEventListener("input", onInput, true);
+            content.addEventListener("keydown", onKeyDown, true);
+            mutationObserver.observe(content, { childList: true, characterData: true, subtree: true });
             window.__mdtxtNativeInputCleanup = () => {
                 content.removeEventListener("beforeinput", onBeforeInput, true);
                 content.removeEventListener("input", onInput, true);
+                content.removeEventListener("keydown", onKeyDown, true);
+                mutationObserver.disconnect();
             };
             return { ok: true };
         });
@@ -322,12 +339,22 @@ describe("mdtxt native Tauri smoke", () => {
 
         const result = await browser.execute(() => {
             const content = document.querySelector(".cm-content");
-            const eventSamples = window.__mdtxtNativeInputSamples ?? { beforeinput: [], input: [] };
+            const eventSamples = window.__mdtxtNativeInputSamples ?? {
+                beforeinput: [],
+                input: [],
+                keydownMutation: [],
+            };
             window.__mdtxtNativeInputCleanup?.();
             delete window.__mdtxtNativeInputCleanup;
             delete window.__mdtxtNativeInputSamples;
-            const inputEvent = eventSamples.beforeinput.length === 40 ? "beforeinput" : "input";
-            const inputSamples = eventSamples[inputEvent];
+            const inputEvent = eventSamples.beforeinput.length === 40
+                ? "beforeinput"
+                : eventSamples.input.length === 40
+                    ? "input"
+                    : "keydown-mutation";
+            const inputSamples = inputEvent === "keydown-mutation"
+                ? eventSamples.keydownMutation
+                : eventSamples[inputEvent];
             inputSamples.sort((left, right) => left - right);
             const inputP95 = inputSamples[Math.ceil(inputSamples.length * 0.95) - 1];
             const updatedLines = content.querySelectorAll(".cm-line");
@@ -338,6 +365,7 @@ describe("mdtxt native Tauri smoke", () => {
                 inputSamples: inputSamples.length,
                 beforeInputSamples: eventSamples.beforeinput.length,
                 inputEventSamples: eventSamples.input.length,
+                keydownMutationSamples: eventSamples.keydownMutation.length,
                 inputP50: inputSamples[Math.ceil(inputSamples.length * 0.5) - 1],
                 inputP95,
                 inputMax: inputSamples.at(-1),
@@ -345,7 +373,7 @@ describe("mdtxt native Tauri smoke", () => {
             };
         });
 
-        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=w3c-keys inputEvent=${result.inputEvent} beforeInputSamples=${result.beforeInputSamples} inputEventSamples=${result.inputEventSamples} inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
+        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=w3c-keys inputEvent=${result.inputEvent} beforeInputSamples=${result.beforeInputSamples} inputEventSamples=${result.inputEventSamples} keydownMutationSamples=${result.keydownMutationSamples} inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
         assert.equal(result.ok, true);
         assert.equal(result.inputSamples, 40);
         assert.equal(result.suffix, "x".repeat(40));

@@ -20,6 +20,7 @@ let application;
 let bridge;
 let requestSequence = 0;
 const pending = new Map();
+const stagedRecoveryIds = [];
 
 const wait = (milliseconds) => new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
 
@@ -103,7 +104,8 @@ async function reload() {
 }
 
 async function stageSizedRecovery(targetBytes, name) {
-    return execute(`
+    const documentId = `windows-native-performance-${Date.now()}-${stagedRecoveryIds.length}`;
+    const result = await execute(`
         const invoke = window.__TAURI_INTERNALS__?.invoke;
         if (!invoke) throw new Error("Tauri invoke bridge is unavailable");
         const bytes = ${targetBytes};
@@ -112,24 +114,32 @@ async function stageSizedRecovery(targetBytes, name) {
         const line = \`plain markdown input \${"x".repeat(payloadWidth)}\\n\`;
         const repeated = line.repeat(Math.ceil((bytes - prefix.length) / line.length));
         const content = \`\${prefix}\${repeated}\`.slice(0, bytes - 1) + "\\n";
-        const timestamp = Date.now();
         const entry = {
-            documentId: \`windows-native-performance-\${timestamp}\`,
+            documentId: ${JSON.stringify(documentId)},
             path: null,
             name: ${JSON.stringify(name)},
             content,
             version: 1,
             context: {
-                recoverySessionId: \`windows-native-performance-session-\${timestamp}\`,
+                recoverySessionId: ${JSON.stringify(`${documentId}-session`)},
                 tabIndex: 0,
                 wasActive: true,
                 cursorLine: 1,
             },
         };
-        const existing = await invoke("list_recoveries");
-        await Promise.all(existing.map((item) => invoke("discard_recovery", { documentId: item.documentId })));
         await invoke("write_recovery", entry);
         return { ok: true, bytes: new TextEncoder().encode(content).byteLength };
+    `);
+    stagedRecoveryIds.push(documentId);
+    return result;
+}
+
+async function discardRecovery(documentId) {
+    await execute(`
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (!invoke) throw new Error("Tauri invoke bridge is unavailable");
+        await invoke("discard_recovery", { documentId: ${JSON.stringify(documentId)} });
+        return true;
     `);
 }
 
@@ -264,6 +274,7 @@ async function run() {
     console.log(`MDTXT_NATIVE_PERF platform=windows target=10MiB sourceOpenMs=${restored10MiB.duration} restrictedLiveMs=${restrictedLiveMs}`);
     assert.ok(restored10MiB.duration <= 3_000, `10 MiB Source open took ${restored10MiB.duration} ms`);
     assert.ok(restrictedLiveMs <= 5_000, `10 MiB restricted Live took ${restrictedLiveMs} ms`);
+    await discardRecovery(stagedRecoveryIds.at(-1));
 
     const target1MiB = 1024 * 1024;
     assert.deepEqual(await stageSizedRecovery(target1MiB, "Windows Native 1 MiB.md"), {
@@ -285,7 +296,12 @@ async function run() {
         range.collapse(false);
         selection?.removeAllRanges();
         selection?.addRange(range);
-        window.__mdtxtNativeInputSamples = { beforeinput: [], input: [] };
+        window.__mdtxtNativeInputSamples = {
+            beforeinput: [],
+            input: [],
+            keydownMutation: [],
+            keydownStarts: [],
+        };
         const record = (eventName) => {
             const started = performance.now();
             queueMicrotask(() => {
@@ -294,11 +310,26 @@ async function run() {
         };
         const onBeforeInput = () => record("beforeinput");
         const onInput = () => record("input");
+        const onKeyDown = (event) => {
+            if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
+                window.__mdtxtNativeInputSamples.keydownStarts.push(performance.now());
+            }
+        };
+        const mutationObserver = new MutationObserver(() => {
+            const started = window.__mdtxtNativeInputSamples.keydownStarts.shift();
+            if (started !== undefined) {
+                window.__mdtxtNativeInputSamples.keydownMutation.push(performance.now() - started);
+            }
+        });
         content.addEventListener("beforeinput", onBeforeInput, true);
         content.addEventListener("input", onInput, true);
+        content.addEventListener("keydown", onKeyDown, true);
+        mutationObserver.observe(content, { childList: true, characterData: true, subtree: true });
         window.__mdtxtNativeInputCleanup = () => {
             content.removeEventListener("beforeinput", onBeforeInput, true);
             content.removeEventListener("input", onInput, true);
+            content.removeEventListener("keydown", onKeyDown, true);
+            mutationObserver.disconnect();
         };
         return { ok: true };
     `), { ok: true });
@@ -307,18 +338,29 @@ async function run() {
     await wait(250);
     const inputResult = await execute(`
         const content = document.querySelector(".cm-content");
-        const eventSamples = window.__mdtxtNativeInputSamples ?? { beforeinput: [], input: [] };
+        const eventSamples = window.__mdtxtNativeInputSamples ?? {
+            beforeinput: [],
+            input: [],
+            keydownMutation: [],
+        };
         window.__mdtxtNativeInputCleanup?.();
         delete window.__mdtxtNativeInputCleanup;
         delete window.__mdtxtNativeInputSamples;
-        const inputEvent = eventSamples.beforeinput.length === 40 ? "beforeinput" : "input";
-        const samples = eventSamples[inputEvent].sort((left, right) => left - right);
+        const inputEvent = eventSamples.beforeinput.length === 40
+            ? "beforeinput"
+            : eventSamples.input.length === 40
+                ? "input"
+                : "keydown-mutation";
+        const samples = (inputEvent === "keydown-mutation"
+            ? eventSamples.keydownMutation
+            : eventSamples[inputEvent]).sort((left, right) => left - right);
         const lines = content?.querySelectorAll(".cm-line");
         const lastLine = lines?.item(lines.length - 1);
         return {
             inputEvent,
             beforeInputSamples: eventSamples.beforeinput.length,
             inputEventSamples: eventSamples.input.length,
+            keydownMutationSamples: eventSamples.keydownMutation.length,
             inputSamples: samples.length,
             inputP50: samples[Math.ceil(samples.length * 0.5) - 1],
             inputP95: samples[Math.ceil(samples.length * 0.95) - 1],
@@ -326,7 +368,7 @@ async function run() {
             suffix: lastLine?.textContent?.slice(-40),
         };
     `);
-    console.log(`MDTXT_NATIVE_PERF platform=windows target=1MiB inputMethod=win32-sendinput inputEvent=${inputResult.inputEvent} beforeInputSamples=${inputResult.beforeInputSamples} inputEventSamples=${inputResult.inputEventSamples} inputProcessingSamples=${inputResult.inputSamples} inputProcessingP50Ms=${inputResult.inputP50} inputProcessingP95Ms=${inputResult.inputP95} inputProcessingMaxMs=${inputResult.inputMax}`);
+    console.log(`MDTXT_NATIVE_PERF platform=windows target=1MiB inputMethod=win32-sendinput inputEvent=${inputResult.inputEvent} beforeInputSamples=${inputResult.beforeInputSamples} inputEventSamples=${inputResult.inputEventSamples} keydownMutationSamples=${inputResult.keydownMutationSamples} inputProcessingSamples=${inputResult.inputSamples} inputProcessingP50Ms=${inputResult.inputP50} inputProcessingP95Ms=${inputResult.inputP95} inputProcessingMaxMs=${inputResult.inputMax}`);
     assert.equal(inputResult.inputSamples, 40);
     assert.equal(inputResult.suffix, "x".repeat(40));
     assert.ok(inputResult.inputP95 <= 16, `1 MiB native WebView input-processing P95 was ${inputResult.inputP95} ms`);
@@ -334,8 +376,9 @@ async function run() {
     await execute(`
         const invoke = window.__TAURI_INTERNALS__?.invoke;
         if (invoke) {
-            const existing = await invoke("list_recoveries");
-            await Promise.all(existing.map((item) => invoke("discard_recovery", { documentId: item.documentId })));
+            await Promise.all(${JSON.stringify(stagedRecoveryIds)}.map(
+                (documentId) => invoke("discard_recovery", { documentId }),
+            ));
         }
         return true;
     `);
