@@ -25,6 +25,18 @@ describe("mdtxt native Tauri smoke", () => {
             0,
             `xdotool could not activate mdtxt window ${windowId} (${activateWindow.status}): ${activateWindow.stderr || activateWindow.stdout}`,
         );
+        // Openbox's EWMH activation raises the window but does not
+        // consistently update X11's keyboard focus under Xvfb. Set it
+        // explicitly before the XTEST click so subsequent keys reach GTK's
+        // focused WebKit widget and its IBus input context.
+        const focusWindow = spawnSync("xdotool", ["windowfocus", "--sync", windowId], {
+            encoding: "utf8",
+        });
+        assert.equal(
+            focusWindow.status,
+            0,
+            `xdotool could not focus mdtxt window ${windowId} (${focusWindow.status}): ${focusWindow.stderr || focusWindow.stdout}`,
+        );
         // Activating the Tauri top-level window does not by itself move X11
         // keyboard focus into WebKit's content child. Click a stable point on
         // the first visible CodeMirror line through XTEST before issuing
@@ -41,6 +53,13 @@ describe("mdtxt native Tauri smoke", () => {
             0,
             `xdotool could not click mdtxt editor (${clickEditor.status}): ${clickEditor.stderr || clickEditor.stdout}`,
         );
+        const actualFocus = spawnSync("xdotool", ["getwindowfocus"], { encoding: "utf8" });
+        assert.equal(
+            actualFocus.status,
+            0,
+            `xdotool could not read X11 keyboard focus (${actualFocus.status}): ${actualFocus.stderr || actualFocus.stdout}`,
+        );
+        console.log(`MDTXT_X11_FOCUS target=${windowId} actual=${actualFocus.stdout.trim()}`);
     };
 
     const sendLinuxNativeKey = (key) => {
