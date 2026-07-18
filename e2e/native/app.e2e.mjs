@@ -73,6 +73,28 @@ describe("mdtxt native Tauri smoke", () => {
             : null;
     });
 
+    const dismissTourIfPresent = async () => {
+        const dismissed = await browser.execute(() => {
+            const dialog = document.querySelector(
+                "[role='dialog'][aria-label='欢迎导览'], [role='dialog'][aria-label='Welcome tour']",
+            );
+            if (!dialog) return false;
+            const button = [...dialog.querySelectorAll("button")]
+                .find((candidate) => /直接开始写作|Just start writing/.test(candidate.textContent ?? ""));
+            if (!(button instanceof HTMLButtonElement)) {
+                throw new Error("Welcome tour is visible without its skip button");
+            }
+            button.click();
+            return true;
+        });
+        if (dismissed) {
+            await browser.waitUntil(async () => browser.execute(() => !document.querySelector(
+                "[role='dialog'][aria-label='欢迎导览'], [role='dialog'][aria-label='Welcome tour']",
+            )));
+        }
+        assert.equal(await browser.execute(() => document.querySelectorAll("[role='dialog']").length), 0);
+    };
+
     const stageSizedRecovery = async (targetBytes, name) => browser.executeAsync((bytes, entryName, done) => {
         const invoke = window.__TAURI_INTERNALS__?.invoke;
         if (!invoke) {
@@ -236,6 +258,7 @@ describe("mdtxt native Tauri smoke", () => {
         const editor = await $(".cm-content");
         await editor.waitForDisplayed();
         await editor.setValue("# IBus native IME\n\n");
+        await dismissTourIfPresent();
 
         const prepared = await browser.execute(() => {
             const content = document.querySelector(".cm-content");
@@ -431,6 +454,7 @@ describe("mdtxt native Tauri smoke", () => {
         const staged = await stageSizedRecovery(targetBytes, "Native 1 MiB.md");
         assert.deepEqual(staged, { ok: true, bytes: targetBytes });
         await restoreStagedRecovery();
+        await dismissTourIfPresent();
 
         const prepared = await browser.execute(() => {
             const content = document.querySelector(".cm-content");
