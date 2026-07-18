@@ -989,6 +989,9 @@ function AppContent() {
   // after a short quiet period. Clean sessions clear their matching recovery
   // entry, so a successful save never prompts to restore already-durable text.
   useEffect(() => {
+    // The browser build is retained for deterministic visual and component
+    // verification, but recovery is a native-only durability boundary.
+    if (!("__TAURI_INTERNALS__" in window)) return;
     const timer = window.setTimeout(() => {
       const activeId = activeTabIdRef.current;
       for (const summary of sessionSnapshot.sessions) {
