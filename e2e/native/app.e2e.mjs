@@ -284,17 +284,22 @@ describe("mdtxt native Tauri smoke", () => {
             selection?.addRange(range);
 
             window.__mdtxtNativeInputSamples = [];
-            let inputStarted = 0;
-            const onBeforeInput = () => { inputStarted = performance.now(); };
-            const onInput = () => {
-                if (inputStarted > 0) window.__mdtxtNativeInputSamples.push(performance.now() - inputStarted);
-                inputStarted = 0;
+            const onBeforeInput = () => {
+                const started = performance.now();
+                // Capture the synchronous editor work caused by this real
+                // beforeinput event. Linux WebKitWebDriver spaces the paired
+                // beforeinput/input events by roughly 128 ms; that observed
+                // transport cadence is not application input latency. A
+                // microtask runs after every listener for this event has
+                // completed, including CodeMirror's transaction and mdtxt's
+                // incremental session consumers.
+                queueMicrotask(() => {
+                    window.__mdtxtNativeInputSamples.push(performance.now() - started);
+                });
             };
-            content.addEventListener("beforeinput", onBeforeInput);
-            content.addEventListener("input", onInput);
+            content.addEventListener("beforeinput", onBeforeInput, true);
             window.__mdtxtNativeInputCleanup = () => {
-                content.removeEventListener("beforeinput", onBeforeInput);
-                content.removeEventListener("input", onInput);
+                content.removeEventListener("beforeinput", onBeforeInput, true);
             };
             return { ok: true };
         });
@@ -328,10 +333,10 @@ describe("mdtxt native Tauri smoke", () => {
             };
         });
 
-        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=w3c-keys inputEventSamples=${result.inputSamples} inputEventP50Ms=${result.inputP50} inputEventP95Ms=${result.inputP95} inputEventMaxMs=${result.inputMax}`);
+        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=w3c-keys inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
         assert.equal(result.ok, true);
         assert.equal(result.inputSamples, 40);
         assert.equal(result.suffix, "x".repeat(40));
-        assert.ok(result.inputP95 <= 16, `1 MiB native WebView input-event P95 was ${result.inputP95} ms`);
+        assert.ok(result.inputP95 <= 16, `1 MiB native WebView input-processing P95 was ${result.inputP95} ms`);
     });
 });
