@@ -239,49 +239,15 @@ async function run() {
     `);
     await reload();
 
-    const target10MiB = 10 * 1024 * 1024;
-    assert.deepEqual(await stageSizedRecovery(target10MiB, "Windows Native 10 MiB.md"), {
-        ok: true,
-        bytes: target10MiB,
-    });
-    const restored10MiB = await restoreStagedRecovery();
-    const restrictedLiveMs = await execute(`
-        return await new Promise((resolveLive, rejectLive) => {
-            const button = document.querySelector("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
-            if (!(button instanceof HTMLButtonElement)) {
-                rejectLive(new Error("Live Beta mode is unavailable"));
-                return;
-            }
-            const started = performance.now();
-            const finish = () => {
-                if (!document.querySelector(".cm-editor[data-mdtxt-live='restricted']")) return false;
-                resolveLive(performance.now() - started);
-                return true;
-            };
-            const observer = new MutationObserver(() => {
-                if (finish()) observer.disconnect();
-            });
-            observer.observe(document.body, { attributes: true, childList: true, subtree: true });
-            setTimeout(() => {
-                observer.disconnect();
-                rejectLive(new Error("Restricted Live did not activate within four seconds"));
-            }, 4_000);
-            button.click();
-            finish();
-        });
-    `);
-    console.log(`MDTXT_NATIVE_TRACE ${JSON.stringify(restored10MiB.metrics ?? [])}`);
-    console.log(`MDTXT_NATIVE_PERF platform=windows target=10MiB sourceOpenMs=${restored10MiB.duration} restrictedLiveMs=${restrictedLiveMs}`);
-    assert.ok(restored10MiB.duration <= 3_000, `10 MiB Source open took ${restored10MiB.duration} ms`);
-    assert.ok(restrictedLiveMs <= 5_000, `10 MiB restricted Live took ${restrictedLiveMs} ms`);
-    await discardRecovery(stagedRecoveryIds.at(-1));
-
     const target1MiB = 1024 * 1024;
+    console.log("MDTXT_NATIVE_WINDOWS phase=stage-1MiB");
     assert.deepEqual(await stageSizedRecovery(target1MiB, "Windows Native 1 MiB.md"), {
         ok: true,
         bytes: target1MiB,
     });
+    console.log("MDTXT_NATIVE_WINDOWS phase=restore-1MiB");
     await restoreStagedRecovery();
+    console.log("MDTXT_NATIVE_WINDOWS phase=prepare-native-input");
     assert.deepEqual(await execute(`
         const content = document.querySelector(".cm-content");
         const lines = content?.querySelectorAll(".cm-line");
@@ -373,15 +339,47 @@ async function run() {
     assert.equal(inputResult.suffix, "x".repeat(40));
     assert.ok(inputResult.inputP95 <= 16, `1 MiB native WebView input-processing P95 was ${inputResult.inputP95} ms`);
 
-    await execute(`
-        const invoke = window.__TAURI_INTERNALS__?.invoke;
-        if (invoke) {
-            await Promise.all(${JSON.stringify(stagedRecoveryIds)}.map(
-                (documentId) => invoke("discard_recovery", { documentId }),
-            ));
-        }
-        return true;
+    console.log("MDTXT_NATIVE_WINDOWS phase=discard-1MiB");
+    await discardRecovery(stagedRecoveryIds.at(-1));
+
+    const target10MiB = 10 * 1024 * 1024;
+    console.log("MDTXT_NATIVE_WINDOWS phase=stage-10MiB");
+    assert.deepEqual(await stageSizedRecovery(target10MiB, "Windows Native 10 MiB.md"), {
+        ok: true,
+        bytes: target10MiB,
+    });
+    console.log("MDTXT_NATIVE_WINDOWS phase=restore-10MiB");
+    const restored10MiB = await restoreStagedRecovery();
+    console.log("MDTXT_NATIVE_WINDOWS phase=activate-restricted-live");
+    const restrictedLiveMs = await execute(`
+        return await new Promise((resolveLive, rejectLive) => {
+            const button = document.querySelector("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
+            if (!(button instanceof HTMLButtonElement)) {
+                rejectLive(new Error("Live Beta mode is unavailable"));
+                return;
+            }
+            const started = performance.now();
+            const finish = () => {
+                if (!document.querySelector(".cm-editor[data-mdtxt-live='restricted']")) return false;
+                resolveLive(performance.now() - started);
+                return true;
+            };
+            const observer = new MutationObserver(() => {
+                if (finish()) observer.disconnect();
+            });
+            observer.observe(document.body, { attributes: true, childList: true, subtree: true });
+            setTimeout(() => {
+                observer.disconnect();
+                rejectLive(new Error("Restricted Live did not activate within four seconds"));
+            }, 4_000);
+            button.click();
+            finish();
+        });
     `);
+    console.log(`MDTXT_NATIVE_TRACE ${JSON.stringify(restored10MiB.metrics ?? [])}`);
+    console.log(`MDTXT_NATIVE_PERF platform=windows target=10MiB sourceOpenMs=${restored10MiB.duration} restrictedLiveMs=${restrictedLiveMs}`);
+    assert.ok(restored10MiB.duration <= 3_000, `10 MiB Source open took ${restored10MiB.duration} ms`);
+    assert.ok(restrictedLiveMs <= 5_000, `10 MiB restricted Live took ${restrictedLiveMs} ms`);
     console.log("MDTXT_NATIVE_WINDOWS result=passed");
 }
 
