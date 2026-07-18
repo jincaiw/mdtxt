@@ -326,3 +326,12 @@ jobs:
       - name: Run native WebView smoke tests on Windows
         if: matrix.platform == 'windows-latest'
         run: bun run test:native:windows
+
+      - name: Upload Windows Microsoft Pinyin preedit evidence
+        if: ${{ always() && matrix.platform == 'windows-latest' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-microsoft-pinyin-preedit-${{ github.sha }}
+          path: ${{ runner.temp }}/mdtxt-microsoft-pinyin-preedit.png
+          if-no-files-found: error
+          retention-days: 14

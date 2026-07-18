@@ -2,10 +2,14 @@ param(
   [Parameter(Mandatory = $true)]
   [int]$TargetProcessId,
 
-  [Parameter(Mandatory = $true)]
-  [string]$Text,
+  [string]$Text = '',
 
-  [int]$DelayMilliseconds = 10
+  [int]$DelayMilliseconds = 10,
+
+  [switch]$MoveToEnd,
+
+  [ValidateSet('Space', 'Enter', 'Left', 'Right', 'Up', 'Down', 'ControlZ', 'ControlShiftZ', 'ControlA', 'ControlC', 'ControlV', 'WinSpace')]
+  [string[]]$Keys = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,6 +24,14 @@ public static class MdtxtNativeInput
     private const uint KEYEVENTF_KEYUP = 0x0002;
     private const int SW_RESTORE = 9;
     private const ushort VK_CONTROL = 0x11;
+    private const ushort VK_SHIFT = 0x10;
+    private const ushort VK_LWIN = 0x5B;
+    private const ushort VK_SPACE = 0x20;
+    private const ushort VK_RETURN = 0x0D;
+    private const ushort VK_LEFT = 0x25;
+    private const ushort VK_UP = 0x26;
+    private const ushort VK_RIGHT = 0x27;
+    private const ushort VK_DOWN = 0x28;
     private const ushort VK_END = 0x23;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -82,6 +94,12 @@ public static class MdtxtNativeInput
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr window, int command);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetKeyboardLayout(uint threadId);
 
     public static void Focus(IntPtr window)
     {
@@ -149,56 +167,78 @@ public static class MdtxtNativeInput
         }
     }
 
-    public static void SendControlEnd()
+    public static void SendChord(ushort[] keys)
     {
-        var inputs = new INPUT[]
+        var inputs = new INPUT[keys.Length * 2];
+        for (int index = 0; index < keys.Length; index++)
         {
-            new INPUT
+            inputs[index] = new INPUT
             {
                 type = INPUT_KEYBOARD,
                 data = new INPUTUNION
                 {
-                    keyboard = new KEYBDINPUT { virtualKey = VK_CONTROL }
+                    keyboard = new KEYBDINPUT { virtualKey = keys[index] }
                 }
-            },
-            new INPUT
+            };
+            inputs[keys.Length + index] = new INPUT
             {
                 type = INPUT_KEYBOARD,
                 data = new INPUTUNION
                 {
-                    keyboard = new KEYBDINPUT { virtualKey = VK_END }
+                    keyboard = new KEYBDINPUT
+                    {
+                        virtualKey = keys[keys.Length - index - 1],
+                        flags = KEYEVENTF_KEYUP
+                    }
                 }
-            },
-            new INPUT
-            {
-                type = INPUT_KEYBOARD,
-                data = new INPUTUNION
-                {
-                    keyboard = new KEYBDINPUT { virtualKey = VK_END, flags = KEYEVENTF_KEYUP }
-                }
-            },
-            new INPUT
-            {
-                type = INPUT_KEYBOARD,
-                data = new INPUTUNION
-                {
-                    keyboard = new KEYBDINPUT { virtualKey = VK_CONTROL, flags = KEYEVENTF_KEYUP }
-                }
-            }
-        };
+            };
+        }
 
         uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
         if (sent != inputs.Length)
         {
             throw new InvalidOperationException(
                 String.Format(
-                    "SendInput delivered {0} of {1} Ctrl+End records. Win32={2}.",
+                    "SendInput delivered {0} of {1} chord records. Win32={2}.",
                     sent,
                     inputs.Length,
                     Marshal.GetLastWin32Error()
                 )
             );
         }
+    }
+
+    public static void SendControlEnd()
+    {
+        SendChord(new ushort[] { VK_CONTROL, VK_END });
+    }
+
+    public static void SendNamedKey(string name)
+    {
+        switch (name)
+        {
+            case "Space": SendChord(new ushort[] { VK_SPACE }); break;
+            case "Enter": SendChord(new ushort[] { VK_RETURN }); break;
+            case "Left": SendChord(new ushort[] { VK_LEFT }); break;
+            case "Right": SendChord(new ushort[] { VK_RIGHT }); break;
+            case "Up": SendChord(new ushort[] { VK_UP }); break;
+            case "Down": SendChord(new ushort[] { VK_DOWN }); break;
+            case "ControlZ": SendChord(new ushort[] { VK_CONTROL, 0x5A }); break;
+            case "ControlShiftZ": SendChord(new ushort[] { VK_CONTROL, VK_SHIFT, 0x5A }); break;
+            case "ControlA": SendChord(new ushort[] { VK_CONTROL, 0x41 }); break;
+            case "ControlC": SendChord(new ushort[] { VK_CONTROL, 0x43 }); break;
+            case "ControlV": SendChord(new ushort[] { VK_CONTROL, 0x56 }); break;
+            case "WinSpace": SendChord(new ushort[] { VK_LWIN, VK_SPACE }); break;
+            default: throw new InvalidOperationException("Unknown named key: " + name);
+        }
+    }
+
+    public static ushort GetLanguageId(IntPtr window)
+    {
+        uint processId;
+        uint threadId = GetWindowThreadProcessId(window, out processId);
+        long layout = GetKeyboardLayout(threadId).ToInt64();
+        return (ushort)(layout & 0xffff);
     }
 }
 '@
@@ -210,8 +250,10 @@ if ($process.MainWindowHandle -eq [IntPtr]::Zero) {
 
 [MdtxtNativeInput]::Focus($process.MainWindowHandle)
 Start-Sleep -Milliseconds 250
-[MdtxtNativeInput]::SendControlEnd()
-Start-Sleep -Milliseconds 100
+if ($MoveToEnd) {
+  [MdtxtNativeInput]::SendControlEnd()
+  Start-Sleep -Milliseconds 100
+}
 
 foreach ($character in $Text.ToCharArray()) {
   [MdtxtNativeInput]::SendCharacter($character)
@@ -219,3 +261,13 @@ foreach ($character in $Text.ToCharArray()) {
     Start-Sleep -Milliseconds $DelayMilliseconds
   }
 }
+
+foreach ($key in $Keys) {
+  [MdtxtNativeInput]::SendNamedKey($key)
+  if ($DelayMilliseconds -gt 0) {
+    Start-Sleep -Milliseconds $DelayMilliseconds
+  }
+}
+
+$languageId = [MdtxtNativeInput]::GetLanguageId($process.MainWindowHandle)
+Write-Output ('MDTXT_NATIVE_INPUT languageId=0x{0:X4}' -f $languageId)

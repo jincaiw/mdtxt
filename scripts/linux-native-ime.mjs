@@ -101,6 +101,14 @@ function runCommand(command, args, description) {
 }
 
 async function focusEditorWindow() {
+    assert.deepEqual(await execute(`
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (!invoke) return { ok: false, error: "Tauri invoke bridge is unavailable" };
+        await invoke("plugin:window|show", { label: "main" });
+        await invoke("plugin:window|set_focus", { label: "main" });
+        return { ok: true };
+    `), { ok: true });
+    await wait(150);
     let search;
     for (let attempt = 0; attempt < 100; attempt += 1) {
         for (const args of [

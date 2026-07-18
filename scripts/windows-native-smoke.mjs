@@ -14,6 +14,9 @@ const binary = process.env.MDTXT_E2E_BINARY
 const bridgePort = Number(process.env.MDTXT_MCP_BRIDGE_PORT ?? 9223);
 const powershell = resolve(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 const sendInputScript = resolve(root, "scripts", "windows-send-input.ps1");
+const enablePinyinScript = resolve(root, "scripts", "windows-enable-pinyin.ps1");
+const captureScreenScript = resolve(root, "scripts", "windows-capture-screen.ps1");
+const pinyinScreenshot = resolve(process.env.RUNNER_TEMP ?? process.env.TEMP ?? root, "mdtxt-microsoft-pinyin-preedit.png");
 const userDataFolderBase = resolve(process.env.RUNNER_TEMP ?? process.env.TEMP ?? root, `mdtxt-mcp-${process.pid}`);
 
 let application;
@@ -163,6 +166,30 @@ async function stageSizedRecovery(targetBytes, name) {
     return result;
 }
 
+async function stageExactRecovery(content, name, purpose) {
+    const documentId = `windows-native-${purpose}-${Date.now()}-${stagedRecoveryIds.length}`;
+    const result = await execute(`
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (!invoke) throw new Error("Tauri invoke bridge is unavailable");
+        await invoke("write_recovery", {
+            documentId: ${JSON.stringify(documentId)},
+            path: null,
+            name: ${JSON.stringify(name)},
+            content: ${JSON.stringify(content)},
+            version: 1,
+            context: {
+                recoverySessionId: ${JSON.stringify(`${documentId}-session`)},
+                tabIndex: 0,
+                wasActive: true,
+                cursorLine: 1,
+            },
+        });
+        return { ok: true };
+    `);
+    stagedRecoveryIds.push(documentId);
+    return result;
+}
+
 async function discardRecovery(documentId) {
     await execute(`
         const invoke = window.__TAURI_INTERNALS__?.invoke;
@@ -207,6 +234,7 @@ async function restoreStagedRecovery({ captureNativeInput = false } = {}) {
                 window.__mdtxtNativeInputSamples = {
                     beforeinput: [],
                     input: [],
+                    composition: [],
                 };
                 const record = (eventName, event) => {
                     if (!(event.target instanceof Element) || !event.target.closest(".cm-content")) return;
@@ -217,11 +245,24 @@ async function restoreStagedRecovery({ captureNativeInput = false } = {}) {
                 };
                 const onBeforeInput = (event) => record("beforeinput", event);
                 const onInput = (event) => record("input", event);
+                const onComposition = (event) => {
+                    if (!(event.target instanceof Element) || !event.target.closest(".cm-content")) return;
+                    window.__mdtxtNativeInputSamples.composition.push({
+                        type: event.type,
+                        data: event.data,
+                    });
+                };
                 document.addEventListener("beforeinput", onBeforeInput, true);
                 document.addEventListener("input", onInput, true);
+                for (const type of ["compositionstart", "compositionupdate", "compositionend"]) {
+                    document.addEventListener(type, onComposition, true);
+                }
                 window.__mdtxtNativeInputCleanup = () => {
                     document.removeEventListener("beforeinput", onBeforeInput, true);
                     document.removeEventListener("input", onInput, true);
+                    for (const type of ["compositionstart", "compositionupdate", "compositionend"]) {
+                        document.removeEventListener(type, onComposition, true);
+                    }
                 };
             }
             const button = [...document.querySelectorAll("[role='alertdialog'] button")]
@@ -253,18 +294,15 @@ async function restoreStagedRecovery({ captureNativeInput = false } = {}) {
     `);
 }
 
-function sendNativeText(text) {
+function runPowerShell(script, args = []) {
     const result = spawnSync(powershell, [
         "-NoProfile",
         "-NonInteractive",
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        sendInputScript,
-        "-TargetProcessId",
-        String(application.pid),
-        "-Text",
-        text,
+        script,
+        ...args,
     ], {
         cwd: root,
         encoding: "utf8",
@@ -273,8 +311,35 @@ function sendNativeText(text) {
     assert.equal(
         result.status,
         0,
-        `Win32 SendInput failed (${result.status}): ${result.stderr || result.stdout}`,
+        `PowerShell script ${script} failed (${result.status}): ${result.stderr || result.stdout}`,
     );
+    return result.stdout.trim();
+}
+
+function sendNativeText(text) {
+    return runPowerShell(sendInputScript, [
+        "-TargetProcessId",
+        String(application.pid),
+        "-Text",
+        text,
+        "-MoveToEnd",
+    ]);
+}
+
+function sendNativeKeys(...keys) {
+    return runPowerShell(sendInputScript, [
+        "-TargetProcessId",
+        String(application.pid),
+        "-Keys",
+        ...keys,
+    ]);
+}
+
+function readNativeLayout() {
+    return runPowerShell(sendInputScript, [
+        "-TargetProcessId",
+        String(application.pid),
+    ]);
 }
 
 async function run() {
@@ -400,6 +465,141 @@ async function run() {
     console.log(`MDTXT_NATIVE_PERF platform=windows target=10MiB sourceOpenMs=${restored10MiB.duration} restrictedLiveMs=${restrictedLiveMs}`);
     assert.ok(restored10MiB.duration <= 3_000, `10 MiB Source open took ${restored10MiB.duration} ms`);
     assert.ok(restrictedLiveMs <= 5_000, `10 MiB restricted Live took ${restrictedLiveMs} ms`);
+
+    console.log("MDTXT_NATIVE_WINDOWS phase=configure-microsoft-pinyin");
+    await discardRecovery(stagedRecoveryIds.at(-1));
+    await stopApplication();
+    console.log(runPowerShell(enablePinyinScript));
+    await launchApplication();
+    await waitForScript(
+        "return document.querySelector('h1')?.textContent === 'mdtxt';",
+        "mdtxt welcome screen before Microsoft Pinyin",
+    );
+    await execute(`
+        localStorage.setItem("mdtxt:liveBeta", "true");
+        localStorage.setItem("mdtxt:tourDone", "true");
+        return true;
+    `);
+    await reload();
+    await discardAllRecoveries();
+    const imeFixture = "# Microsoft Pinyin native IME\n\n";
+    assert.deepEqual(
+        await stageExactRecovery(imeFixture, "Microsoft Pinyin IME.md", "microsoft-pinyin"),
+        { ok: true },
+    );
+    await restoreStagedRecovery({ captureNativeInput: true });
+    await wait(500);
+
+    let layout = readNativeLayout();
+    for (let attempt = 0; attempt < 3 && !/languageId=0x0804/i.test(layout); attempt += 1) {
+        layout = sendNativeKeys("WinSpace");
+        await wait(500);
+    }
+    assert.match(layout, /languageId=0x0804/i, `Microsoft Pinyin layout did not activate: ${layout}`);
+
+    sendNativeText("zhongwen");
+    await wait(500);
+    const preedit = await execute(`
+        return {
+            events: window.__mdtxtNativeInputSamples?.composition ?? [],
+            activeLine: document.querySelector(".cm-activeLine")?.textContent ?? "",
+        };
+    `);
+    console.log(runPowerShell(captureScreenScript, ["-Path", pinyinScreenshot]));
+    assert.equal(
+        preedit.events.some((event) => event.type === "compositionstart"),
+        true,
+        `Microsoft Pinyin emitted no compositionstart: ${JSON.stringify(preedit)}`,
+    );
+    sendNativeKeys("Space");
+    await wait(500);
+    const committed = await execute(`
+        const content = document.querySelector(".cm-content");
+        return {
+            events: window.__mdtxtNativeInputSamples?.composition ?? [],
+            text: content
+                ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
+                : null,
+        };
+    `);
+    assert.equal(committed.events.some((event) => event.type === "compositionend"), true);
+    const sourceChinese = committed.text.match(/[\u3400-\u9fff]{2,}/u)?.[0];
+    assert.ok(sourceChinese, `Microsoft Pinyin did not commit multi-character Chinese: ${committed.text}`);
+    assert.equal(committed.text.includes("zhongwen"), false);
+
+    sendNativeKeys("ControlZ");
+    await wait(200);
+    assert.equal((await execute("return document.querySelector('.cm-content')?.textContent ?? '';")).includes(sourceChinese), false);
+    sendNativeKeys("ControlShiftZ");
+    await wait(200);
+    assert.equal((await execute("return document.querySelector('.cm-content')?.textContent ?? '';")).includes(sourceChinese), true);
+
+    await execute(`
+        const button = document.querySelector("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
+        if (!(button instanceof HTMLButtonElement)) throw new Error("Live Beta mode is unavailable");
+        button.click();
+        return true;
+    `);
+    await waitForScript(
+        "return Boolean(document.querySelector(\".cm-editor[data-mdtxt-live='true']\"));",
+        "Windows Live Beta mode",
+    );
+    await execute("document.querySelector('.cm-content')?.focus(); return true;");
+    sendNativeText("wancheng");
+    await wait(300);
+    sendNativeKeys("Space");
+    await wait(500);
+    const liveText = await execute(`
+        const content = document.querySelector(".cm-content");
+        return content
+            ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
+            : null;
+    `);
+    const liveChinese = liveText.match(/[\u3400-\u9fff]{2,}/gu) ?? [];
+    assert.ok(liveChinese.length >= 2, `Live did not commit a second Chinese phrase: ${liveText}`);
+
+    sendNativeKeys("ControlA");
+    sendNativeKeys("ControlC");
+    sendNativeKeys("Enter");
+    sendNativeKeys("ControlV");
+    await wait(300);
+    const copiedText = await execute(`
+        const content = document.querySelector(".cm-content");
+        return content
+            ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
+            : null;
+    `);
+    assert.ok(copiedText.endsWith(liveText), "Microsoft Pinyin clipboard round trip changed the document text");
+
+    const firstTabName = await execute(
+        "return document.querySelector(\"[role='tab'][aria-selected='true']\")?.getAttribute('title');",
+    );
+    assert.ok(firstTabName);
+    await execute(`
+        document.querySelector("button[aria-label='新建标签页'], button[aria-label='New tab']")?.click();
+        return true;
+    `);
+    await execute(`
+        const name = ${JSON.stringify(firstTabName)};
+        const tab = [...document.querySelectorAll("[role='tab']")]
+            .find((candidate) => candidate.getAttribute("title") === name);
+        if (!(tab instanceof HTMLButtonElement)) throw new Error("Original tab is unavailable");
+        tab.click();
+        return true;
+    `);
+    assert.equal(
+        await execute("return document.querySelector('.cm-content')?.textContent ?? '';"),
+        copiedText,
+    );
+    await execute(`
+        document.querySelector("button[aria-label='源码编辑器'], button[aria-label='Code editor']")?.click();
+        return true;
+    `);
+    assert.equal(
+        await execute("return document.querySelector('.cm-content')?.textContent ?? '';"),
+        copiedText,
+    );
+    console.log(`MDTXT_NATIVE_IME platform=windows engine=microsoft-pinyin input=win32-sendinput sourcePhrase=${sourceChinese} compositionEvents=${committed.events.length} liveChineseRuns=${liveChinese.length} clipboard=passed undoRedo=passed modeTabRoundTrip=passed screenshot=${pinyinScreenshot}`);
     console.log("MDTXT_NATIVE_WINDOWS result=passed");
 }
 
