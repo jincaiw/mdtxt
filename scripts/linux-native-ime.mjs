@@ -100,12 +100,29 @@ function runCommand(command, args, description) {
     return result.stdout.trim();
 }
 
-function focusEditorWindow() {
-    const ids = runCommand(
-        "xdotool",
-        ["search", "--onlyvisible", "--name", "mdtxt"],
-        "finding the mdtxt X11 window",
-    ).split(/\s+/).filter(Boolean);
+async function focusEditorWindow() {
+    let search;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+        search = spawnSync(
+            "xdotool",
+            ["search", "--onlyvisible", "--pid", String(application.pid)],
+            { encoding: "utf8" },
+        );
+        if (search.status === 0 && search.stdout.trim()) break;
+        search = spawnSync(
+            "xdotool",
+            ["search", "--onlyvisible", "--name", "mdtxt"],
+            { encoding: "utf8" },
+        );
+        if (search.status === 0 && search.stdout.trim()) break;
+        await wait(100);
+    }
+    assert.equal(
+        search?.status,
+        0,
+        `finding the mdtxt X11 window failed (${search?.status}): ${search?.stderr || search?.stdout}`,
+    );
+    const ids = search.stdout.trim().split(/\s+/).filter(Boolean);
     const windowId = ids.at(-1);
     assert.ok(windowId, "xdotool returned no visible mdtxt X11 window");
     runCommand("xdotool", ["windowactivate", "--sync", windowId], "activating the mdtxt X11 window");
@@ -134,8 +151,8 @@ function sendKey(key) {
     );
 }
 
-function sendText(text, delayMilliseconds = 35) {
-    focusEditorWindow();
+async function sendText(text, delayMilliseconds = 35) {
+    await focusEditorWindow();
     sendKey("ctrl+End");
     runCommand(
         "xte",
@@ -219,7 +236,7 @@ async function run() {
         return { ok: document.activeElement === content };
     `), { ok: true });
 
-    sendText("zhongwen");
+    await sendText("zhongwen");
     await wait(350);
     const preedit = await execute(`
         return {
@@ -266,7 +283,7 @@ async function run() {
         "Live Beta mode",
     );
     await execute("document.querySelector('.cm-content')?.focus(); return true;");
-    sendText("wancheng");
+    await sendText("wancheng");
     sendKey("space");
     await wait(500);
     const liveText = await execute(editorTextScript);
