@@ -12,6 +12,7 @@ import {
 } from "@codemirror/view";
 import { history, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { ensureSyntaxTree } from "@codemirror/language";
 import { autocompletion, closeBrackets, closeBracketsKeymap, type CompletionSource } from "@codemirror/autocomplete";
 import { getOriginalDoc } from "@codemirror/merge";
 import { handleTab, handleEnter, wrapSelection, insertLink, type EditorResult, type EditorState } from "../../utils/editorActions";
@@ -133,27 +134,35 @@ export function useCodeMirrorHost({
             }
         });
 
-        const createState = (doc: string) => CMEditorState.create({
-            doc,
-            extensions: [
-                lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(),
-                historyCompRef.current.of(history()), drawSelection(), dropCursor(), closeBrackets(),
-                autocompletion({ override: [wikiCompletionSource], icons: false, aboveCursor: false }),
-                sourceSyntaxCompRef.current.of(sourceSyntaxExtensions(doc.length)), editorTheme,
-                wrapCompRef.current.of(wordWrap ? EditorView.lineWrapping : []),
-                spellCompRef.current.of(EditorView.contentAttributes.of(spellcheckAttributes(spellCheck))),
-                mergeCompRef.current.of([]), editingKeymap,
-                // Restricted Live is a DOM marker applied by
-                // useLiveMarkdownPresentation. Keeping this compartment empty
-                // avoids a full CodeMirror configuration transaction for a
-                // multi-megabyte Source document.
-                liveCompRef.current.of(liveMode && !liveRestricted ? liveMarkdownPresentation : []),
-                keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
-                updateListener,
-                EditorView.domEventHandlers({ paste: handlePaste }),
-                EditorView.theme({ "&": { outline: "none" } }),
-            ],
-        });
+        const createState = (doc: string) => {
+            const state = CMEditorState.create({
+                doc,
+                extensions: [
+                    lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(),
+                    historyCompRef.current.of(history()), drawSelection(), dropCursor(), closeBrackets(),
+                    autocompletion({ override: [wikiCompletionSource], icons: false, aboveCursor: false }),
+                    sourceSyntaxCompRef.current.of(sourceSyntaxExtensions(doc.length)), editorTheme,
+                    wrapCompRef.current.of(wordWrap ? EditorView.lineWrapping : []),
+                    spellCompRef.current.of(EditorView.contentAttributes.of(spellcheckAttributes(spellCheck))),
+                    mergeCompRef.current.of([]), editingKeymap,
+                    // Restricted Live is a DOM marker applied by
+                    // useLiveMarkdownPresentation. Keeping this compartment empty
+                    // avoids a full CodeMirror configuration transaction for a
+                    // multi-megabyte Source document.
+                    liveCompRef.current.of(liveMode && !liveRestricted ? liveMarkdownPresentation : []),
+                    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
+                    updateListener,
+                    EditorView.domEventHandlers({ paste: handlePaste }),
+                    EditorView.theme({ "&": { outline: "none" } }),
+                ],
+            });
+            const eagerSyntaxStarted = performance.now();
+            eagerlyParseSourceSyntax(state);
+            if (doc.length > 0 && doc.length <= EAGER_SOURCE_SYNTAX_LIMIT) {
+                reportMetric("editor-eager-syntax", performance.now() - eagerSyntaxStarted);
+            }
+            return state;
+        };
         createStateRef.current = createState;
 
         const initialStateStarted = performance.now();
@@ -185,6 +194,7 @@ function reportMetric(name: string, duration: number) {
 }
 
 export const LARGE_SOURCE_SYNTAX_LIMIT = 5 * 1024 * 1024;
+export const EAGER_SOURCE_SYNTAX_LIMIT = 2 * 1024 * 1024;
 
 export function sourceSyntaxExtensions(documentLength: number) {
     // Preserve exact editable source and undo history above the documented
@@ -192,6 +202,19 @@ export function sourceSyntaxExtensions(documentLength: number) {
     return documentLength > LARGE_SOURCE_SYNTAX_LIMIT
         ? []
         : [markdown({ base: markdownLanguage }), markdownPresentationExtensions];
+}
+
+/**
+ * Complete the initial syntax pass for ordinary-size documents before the
+ * editor becomes interactive. CodeMirror otherwise parses toward a newly
+ * selected viewport on its first input. Jumping straight to the end of a
+ * 1 MiB Markdown file can then put that entire catch-up parse in the first
+ * input event. The resulting tree remains CodeMirror's incremental Lezer tree;
+ * syntax, history, and document ownership are unchanged.
+ */
+export function eagerlyParseSourceSyntax(state: CMEditorState): boolean {
+    if (state.doc.length === 0 || state.doc.length > EAGER_SOURCE_SYNTAX_LIMIT) return false;
+    return ensureSyntaxTree(state, state.doc.length, 500) !== null;
 }
 
 function runAction(view: EditorView, action: (state: EditorState) => EditorResult | null): boolean {
