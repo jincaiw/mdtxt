@@ -347,8 +347,13 @@ describe("mdtxt native Tauri smoke", () => {
         // WebKitWebDriver occasionally mutates contenteditable directly without
         // dispatching any keyboard/input events, which cannot prove native
         // editor latency even when the resulting text is correct.
-        const editor = await $(".cm-content");
-        await editor.click();
+        // `content.focus()` above already transfers DOM focus. A WebDriver
+        // click on a 1 MiB contenteditable asks WebKit to target the midpoint
+        // of its 300k-pixel layout box and is intercepted by the viewport.
+        // Keep the click out of the measurement path and verify the focused
+        // element directly before handing input to X11.
+        const focused = await browser.execute(() => document.activeElement?.classList.contains("cm-content") === true);
+        assert.equal(focused, true, "CodeMirror content did not retain focus before X11 input");
         sendLinuxNativeText("x".repeat(40));
 
         const result = await browser.execute(() => {

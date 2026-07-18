@@ -253,7 +253,14 @@ async function run() {
         if (!(content instanceof HTMLElement)) {
             return { ok: false, error: "CodeMirror content is unavailable" };
         }
-        content.focus();
+        // The editor focuses itself when the restored CodeMirror host mounts.
+        // Re-focusing a 1 MiB contenteditable here forces WebView2 to resolve
+        // its full layout box and exceeds the bridge's five-second script
+        // budget. Preserve the mounted focus and fail explicitly if it was
+        // lost instead of hiding that condition with a costly synthetic focus.
+        if (document.activeElement !== content) {
+            return { ok: false, error: "CodeMirror content did not retain focus after recovery" };
+        }
         window.__mdtxtNativeInputSamples = {
             beforeinput: [],
             input: [],
