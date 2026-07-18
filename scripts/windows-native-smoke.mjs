@@ -250,18 +250,10 @@ async function run() {
     console.log("MDTXT_NATIVE_WINDOWS phase=prepare-native-input");
     assert.deepEqual(await execute(`
         const content = document.querySelector(".cm-content");
-        const lines = content?.querySelectorAll(".cm-line");
-        const lastLine = lines?.item(lines.length - 1);
-        if (!(content instanceof HTMLElement) || !(lastLine instanceof HTMLElement)) {
+        if (!(content instanceof HTMLElement)) {
             return { ok: false, error: "CodeMirror content is unavailable" };
         }
         content.focus();
-        const selection = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(lastLine);
-        range.collapse(false);
-        selection?.removeAllRanges();
-        selection?.addRange(range);
         window.__mdtxtNativeInputSamples = {
             beforeinput: [],
             input: [],
@@ -320,8 +312,7 @@ async function run() {
         const samples = (inputEvent === "keydown-mutation"
             ? eventSamples.keydownMutation
             : eventSamples[inputEvent]).sort((left, right) => left - right);
-        const lines = content?.querySelectorAll(".cm-line");
-        const lastLine = lines?.item(lines.length - 1);
+        const activeLine = content?.querySelector(".cm-activeLine");
         return {
             inputEvent,
             beforeInputSamples: eventSamples.beforeinput.length,
@@ -331,7 +322,7 @@ async function run() {
             inputP50: samples[Math.ceil(samples.length * 0.5) - 1],
             inputP95: samples[Math.ceil(samples.length * 0.95) - 1],
             inputMax: samples.at(-1),
-            suffix: lastLine?.textContent?.slice(-40),
+            suffix: activeLine?.textContent?.slice(-40),
         };
     `);
     console.log(`MDTXT_NATIVE_PERF platform=windows target=1MiB inputMethod=win32-sendinput inputEvent=${inputResult.inputEvent} beforeInputSamples=${inputResult.beforeInputSamples} inputEventSamples=${inputResult.inputEventSamples} keydownMutationSamples=${inputResult.keydownMutationSamples} inputProcessingSamples=${inputResult.inputSamples} inputProcessingP50Ms=${inputResult.inputP50} inputProcessingP95Ms=${inputResult.inputP95} inputProcessingMaxMs=${inputResult.inputMax}`);

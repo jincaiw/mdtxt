@@ -19,6 +19,8 @@ public static class MdtxtNativeInput
     private const uint INPUT_KEYBOARD = 1;
     private const uint KEYEVENTF_KEYUP = 0x0002;
     private const int SW_RESTORE = 9;
+    private const ushort VK_CONTROL = 0x11;
+    private const ushort VK_END = 0x23;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
@@ -146,6 +148,58 @@ public static class MdtxtNativeInput
             );
         }
     }
+
+    public static void SendControlEnd()
+    {
+        var inputs = new INPUT[]
+        {
+            new INPUT
+            {
+                type = INPUT_KEYBOARD,
+                data = new INPUTUNION
+                {
+                    keyboard = new KEYBDINPUT { virtualKey = VK_CONTROL }
+                }
+            },
+            new INPUT
+            {
+                type = INPUT_KEYBOARD,
+                data = new INPUTUNION
+                {
+                    keyboard = new KEYBDINPUT { virtualKey = VK_END }
+                }
+            },
+            new INPUT
+            {
+                type = INPUT_KEYBOARD,
+                data = new INPUTUNION
+                {
+                    keyboard = new KEYBDINPUT { virtualKey = VK_END, flags = KEYEVENTF_KEYUP }
+                }
+            },
+            new INPUT
+            {
+                type = INPUT_KEYBOARD,
+                data = new INPUTUNION
+                {
+                    keyboard = new KEYBDINPUT { virtualKey = VK_CONTROL, flags = KEYEVENTF_KEYUP }
+                }
+            }
+        };
+
+        uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        if (sent != inputs.Length)
+        {
+            throw new InvalidOperationException(
+                String.Format(
+                    "SendInput delivered {0} of {1} Ctrl+End records. Win32={2}.",
+                    sent,
+                    inputs.Length,
+                    Marshal.GetLastWin32Error()
+                )
+            );
+        }
+    }
 }
 '@
 
@@ -156,6 +210,8 @@ if ($process.MainWindowHandle -eq [IntPtr]::Zero) {
 
 [MdtxtNativeInput]::Focus($process.MainWindowHandle)
 Start-Sleep -Milliseconds 250
+[MdtxtNativeInput]::SendControlEnd()
+Start-Sleep -Milliseconds 100
 
 foreach ($character in $Text.ToCharArray()) {
   [MdtxtNativeInput]::SendCharacter($character)

@@ -1,8 +1,30 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 
 describe("mdtxt native Tauri smoke", () => {
     const activate = async (element) => {
         await browser.execute((target) => target.click(), element);
+    };
+
+    const sendLinuxNativeText = (text) => {
+        const keyResult = spawnSync("xdotool", ["key", "--clearmodifiers", "ctrl+End"], {
+            encoding: "utf8",
+        });
+        assert.equal(
+            keyResult.status,
+            0,
+            `xdotool Ctrl+End failed (${keyResult.status}): ${keyResult.stderr || keyResult.stdout}`,
+        );
+        const typeResult = spawnSync(
+            "xdotool",
+            ["type", "--clearmodifiers", "--delay", "1", "--", text],
+            { encoding: "utf8" },
+        );
+        assert.equal(
+            typeResult.status,
+            0,
+            `xdotool typing failed (${typeResult.status}): ${typeResult.stderr || typeResult.stdout}`,
+        );
     };
 
     const stageSizedRecovery = async (targetBytes, name) => browser.executeAsync((bytes, entryName, done) => {
@@ -270,18 +292,10 @@ describe("mdtxt native Tauri smoke", () => {
 
         const prepared = await browser.execute(() => {
             const content = document.querySelector(".cm-content");
-            const lines = content?.querySelectorAll(".cm-line");
-            const lastLine = lines?.item(lines.length - 1);
-            if (!(content instanceof HTMLElement) || !(lastLine instanceof HTMLElement)) {
+            if (!(content instanceof HTMLElement)) {
                 return { ok: false, error: "CodeMirror content is unavailable" };
             }
             content.focus();
-            const selection = window.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(lastLine);
-            range.collapse(false);
-            selection?.removeAllRanges();
-            selection?.addRange(range);
 
             window.__mdtxtNativeInputSamples = {
                 beforeinput: [],
@@ -329,13 +343,13 @@ describe("mdtxt native Tauri smoke", () => {
         });
         assert.deepEqual(prepared, { ok: true });
 
-        // Use the W3C WebDriver key-input path. The previous benchmark called
-        // deprecated document.execCommand forty times in one renderer task,
-        // which measured a synthetic script loop rather than native keyboard
-        // input. Event durations are still sampled inside the native WebView,
-        // so WebDriver transport latency is not mistaken for editor latency.
+        // Drive the active X11 window through the operating-system input path.
+        // WebKitWebDriver occasionally mutates contenteditable directly without
+        // dispatching any keyboard/input events, which cannot prove native
+        // editor latency even when the resulting text is correct.
         const editor = await $(".cm-content");
-        await editor.addValue("x".repeat(40));
+        await editor.click();
+        sendLinuxNativeText("x".repeat(40));
 
         const result = await browser.execute(() => {
             const content = document.querySelector(".cm-content");
@@ -357,8 +371,7 @@ describe("mdtxt native Tauri smoke", () => {
                 : eventSamples[inputEvent];
             inputSamples.sort((left, right) => left - right);
             const inputP95 = inputSamples[Math.ceil(inputSamples.length * 0.95) - 1];
-            const updatedLines = content.querySelectorAll(".cm-line");
-            const updatedLastLine = updatedLines.item(updatedLines.length - 1);
+            const activeLine = content.querySelector(".cm-activeLine");
             return {
                 ok: true,
                 inputEvent,
@@ -369,11 +382,11 @@ describe("mdtxt native Tauri smoke", () => {
                 inputP50: inputSamples[Math.ceil(inputSamples.length * 0.5) - 1],
                 inputP95,
                 inputMax: inputSamples.at(-1),
-                suffix: updatedLastLine?.textContent?.slice(-40),
+                suffix: activeLine?.textContent?.slice(-40),
             };
         });
 
-        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=w3c-keys inputEvent=${result.inputEvent} beforeInputSamples=${result.beforeInputSamples} inputEventSamples=${result.inputEventSamples} keydownMutationSamples=${result.keydownMutationSamples} inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
+        console.log(`MDTXT_NATIVE_PERF target=1MiB inputMethod=x11-xdotool inputEvent=${result.inputEvent} beforeInputSamples=${result.beforeInputSamples} inputEventSamples=${result.inputEventSamples} keydownMutationSamples=${result.keydownMutationSamples} inputProcessingSamples=${result.inputSamples} inputProcessingP50Ms=${result.inputP50} inputProcessingP95Ms=${result.inputP95} inputProcessingMaxMs=${result.inputMax}`);
         assert.equal(result.ok, true);
         assert.equal(result.inputSamples, 40);
         assert.equal(result.suffix, "x".repeat(40));
