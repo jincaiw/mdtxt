@@ -91,6 +91,30 @@ describe("mdtxt native Tauri smoke", () => {
         );
     };
 
+    const setLinuxIbusEngine = (engine) => {
+        const setEngine = spawnSync("ibus", ["engine", engine], { encoding: "utf8" });
+        assert.equal(
+            setEngine.status,
+            0,
+            `ibus could not activate ${engine} (${setEngine.status}): ${setEngine.stderr || setEngine.stdout}`,
+        );
+        const activeEngine = spawnSync("ibus", ["engine"], { encoding: "utf8" });
+        assert.equal(
+            activeEngine.status,
+            0,
+            `ibus could not report its active engine (${activeEngine.status}): ${activeEngine.stderr || activeEngine.stdout}`,
+        );
+        assert.equal(activeEngine.stdout.trim(), engine);
+    };
+
+    afterEach(() => {
+        if (process.env.MDTXT_E2E_IBUS_ENGINE === "libpinyin") {
+            // Fixture setup and later performance tests must not inherit an
+            // unfinished Chinese preedit from the dedicated IME case.
+            setLinuxIbusEngine("xkb:us::eng");
+        }
+    });
+
     const editorText = () => browser.execute(() => {
         const content = document.querySelector(".cm-content");
         return content
@@ -288,6 +312,11 @@ describe("mdtxt native Tauri smoke", () => {
         await editor.waitForDisplayed();
         await editor.setValue("# IBus native IME\n\n");
         await dismissTourIfPresent();
+        // Keep WebDriver's English fixture preparation outside the IME path.
+        // Activating libpinyin before setValue causes those setup keystrokes
+        // to become one long, uncommitted native preedit and invalidates both
+        // the composition and subsequent performance evidence.
+        setLinuxIbusEngine("libpinyin");
 
         const prepared = await browser.execute(() => {
             const content = document.querySelector(".cm-content");

@@ -288,6 +288,11 @@ jobs:
             done
             ibus list-engine
             test "$(ibus engine)" = "libpinyin"
+            # Keep ordinary WebDriver fixture setup out of the IME. The
+            # dedicated native test activates libpinyin only after its
+            # composition listeners and exact English source are ready.
+            ibus engine xkb:us::eng
+            test "$(ibus engine)" = "xkb:us::eng"
             bun run test:native
           '
 
