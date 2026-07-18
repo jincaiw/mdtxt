@@ -260,6 +260,8 @@ jobs:
       - name: Run native WebView smoke tests on Windows
         if: matrix.platform == 'windows-latest'
         shell: pwsh
+        env:
+          WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: --remote-debugging-port=0
         run: |
           $watchLog = Join-Path $env:RUNNER_TEMP 'mdtxt-webview2-discovery.log'
           $watchErrorLog = Join-Path $env:RUNNER_TEMP 'mdtxt-webview2-discovery-error.log'

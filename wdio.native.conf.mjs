@@ -110,7 +110,15 @@ export const config = {
         "tauri:options": {
             application: binary,
             ...(windowsUserDataFolder
-                ? { webviewOptions: { userDataFolder: windowsUserDataFolder } }
+                ? {
+                    webviewOptions: {
+                        userDataFolder: windowsUserDataFolder,
+                        // EdgeDriver needs the host WebView2 browser process
+                        // to expose an ephemeral DevTools endpoint. Keep this
+                        // capability inside the native test session only.
+                        additionalBrowserArguments: ["--remote-debugging-port=0"],
+                    },
+                }
                 : {}),
         },
     }],
