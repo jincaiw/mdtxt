@@ -156,9 +156,11 @@ async function run() {
     send({ keys: ["ControlN"] });
     invokeUi("Just start writing|直接开始写作");
     await wait(800);
+    send({ keys: ["ClickEditor"] });
     await typeLines(firstLines);
     send({ keys: ["ControlN"] });
     await wait(800);
+    send({ keys: ["ClickEditor"] });
     await typeLines(secondLines);
     await wait(3_500);
     assert.equal(readEditorThroughClipboard(), secondText);
@@ -168,6 +170,7 @@ async function run() {
     waitForUi("Restore all|全部恢复|Restore latest session|恢复最新会话");
     send({ keys: ["Enter"] });
     await wait(1_000);
+    send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
     send({ keys: ["ControlShiftTab"] });
     await wait(500);

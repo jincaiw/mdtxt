@@ -8,7 +8,7 @@ param(
 
   [switch]$MoveToEnd,
 
-  [ValidateSet('Space', 'Enter', 'Left', 'Right', 'Up', 'Down', 'ControlN', 'ControlZ', 'ControlY', 'ControlShiftZ', 'ControlShiftTab', 'ControlA', 'ControlC', 'ControlV', 'WinSpace', 'ActivateChinese')]
+  [ValidateSet('Space', 'Enter', 'Left', 'Right', 'Up', 'Down', 'ControlN', 'ControlZ', 'ControlY', 'ControlShiftZ', 'ControlShiftTab', 'ControlA', 'ControlC', 'ControlV', 'WinSpace', 'ActivateChinese', 'ClickEditor')]
   [string[]]$Keys = @()
 )
 
@@ -22,6 +22,8 @@ public static class MdtxtNativeInput
 {
     private const uint INPUT_KEYBOARD = 1;
     private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
+    private const uint MOUSEEVENTF_LEFTUP = 0x0004;
     private const int SW_RESTORE = 9;
     private const ushort VK_CONTROL = 0x11;
     private const ushort VK_SHIFT = 0x10;
@@ -121,6 +123,15 @@ public static class MdtxtNativeInput
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr window, int command);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetWindowRect(IntPtr window, out RECT rect);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
@@ -252,6 +263,23 @@ public static class MdtxtNativeInput
         SendChord(new ushort[] { VK_CONTROL, VK_END });
     }
 
+    public static void ClickEditor(IntPtr window)
+    {
+        RECT rect;
+        if (!GetWindowRect(window, out rect))
+        {
+            throw new InvalidOperationException("GetWindowRect failed. Win32=" + Marshal.GetLastWin32Error());
+        }
+        int x = rect.left + (rect.right - rect.left) / 2;
+        int y = rect.top + ((rect.bottom - rect.top) * 2 / 3);
+        if (!SetCursorPos(x, y))
+        {
+            throw new InvalidOperationException("SetCursorPos failed. Win32=" + Marshal.GetLastWin32Error());
+        }
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, UIntPtr.Zero);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
+    }
+
     public static void SendNamedKey(string name)
     {
         switch (name)
@@ -340,6 +368,8 @@ foreach ($character in $Text.ToCharArray()) {
 foreach ($key in $Keys) {
   if ($key -eq 'ActivateChinese') {
     [MdtxtNativeInput]::ActivateChinese($process.MainWindowHandle)
+  } elseif ($key -eq 'ClickEditor') {
+    [MdtxtNativeInput]::ClickEditor($process.MainWindowHandle)
   } else {
     [MdtxtNativeInput]::SendNamedKey($key)
   }
