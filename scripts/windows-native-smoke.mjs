@@ -592,7 +592,7 @@ async function run() {
     `);
     await execute(`
         const tab = document.querySelectorAll("[role='tab']")[0];
-        if (!(tab instanceof HTMLButtonElement)) throw new Error("Original tab is unavailable");
+        if (!(tab instanceof HTMLElement)) throw new Error("Original tab is unavailable");
         tab.click();
         return true;
     `);

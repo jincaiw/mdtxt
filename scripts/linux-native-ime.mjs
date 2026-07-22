@@ -211,7 +211,7 @@ async function run() {
         "mdtxt startup",
     );
 
-    const fixture = "# IBus native IME\n\n";
+    const fixture = "# Fcitx5 native IME\n\n";
     assert.deepEqual(await execute(`
         const invoke = window.__TAURI_INTERNALS__?.invoke;
         if (!invoke) throw new Error("Tauri invoke bridge is unavailable");
@@ -221,7 +221,7 @@ async function run() {
         await invoke("write_recovery", {
             documentId: \`linux-ime-\${timestamp}\`,
             path: null,
-            name: "Native IBus IME.md",
+            name: "Native Fcitx5 IME.md",
             content: ${JSON.stringify(fixture)},
             version: 1,
             context: {
@@ -314,13 +314,30 @@ async function run() {
         ...preedit,
     })}`);
     runCommand("scrot", ["/tmp/mdtxt-linux-ime-preedit.png"], "capturing the Chinese IME candidate window");
-    assert.equal(preedit.events.some((event) => event.type === "compositionstart"), true);
+    const usingFcitx = configuredIme.startsWith("fcitx5");
+    if (usingFcitx) {
+        // WebKitGTK's XIM path keeps preedit in the native Fcitx candidate
+        // surface instead of forwarding DOM composition events. Prove that
+        // boundary explicitly: Pinyin is active, Latin keydowns were consumed,
+        // no editor input occurred, and the candidate-window screenshot above
+        // captures the visible preedit before the commit assertion below.
+        assert.equal(activeEngine, "pinyin");
+        assert.equal(preedit.text, "");
+        assert.equal(preedit.inputEvents.length, 0);
+        assert.equal(
+            preedit.keyEvents.some((event) => event.type === "keydown" && /^Key[A-Z]$/.test(event.code)),
+            false,
+        );
+    } else {
+        assert.equal(preedit.events.some((event) => event.type === "compositionstart"), true);
+    }
 
     sendKey("space");
     await wait(500);
     const committed = await execute(`
         return {
             events: window.__mdtxtImeEvents ?? [],
+            inputEvents: window.__mdtxtImeInputEvents ?? [],
             text: (() => {
                 const content = document.querySelector(".cm-content");
                 return content
@@ -329,10 +346,20 @@ async function run() {
             })(),
         };
     `);
-    assert.equal(committed.events.some((event) => event.type === "compositionend"), true);
     const sourceChinese = committed.text.match(/[\u3400-\u9fff]{2,}/u)?.[0];
-    assert.ok(sourceChinese, `IBus did not commit multi-character Chinese: ${committed.text}`);
+    assert.ok(sourceChinese, `${activeEngine} did not commit multi-character Chinese: ${committed.text}`);
     assert.equal(committed.text.includes("zhongwen"), false);
+    if (usingFcitx) {
+        assert.equal(
+            committed.inputEvents.some((event) =>
+                typeof event.data === "string" && /[\u3400-\u9fff]{2,}/u.test(event.data)
+            ),
+            true,
+            `Fcitx5 commit emitted no Chinese editor input: ${JSON.stringify(committed.inputEvents)}`,
+        );
+    } else {
+        assert.equal(committed.events.some((event) => event.type === "compositionend"), true);
+    }
 
     sendKey("ctrl+z");
     await wait(200);
@@ -375,7 +402,7 @@ async function run() {
     `);
     await execute(`
         const tab = document.querySelectorAll("[role='tab']")[0];
-        if (!(tab instanceof HTMLButtonElement)) throw new Error("Original tab is unavailable");
+        if (!(tab instanceof HTMLElement)) throw new Error("Original tab is unavailable");
         tab.click();
         return true;
     `);
