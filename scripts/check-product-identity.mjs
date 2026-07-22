@@ -40,6 +40,9 @@ if (cargoVersion !== expected.version) failures.push(`cargo version=${cargoVersi
 if (cargoLib !== "mdtxt_lib") failures.push(`cargo lib=${cargoLib ?? "missing"}`);
 if (tauri.plugins?.updater) failures.push("updater must be disabled until mdtxt has an owned endpoint");
 if (tauri.bundle?.createUpdaterArtifacts) failures.push("updater artifacts must be disabled without mdtxt signing keys");
+if (tauri.bundle?.macOS?.signingIdentity !== "-") {
+  failures.push("unsigned macOS prereleases must carry a complete ad-hoc app signature");
+}
 if (/paperling/i.test(releaseWorkflow) || /paperling/i.test(testBuildWorkflow)) {
   failures.push("release workflows retain Paperling identity");
 }
