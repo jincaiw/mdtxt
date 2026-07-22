@@ -123,8 +123,8 @@ async function run() {
 
     await launch();
     waitForUi("New File|新建文件");
-    invokeUi("Just start writing|直接开始写作");
     send({ keys: ["ControlN"] });
+    invokeUi("Just start writing|直接开始写作");
     waitForUi("Ln 1");
     await typeLines(firstLines);
     send({ keys: ["ControlN"] });
