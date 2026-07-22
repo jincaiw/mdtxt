@@ -557,11 +557,18 @@ async function run() {
         "Windows Live Beta mode",
     );
     await execute("document.querySelector('.cm-content')?.focus(); return true;");
+    // Live remounts CodeMirror and therefore creates a fresh TSF input
+    // context. Rebind Microsoft Pinyin to that focused context before the
+    // second composition instead of relying on the Source editor's layout.
+    layout = sendNativeKeys("ActivateChinese");
+    await wait(500);
+    layout = readNativeLayout();
+    assert.match(layout, /languageId=0x0804/i, `Microsoft Pinyin did not rebind in Live: ${layout}`);
     // Keep the Source and Live commits on separate lines so the evidence can
     // assert two Chinese runs instead of merging adjacent phrases into one.
     sendNativeKeys("Enter");
-    sendNativeText("wancheng");
-    await wait(300);
+    sendNativeText("ceshi");
+    await wait(500);
     sendNativeKeys("Space");
     await wait(500);
     const liveText = await execute(`
