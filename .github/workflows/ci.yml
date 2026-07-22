@@ -276,7 +276,6 @@ jobs:
             export GTK_IM_MODULE=ibus
             export XMODIFIERS=@im=ibus
             export QT_IM_MODULE=ibus
-            export IBUS_ENABLE_SYNC_MODE=1
             # The test owns a private session bus and its IBus daemon; forcing
             # direct client transport avoids the desktop-portal proxy losing
             # preedit callbacks in the headless runner.
