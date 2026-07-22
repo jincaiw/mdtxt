@@ -100,11 +100,15 @@ function readEditorThroughClipboard() {
     return clipboard.stdout.replaceAll("\r\n", "\n").replaceAll("\r", "\n").replace(/\n$/, "");
 }
 
-async function typeLines(lines) {
-    for (let index = 0; index < lines.length; index += 1) {
-        send({ text: lines[index] });
-        if (index < lines.length - 1) send({ keys: ["Enter"] });
-    }
+function pasteExactText(text) {
+    const clipboard = spawnSync(powershell, [
+        "-NoProfile", "-NonInteractive", "-Command", "Set-Clipboard -Value $env:MDTXT_CLIPBOARD_TEXT",
+    ], {
+        encoding: "utf8",
+        env: { ...process.env, MDTXT_CLIPBOARD_TEXT: text },
+    });
+    assert.equal(clipboard.status, 0, clipboard.stderr || clipboard.stdout);
+    send({ keys: ["ControlV"] });
 }
 
 async function forceKill() {
@@ -157,11 +161,11 @@ async function run() {
     invokeUi("Just start writing|直接开始写作");
     await wait(800);
     send({ keys: ["ClickEditor"] });
-    await typeLines(firstLines);
+    pasteExactText(firstText);
     send({ keys: ["ControlN"] });
     await wait(800);
     send({ keys: ["ClickEditor"] });
-    await typeLines(secondLines);
+    pasteExactText(secondText);
     await wait(3_500);
     assert.equal(readEditorThroughClipboard(), secondText);
     await forceKill();
