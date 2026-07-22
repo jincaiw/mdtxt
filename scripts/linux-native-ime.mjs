@@ -379,6 +379,9 @@ async function run() {
         "Live Beta mode",
     );
     await execute("document.querySelector('.cm-content')?.focus(); return true;");
+    // Keep the Source and Live commits on separate lines so two successful
+    // Chinese phrases cannot collapse into one contiguous regex run.
+    sendKey("Return");
     await sendText("wancheng");
     sendKey("space");
     await wait(500);
