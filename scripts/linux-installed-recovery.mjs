@@ -87,7 +87,10 @@ async function typeEditorLines(text) {
     const lines = text.split("\n");
     await browser.$(".cm-content").click();
     for (let index = 0; index < lines.length; index += 1) {
-        await browser.keys(lines[index]);
+        for (const character of lines[index]) {
+            await browser.keys(character);
+            await browser.pause(20);
+        }
         if (index < lines.length - 1) await browser.keys("\uE007");
     }
 }

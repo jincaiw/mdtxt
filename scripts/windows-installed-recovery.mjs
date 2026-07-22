@@ -81,7 +81,8 @@ function capture(path) {
 }
 
 function readEditorThroughClipboard() {
-    send({ keys: ["ControlA", "ControlC"] });
+    send({ keys: ["ControlA"] });
+    send({ keys: ["ControlC"] });
     const clipboard = spawnSync(powershell, [
         "-NoProfile", "-NonInteractive", "-Command", "Get-Clipboard -Raw",
     ], { encoding: "utf8" });
