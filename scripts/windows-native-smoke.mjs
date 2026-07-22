@@ -557,6 +557,9 @@ async function run() {
         "Windows Live Beta mode",
     );
     await execute("document.querySelector('.cm-content')?.focus(); return true;");
+    // Keep the Source and Live commits on separate lines so the evidence can
+    // assert two Chinese runs instead of merging adjacent phrases into one.
+    sendNativeKeys("Enter");
     sendNativeText("wancheng");
     await wait(300);
     sendNativeKeys("Space");
