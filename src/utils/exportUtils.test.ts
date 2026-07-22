@@ -9,7 +9,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { generateHTML, prepareExportHtml } from "./exportUtils";
-import { exportToDocx, resolveDocxFont } from "./docxExport";
+import { addEastAsianFontToWordXml, exportToDocx, resolveDocxFont } from "./docxExport";
 
 describe("generateHTML", () => {
     it("wraps the content in a standalone HTML document", () => {
@@ -110,6 +110,13 @@ describe("exportToDocx", () => {
     it("selects an explicit CJK-capable font for Chinese documents", () => {
         expect(resolveDocxFont("<p>中文 mixed content</p>")).toBe("Arial Unicode MS");
         expect(resolveDocxFont("<p>English only</p>")).toBe("Calibri");
+    });
+
+    it("adds an explicit East Asia font without replacing western or existing mappings", () => {
+        const xml = '<w:rFonts w:ascii="Calibri"/><w:rFonts w:ascii="Courier" w:eastAsia="SimSun"/>';
+        const out = addEastAsianFontToWordXml(xml, "Arial Unicode MS");
+        expect(out).toContain('<w:rFonts w:ascii="Calibri" w:eastAsia="Arial Unicode MS"/>');
+        expect(out).toContain('<w:rFonts w:ascii="Courier" w:eastAsia="SimSun"/>');
     });
 
     it("returns false and writes nothing when the save dialog is cancelled", async () => {

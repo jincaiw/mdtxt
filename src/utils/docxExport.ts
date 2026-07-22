@@ -13,6 +13,25 @@ type HtmlToDocx = (
 export const resolveDocxFont = (htmlContent: string): string =>
     /[\u3400-\u9fff\uf900-\ufaff]/u.test(htmlContent) ? "Arial Unicode MS" : "Calibri";
 
+export function addEastAsianFontToWordXml(xml: string, font: string): string {
+    const escapedFont = font.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    return xml.replace(/<w:rFonts\b([^>]*?)\/>/g, (tag, attributes: string) => {
+        if (/\bw:eastAsia=/.test(attributes)) return tag;
+        return `<w:rFonts${attributes} w:eastAsia="${escapedFont}"/>`;
+    });
+}
+
+async function applyEastAsianDocxFont(bytes: Uint8Array, font: string): Promise<Uint8Array> {
+    const { default: JSZip } = await import("jszip");
+    const zip = await JSZip.loadAsync(bytes);
+    for (const path of ["word/styles.xml", "word/document.xml"]) {
+        const file = zip.file(path);
+        if (!file) continue;
+        zip.file(path, addEastAsianFontToWordXml(await file.async("string"), font));
+    }
+    return zip.generateAsync({ type: "uint8array" });
+}
+
 const escapeHtml = (text: string): string => text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -69,9 +88,12 @@ export async function exportToDocx(
         fontSize: 22,
         table: { row: { cantSplit: true } },
     });
-    const bytes = out instanceof Blob
+    let bytes = out instanceof Blob
         ? new Uint8Array(await out.arrayBuffer())
         : out instanceof Uint8Array ? out : new Uint8Array(out as ArrayBuffer);
+    if (resolveDocxFont(cleaned) !== "Calibri") {
+        bytes = await applyEastAsianDocxFont(bytes, "Arial Unicode MS");
+    }
     await invoke("write_export_binary", { path: filePath, bytes: Array.from(bytes) });
     return true;
 }
