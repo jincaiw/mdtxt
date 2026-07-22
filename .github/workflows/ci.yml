@@ -277,6 +277,10 @@ jobs:
             export XMODIFIERS=@im=ibus
             export QT_IM_MODULE=ibus
             export IBUS_ENABLE_SYNC_MODE=1
+            # The test owns a private session bus and its IBus daemon; forcing
+            # direct client transport avoids the desktop-portal proxy losing
+            # preedit callbacks in the headless runner.
+            export IBUS_USE_PORTAL=0
             export GDK_BACKEND=x11
             export LIBGL_ALWAYS_SOFTWARE=1
             export WEBKIT_DISABLE_COMPOSITING_MODE=1
@@ -307,6 +311,7 @@ jobs:
               sleep 0.1
             done
             test "$(ibus engine)" = "libpinyin"
+            sleep 2
             bun scripts/linux-native-ime.mjs
           '
 
