@@ -76,6 +76,20 @@ describe("editor selection theming", () => {
         expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
     });
 
+    it("mounts bounded frontmatter metadata without replacing the YAML source", async () => {
+        const source = "---\ntitle: 安全说明\ntags: docs, beta\n---\n\n# Body";
+        const { container } = render(<CodeEditor documentId="frontmatter" content={source} onChange={() => {}} liveMode />);
+        const editor = await waitFor(() => {
+            const element = container.querySelector<HTMLElement>(".cm-editor");
+            expect(element).toBeTruthy();
+            return element!;
+        });
+        const view = EditorView.findFromDOM(editor);
+        view.dispatch({ selection: { anchor: source.length } });
+        await waitFor(() => expect(container.querySelector(".cm-live-frontmatter-widget")).toHaveTextContent("安全说明"));
+        expect(view.state.doc.toString()).toBe(source);
+    });
+
     it("marks an over-threshold document as restricted without removing its source editor", async () => {
         const { container, rerender } = render(
             <CodeEditor
