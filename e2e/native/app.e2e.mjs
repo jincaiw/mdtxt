@@ -325,18 +325,34 @@ describe("mdtxt native Tauri smoke", () => {
 
         const started = await browser.execute(() => performance.now());
         await activate(await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']"));
-        const widgetSelectors = [
-            ".cm-live-image-widget",
-            ".cm-live-code-widget",
-            ".cm-live-frontmatter-widget",
-            ".cm-live-table-widget",
-            ".cm-live-math-widget",
-            ".cm-live-mermaid-widget",
-            ".cm-live-footnote-widget",
-            ".cm-live-callout-widget",
+        const widgetTargets = [
+            [".cm-live-frontmatter-widget", "title: Native widgets"],
+            [".cm-live-image-widget", "![pixel]"],
+            [".cm-live-code-widget", "const native"],
+            [".cm-live-table-widget", "| native | 8 |"],
+            [".cm-live-math-widget", "x^2 + y^2"],
+            [".cm-live-mermaid-widget", "graph TD; A-->B"],
+            [".cm-live-footnote-widget", "[^1]: Native footnote"],
+            [".cm-live-callout-widget", "> Native callout"],
         ];
-        for (const selector of widgetSelectors) await $(selector).waitForExist({ timeout: 20_000 });
-        await $(".cm-live-mermaid-widget svg").waitForExist({ timeout: 20_000 });
+        // Widgets are deliberately bounded to CodeMirror's visible ranges. A
+        // single viewport cannot contain all eight blocks on every runner, so
+        // bring each source block into the native viewport before asserting
+        // its corresponding decoration.
+        for (const [selector, sourceCue] of widgetTargets) {
+            const scrolled = await browser.execute((cue) => {
+                const line = [...document.querySelectorAll(".cm-content .cm-line")]
+                    .find((candidate) => (candidate.textContent ?? "").includes(cue));
+                if (!(line instanceof HTMLElement)) return false;
+                line.scrollIntoView({ block: "center" });
+                return true;
+            }, sourceCue);
+            assert.equal(scrolled, true, `P7 source cue is unavailable: ${sourceCue}`);
+            await $(selector).waitForExist({ timeout: 20_000 });
+            if (selector === ".cm-live-mermaid-widget") {
+                await $(".cm-live-mermaid-widget svg").waitForExist({ timeout: 20_000 });
+            }
+        }
         const duration = await browser.execute((start) => performance.now() - start, started);
 
         await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
@@ -344,7 +360,7 @@ describe("mdtxt native Tauri smoke", () => {
             [...document.querySelectorAll(".cm-content .cm-line")].map((line) => line.textContent ?? "").join("\n")
         ));
         assert.equal(roundTrip.replaceAll("\u00a0", " "), fixture);
-        console.log(`MDTXT_NATIVE_P7 platform=ubuntu widgets=${widgetSelectors.length} liveActivationMs=${duration} mermaid=passed sourceRoundTrip=passed`);
+        console.log(`MDTXT_NATIVE_P7 platform=ubuntu widgets=${widgetTargets.length} liveActivationMs=${duration} mermaid=passed sourceRoundTrip=passed`);
     });
 
     it("measures a 10 MiB Source to restricted-Live path in the native WebView", async () => {
