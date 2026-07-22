@@ -8,7 +8,7 @@ param(
 
   [switch]$MoveToEnd,
 
-  [ValidateSet('Space', 'Enter', 'Left', 'Right', 'Up', 'Down', 'ControlZ', 'ControlShiftZ', 'ControlA', 'ControlC', 'ControlV', 'WinSpace', 'ActivateChinese')]
+  [ValidateSet('Space', 'Enter', 'Left', 'Right', 'Up', 'Down', 'ControlZ', 'ControlY', 'ControlShiftZ', 'ControlA', 'ControlC', 'ControlV', 'WinSpace', 'ActivateChinese')]
   [string[]]$Keys = @()
 )
 
@@ -262,6 +262,7 @@ public static class MdtxtNativeInput
             case "Up": SendChord(new ushort[] { VK_UP }); break;
             case "Down": SendChord(new ushort[] { VK_DOWN }); break;
             case "ControlZ": SendChord(new ushort[] { VK_CONTROL, 0x5A }); break;
+            case "ControlY": SendChord(new ushort[] { VK_CONTROL, 0x59 }); break;
             case "ControlShiftZ": SendChord(new ushort[] { VK_CONTROL, VK_SHIFT, 0x5A }); break;
             case "ControlA": SendChord(new ushort[] { VK_CONTROL, 0x41 }); break;
             case "ControlC": SendChord(new ushort[] { VK_CONTROL, 0x43 }); break;

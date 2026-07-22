@@ -540,7 +540,9 @@ async function run() {
     sendNativeKeys("ControlZ");
     await wait(200);
     assert.equal((await execute("return document.querySelector('.cm-content')?.textContent ?? '';")).includes(sourceChinese), false);
-    sendNativeKeys("ControlShiftZ");
+    // Ctrl+Y is the platform-native redo binding and avoids Microsoft Pinyin
+    // treating the shifted character chord as a fresh text-service input.
+    sendNativeKeys("ControlY");
     await wait(200);
     assert.equal((await execute("return document.querySelector('.cm-content')?.textContent ?? '';")).includes(sourceChinese), true);
 
