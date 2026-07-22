@@ -286,10 +286,13 @@ describe("mdtxt native Tauri smoke", () => {
             "> [!NOTE]",
             "> Native callout",
         ].join("\n");
-        const sourceMode = await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']");
-        await activate(sourceMode);
+        await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
         const editor = await $(".cm-content");
         await editor.setValue(fixture);
+        await browser.waitUntil(async () => (await $$(".cm-line")).length >= 5, {
+            timeout: 10_000,
+            timeoutMsg: "P7 fixture did not render its heading line in CodeMirror",
+        });
         const headingLine = (await $$(".cm-line"))[4];
         await headingLine.click();
 
@@ -309,7 +312,7 @@ describe("mdtxt native Tauri smoke", () => {
         await $(".cm-live-mermaid-widget svg").waitForExist({ timeout: 20_000 });
         const duration = await browser.execute((start) => performance.now() - start, started);
 
-        await activate(sourceMode);
+        await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
         const roundTrip = await browser.execute(() => (
             [...document.querySelectorAll(".cm-content .cm-line")].map((line) => line.textContent ?? "").join("\n")
         ));
