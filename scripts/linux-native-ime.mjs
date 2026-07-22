@@ -112,6 +112,13 @@ async function verifySystemPrintDialog() {
         const exportButton = document.querySelector("button[aria-label='导出文档'], button[aria-label='Export document']");
         if (!(exportButton instanceof HTMLButtonElement)) throw new Error("Export menu is unavailable");
         exportButton.click();
+        return true;
+    `), true);
+    await waitForScript(`
+        return [...document.querySelectorAll("[role='menu'] [role='menuitem']")]
+            .some((item) => item.textContent?.trim() === "PDF");
+    `, "PDF export menu item");
+    assert.equal(await execute(`
         const pdf = [...document.querySelectorAll("[role='menu'] button, [role='menuitem']")]
             .find((item) => item.textContent?.trim() === "PDF");
         if (!(pdf instanceof HTMLElement)) throw new Error("PDF export action is unavailable");
