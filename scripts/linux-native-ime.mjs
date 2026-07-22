@@ -290,11 +290,15 @@ async function run() {
             text: document.querySelector(".cm-activeLine")?.textContent ?? "",
         };
     `);
-    console.log(`MDTXT_IBUS_PREEDIT ${JSON.stringify({
-        engine: runCommand("ibus", ["engine"], "reading the active IBus engine"),
+    const configuredIme = process.env.MDTXT_LINUX_IME_ENGINE ?? "ibus-libpinyin";
+    const activeEngine = configuredIme.startsWith("fcitx5")
+        ? runCommand("fcitx5-remote", ["-n"], "reading the active Fcitx5 engine")
+        : runCommand("ibus", ["engine"], "reading the active IBus engine");
+    console.log(`MDTXT_LINUX_IME_PREEDIT ${JSON.stringify({
+        engine: activeEngine,
         ...preedit,
     })}`);
-    runCommand("scrot", ["/tmp/mdtxt-ibus-preedit.png"], "capturing the IBus candidate window");
+    runCommand("scrot", ["/tmp/mdtxt-linux-ime-preedit.png"], "capturing the Chinese IME candidate window");
     assert.equal(preedit.events.some((event) => event.type === "compositionstart"), true);
 
     sendKey("space");
@@ -373,7 +377,7 @@ async function run() {
     `);
     assert.equal(await execute(editorTextScript), copiedText);
 
-    console.log(`MDTXT_NATIVE_IME platform=ubuntu engine=ibus-libpinyin input=x11-xte-xtest sourcePhrase=${sourceChinese} compositionEvents=${committed.events.length} liveChineseRuns=${allChinese.length} clipboard=passed undoRedo=passed modeTabRoundTrip=passed screenshot=/tmp/mdtxt-ibus-preedit.png`);
+    console.log(`MDTXT_NATIVE_IME platform=ubuntu engine=${configuredIme} input=x11-xdotool-xtest sourcePhrase=${sourceChinese} compositionEvents=${committed.events.length} liveChineseRuns=${allChinese.length} clipboard=passed undoRedo=passed modeTabRoundTrip=passed screenshot=/tmp/mdtxt-linux-ime-preedit.png`);
 }
 
 try {

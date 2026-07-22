@@ -232,7 +232,7 @@ jobs:
         if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf webkit2gtk-driver xvfb xdotool xautomation x11-utils openbox dbus-x11 ibus ibus-libpinyin scrot
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf webkit2gtk-driver xvfb xdotool x11-utils openbox dbus-x11 fcitx5 fcitx5-chinese-addons fcitx5-frontend-gtk3 scrot
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.96.1
@@ -273,13 +273,9 @@ jobs:
           MDTXT_E2E_SKIP_BUILD: 'true'
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" dbus-run-session -- bash -euxo pipefail -c '
-            export GTK_IM_MODULE=ibus
-            export XMODIFIERS=@im=ibus
-            export QT_IM_MODULE=ibus
-            # The test owns a private session bus and its IBus daemon; forcing
-            # direct client transport avoids the desktop-portal proxy losing
-            # preedit callbacks in the headless runner.
-            export IBUS_USE_PORTAL=0
+            export GTK_IM_MODULE=fcitx
+            export XMODIFIERS=@im=fcitx
+            export QT_IM_MODULE=fcitx
             export GDK_BACKEND=x11
             export LIBGL_ALWAYS_SOFTWARE=1
             export WEBKIT_DISABLE_COMPOSITING_MODE=1
@@ -289,37 +285,34 @@ jobs:
               sleep 0.1
             done
             xprop -root _NET_SUPPORTING_WM_CHECK | grep -q window
-            ibus-daemon --daemonize --replace --xim
+            mkdir -p "$HOME/.config/fcitx5"
+            printf "[Groups/0]\nName=Default\nDefault Layout=us\nDefaultIM=pinyin\n\n[Groups/0/Items/0]\nName=keyboard-us\nLayout=\n\n[Groups/0/Items/1]\nName=pinyin\nLayout=\n\n[GroupOrder]\n0=Default\n" > "$HOME/.config/fcitx5/profile"
+            fcitx5 -d --replace
             for attempt in $(seq 1 50); do
-              if ibus engine libpinyin; then break; fi
+              if fcitx5-remote >/dev/null 2>&1; then break; fi
               sleep 0.1
             done
-            ibus list-engine
-            ibus engine xkb:us::eng
-            test "$(ibus engine)" = "xkb:us::eng"
+            fcitx5-remote -s keyboard-us
+            test "$(fcitx5-remote -n)" = "keyboard-us"
             bun run test:native
-            # Run the real IBus/XTEST proof outside WebKitWebDriver. Linux
+            # Run the real Fcitx5/XTEST proof outside WebKitWebDriver. Linux
             # WebKitGTK suppresses external XTEST events while an automation
             # session owns the page; the Debug-only localhost bridge observes
             # the ordinary packaged WebView without injecting input.
-            # Keep the same D-Bus/IBus daemon that owns the XIM selection on
-            # this X server. A nested dbus-run-session can report libpinyin
-            # while the outer XIM owner still handles keys with the US engine.
-            for attempt in $(seq 1 50); do
-              if ibus engine libpinyin; then break; fi
-              sleep 0.1
-            done
-            test "$(ibus engine)" = "libpinyin"
+            fcitx5-remote -s pinyin
+            fcitx5-remote -a
+            test "$(fcitx5-remote -n)" = "pinyin"
             sleep 2
+            export MDTXT_LINUX_IME_ENGINE=fcitx5-pinyin
             bun scripts/linux-native-ime.mjs
           '
 
-      - name: Upload Ubuntu IBus preedit evidence
+      - name: Upload Ubuntu Chinese IME preedit evidence
         if: ${{ always() && matrix.platform == 'ubuntu-24.04' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ubuntu-ibus-preedit-${{ github.sha }}
-          path: /tmp/mdtxt-ibus-preedit.png
+          name: ubuntu-chinese-ime-preedit-${{ github.sha }}
+          path: /tmp/mdtxt-linux-ime-preedit.png
           if-no-files-found: error
           retention-days: 14
 
