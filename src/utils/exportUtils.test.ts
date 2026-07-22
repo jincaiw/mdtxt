@@ -108,8 +108,8 @@ describe("prepareExportHtml", () => {
 
 describe("exportToDocx", () => {
     it("selects an explicit CJK-capable font for Chinese documents", () => {
-        expect(resolveDocxFont("zh-CN")).toBe("Arial Unicode MS");
-        expect(resolveDocxFont("en")).toBe("Calibri");
+        expect(resolveDocxFont("<p>中文 mixed content</p>")).toBe("Arial Unicode MS");
+        expect(resolveDocxFont("<p>English only</p>")).toBe("Calibri");
     });
 
     it("returns false and writes nothing when the save dialog is cancelled", async () => {
