@@ -172,19 +172,9 @@ async function focusEditorWindow() {
 }
 
 function sendKey(key) {
-    const tokens = key.split("+");
-    const keyName = tokens.pop();
-    const modifiers = tokens.map((token) => ({
-        ctrl: "Control_L",
-        shift: "Shift_L",
-    })[token] ?? token);
     runCommand(
-        "xte",
-        [
-            ...modifiers.map((modifier) => `keydown ${modifier}`),
-            `key ${keyName}`,
-            ...modifiers.reverse().map((modifier) => `keyup ${modifier}`),
-        ],
+        "xdotool",
+        ["key", "--clearmodifiers", key],
         `sending ${key} through XTEST`,
     );
 }
@@ -192,14 +182,13 @@ function sendKey(key) {
 async function sendText(text, delayMilliseconds = 35) {
     await focusEditorWindow();
     sendKey("ctrl+End");
-    runCommand(
-        "xte",
-        [...text].flatMap((character) => [
-            `key ${character}`,
-            `usleep ${Math.round(delayMilliseconds * 1000)}`,
-        ]),
-        `typing ${text} through XTEST`,
-    );
+    runCommand("xdotool", [
+        "type",
+        "--clearmodifiers",
+        "--delay",
+        String(delayMilliseconds),
+        text,
+    ], `typing ${text} through XTEST`);
 }
 
 const editorTextScript = `
@@ -267,6 +256,7 @@ async function run() {
         content.focus();
         window.__mdtxtImeEvents = [];
         window.__mdtxtImeInputEvents = [];
+        window.__mdtxtImeKeyEvents = [];
         for (const type of ["compositionstart", "compositionupdate", "compositionend"]) {
             content.addEventListener(type, (event) => {
                 window.__mdtxtImeEvents.push({ type, data: event.data });
@@ -282,6 +272,11 @@ async function run() {
                 });
             });
         }
+        for (const type of ["keydown", "keyup"]) {
+            content.addEventListener(type, (event) => {
+                window.__mdtxtImeKeyEvents.push({ type, key: event.key, code: event.code });
+            });
+        }
         return { ok: document.activeElement === content };
     `), { ok: true });
 
@@ -291,6 +286,7 @@ async function run() {
         return {
             events: window.__mdtxtImeEvents ?? [],
             inputEvents: window.__mdtxtImeInputEvents ?? [],
+            keyEvents: window.__mdtxtImeKeyEvents ?? [],
             text: document.querySelector(".cm-activeLine")?.textContent ?? "",
         };
     `);
