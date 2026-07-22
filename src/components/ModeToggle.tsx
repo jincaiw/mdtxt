@@ -29,7 +29,7 @@ export function ModeToggle({ mode, onSetMode, liveEnabled = false }: ModeToggleP
                     className={`${buttonBase} ${modeClass(mode === "code")}`}
                 >
                     <span className="material-symbols-outlined text-[15px]">code</span>
-                    <span>{t("Source")}</span>
+                    <span className="hidden lg:inline">{t("Source")}</span>
                 </button>
 
                 {liveEnabled && <button
@@ -40,7 +40,7 @@ export function ModeToggle({ mode, onSetMode, liveEnabled = false }: ModeToggleP
                     className={`${buttonBase} ${modeClass(mode === "live")}`}
                 >
                     <span className="material-symbols-outlined text-[15px]">auto_fix_high</span>
-                    <span>{t("Live Beta")}</span>
+                    <span className="hidden lg:inline">{t("Live Beta")}</span>
                 </button>}
 
                 <button
@@ -51,7 +51,7 @@ export function ModeToggle({ mode, onSetMode, liveEnabled = false }: ModeToggleP
                     className={`${buttonBase} ${modeClass(mode === "split")}`}
                 >
                     <span className="material-symbols-outlined text-[15px]">vertical_split</span>
-                    <span>{t("Split")}</span>
+                    <span className="hidden lg:inline">{t("Split")}</span>
                 </button>
 
                 <button
@@ -62,7 +62,7 @@ export function ModeToggle({ mode, onSetMode, liveEnabled = false }: ModeToggleP
                     className={`${buttonBase} ${modeClass(mode === "preview")}`}
                 >
                     <span className="material-symbols-outlined text-[15px]">visibility</span>
-                    <span>{t("Reader")}</span>
+                    <span className="hidden lg:inline">{t("Reader")}</span>
                 </button>
         </div>
     );

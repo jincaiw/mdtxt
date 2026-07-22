@@ -503,7 +503,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         {section === "about" && (
                             <div className="text-sm text-[var(--text-secondary)] space-y-2">
                                 <div className="flex items-center gap-3">
-                                    <img src="/icon.svg" alt="mdtxt" className="w-10 h-10" />
+                                    <img src="/icon.png" alt="mdtxt" className="h-10 w-10 rounded-[10px] object-contain" />
                                     <div>
                                         <div className="text-[var(--text-primary)] font-semibold">mdtxt</div>
                                         <div className="text-[11px] tabular-nums text-[var(--text-muted)]">v{appPackage.version}</div>

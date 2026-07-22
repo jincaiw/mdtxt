@@ -117,7 +117,7 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: Expo
     };
 
     return (
-        <div ref={menuRef} className="relative no-drag">
+        <div ref={menuRef} className="relative shrink-0 no-drag">
             {/* Export Button */}
             <button
                 onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -125,7 +125,7 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: Expo
                 aria-label={t("Export document")}
                 aria-expanded={isOpen}
                 aria-haspopup="true"
-                className={`btn-press flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-xs ${
+                className={`btn-press flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-xs transition-colors hover:bg-[var(--bg-hover)] xl:px-2 ${
                     disabled
                         // Muted color at full opacity rather than opacity-40 on top
                         // of muted — keeps the disabled label readable (a11y).
@@ -137,12 +137,12 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: Expo
                 {isExporting ? (
                     <>
                         <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-                        <span className="hidden sm:inline">{t("Exporting...")}</span>
+                        <span className="hidden xl:inline">{t("Exporting...")}</span>
                     </>
                 ) : (
                     <>
                         <span className="material-symbols-outlined text-[16px]">ios_share</span>
-                        <span className="hidden sm:inline">{t("Export")}</span>
+                        <span className="hidden xl:inline">{t("Export")}</span>
                     </>
                 )}
             </button>

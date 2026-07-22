@@ -112,46 +112,46 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
             >
                 {/* Left: Icon & Title */}
                 <div className="flex min-w-0 items-center gap-2 no-drag">
-                    {hasFile && <div className="flex items-center justify-center w-5 h-5">
-                        <img src="/icon.svg" alt="mdtxt" className="w-full h-full" />
+                    {hasFile && <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                        <img src="/icon.png" alt="mdtxt" className="h-full w-full rounded-[5px] object-contain" />
                     </div>}
-                    {hasFile && <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] min-w-0">
+                    {hasFile && <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-[var(--text-secondary)]">
                         {parentFolder && (
                             <>
                                 <span className="opacity-60 hidden md:inline">{parentFolder} /</span>
                             </>
                         )}
-                        <span className="text-[var(--text-primary)] font-semibold tracking-tight truncate max-w-[28vw]">
+                        <span className="min-w-0 flex-1 truncate font-semibold tracking-tight text-[var(--text-primary)]">
                             {fileName || "mdtxt"}
                         </span>
                         {isDirty && (
-                            <span className="text-[var(--status-unsaved)] ml-1 italic text-xs">— {t("Edited")}</span>
+                            <span className="ml-1 shrink-0 whitespace-nowrap text-xs italic text-[var(--status-unsaved)]">— {t("Edited")}</span>
                         )}
                     </div>}
 
                     {/* Open File / New Button - shown when a file is already open */}
                     {hasFile && onOpenFile && (
-                        <>
-                            <div className="w-[1px] h-4 bg-[var(--border)] ml-2"></div>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                            <div className="ml-1 h-4 w-px shrink-0 bg-[var(--border)]"></div>
                             {onNewFile && (
                                 <button
                                     onClick={onNewFile}
                                     aria-label={t("New file")}
-                                    className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors text-xs"
+                                    className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-md)] px-1.5 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] xl:px-2"
                                     title={t("New File (Ctrl+N)")}
                                 >
                                     <span className="material-symbols-outlined text-[16px]">edit_note</span>
-                                    <span className="hidden sm:inline">{t("New")}</span>
+                                    <span className="hidden xl:inline">{t("New")}</span>
                                 </button>
                             )}
                             <button
                                 onClick={onOpenFile}
                                 aria-label={t("Open file")}
-                                className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors text-xs"
+                                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-md)] px-1.5 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] xl:px-2"
                                 title={t("Open File (Ctrl+O)")}
                             >
                                 <span className="material-symbols-outlined text-[16px]">folder_open</span>
-                                <span className="hidden sm:inline">{t("Open")}</span>
+                                <span className="hidden xl:inline">{t("Open")}</span>
                             </button>
                             <ExportMenu
                                 fileName={fileName || 'document.md'}
@@ -165,16 +165,16 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                                     aria-label={t("AI assistant")}
                                     aria-pressed={aiActive}
                                     title={t("AI assistant")}
-                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] transition-colors text-xs font-semibold tracking-wide ${aiActive
+                                    className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-md)] px-1.5 py-1 text-xs font-semibold tracking-wide transition-colors xl:px-2.5 ${aiActive
                                         ? "bg-[var(--bg-hover)] text-[var(--accent)]"
                                         : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                                        }`}
+                                    }`}
                                 >
                                     <span className="material-symbols-outlined text-[15px] ai-shimmer" aria-hidden="true">auto_awesome</span>
-                                    <span>AI</span>
+                                    <span className="hidden xl:inline">AI</span>
                                 </button>
                             )}
-                        </>
+                        </div>
                     )}
                 </div>
 
