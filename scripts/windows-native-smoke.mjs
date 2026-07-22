@@ -620,7 +620,12 @@ async function run() {
     `);
     await wait(200);
     assert.equal(
-        await execute("return document.querySelector('.cm-content')?.textContent ?? '';"),
+        await execute(`
+            const content = document.querySelector(".cm-content");
+            return content
+                ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
+                : null;
+        `),
         copiedText,
     );
     await execute(`
@@ -628,7 +633,12 @@ async function run() {
         return true;
     `);
     assert.equal(
-        await execute("return document.querySelector('.cm-content')?.textContent ?? '';"),
+        await execute(`
+            const content = document.querySelector(".cm-content");
+            return content
+                ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
+                : null;
+        `),
         copiedText,
     );
     console.log(`MDTXT_NATIVE_IME platform=windows engine=microsoft-pinyin input=win32-sendinput sourcePhrase=${sourceChinese} compositionEvents=${committed.events.length} liveChineseRuns=${liveChinese.length} clipboard=passed undoRedo=passed modeTabRoundTrip=passed screenshot=${pinyinScreenshot}`);

@@ -149,7 +149,7 @@ async function run() {
     assert.equal(candidates.some((entry) => entry.includes("Untitled-2.md")), true);
     await browser.execute(() => {
         const button = [...document.querySelectorAll("[role='alertdialog'] button")]
-            .find((candidate) => /恢复全部|恢复最新会话|Restore all|Restore latest session/.test(candidate.textContent ?? ""));
+            .find((candidate) => /全部恢复|恢复最新会话|Restore all|Restore latest session/.test(candidate.textContent ?? ""));
         if (!(button instanceof HTMLButtonElement)) throw new Error("Restore-all action is unavailable");
         button.click();
     });
