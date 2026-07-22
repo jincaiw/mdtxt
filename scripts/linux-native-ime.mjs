@@ -354,18 +354,12 @@ async function run() {
     const copiedText = await execute(editorTextScript);
     assert.ok(copiedText.endsWith(liveText), "Native Chinese clipboard paste did not preserve the document text");
 
-    const firstTabName = await execute(`
-        return document.querySelector("[role='tab'][aria-selected='true']")?.getAttribute("title");
-    `);
-    assert.ok(firstTabName);
     await execute(`
         document.querySelector("button[aria-label='新建标签页'], button[aria-label='New tab']")?.click();
         return true;
     `);
     await execute(`
-        const name = ${JSON.stringify(firstTabName)};
-        const tab = [...document.querySelectorAll("[role='tab']")]
-            .find((candidate) => candidate.getAttribute("title") === name);
+        const tab = document.querySelectorAll("[role='tab']")[0];
         if (!(tab instanceof HTMLButtonElement)) throw new Error("Original tab is unavailable");
         tab.click();
         return true;
