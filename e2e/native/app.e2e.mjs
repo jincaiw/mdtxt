@@ -89,7 +89,7 @@ describe("mdtxt native Tauri smoke", () => {
         invoke("list_recoveries")
             .then((existing) => Promise.all(existing.map((item) => invoke("discard_recovery", { documentId: item.documentId }))))
             .then(() => invoke("write_recovery", entry))
-            .then(() => done({ ok: true }))
+            .then(() => done({ ok: true, documentId: entry.documentId }))
             .catch((error) => done({ ok: false, error: String(error) }));
     }, content, name);
 
@@ -313,7 +313,8 @@ describe("mdtxt native Tauri smoke", () => {
             "> [!NOTE]",
             "> Native callout",
         ].join("\n");
-        assert.deepEqual(await stageExactRecovery(fixture, "P7 Native Widgets.md"), { ok: true });
+        const staged = await stageExactRecovery(fixture, "P7 Native Widgets.md");
+        assert.equal(staged.ok, true, staged.error);
         await restoreStagedRecovery();
         await dismissTourIfPresent();
         const editor = await $(".cm-content");
@@ -361,10 +362,16 @@ describe("mdtxt native Tauri smoke", () => {
         const duration = await browser.execute((start) => performance.now() - start, started);
 
         await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
-        const roundTrip = await browser.execute(() => (
-            [...document.querySelectorAll(".cm-content .cm-line")].map((line) => line.textContent ?? "").join("\n")
-        ));
-        assert.equal(roundTrip.replaceAll("\u00a0", " "), fixture);
+        // CodeMirror virtualizes off-screen Source lines too. Validate the
+        // controller-owned full document through the new recovery entry rather
+        // than reconstructing only the currently mounted line DOM.
+        await browser.pause(2_250);
+        const roundTrip = await browser.executeAsync((originalDocumentId, done) => {
+            window.__TAURI_INTERNALS__.invoke("list_recoveries")
+                .then((entries) => done(entries.find((entry) => entry.documentId !== originalDocumentId)?.content ?? null))
+                .catch((error) => done({ error: String(error) }));
+        }, staged.documentId);
+        assert.equal(roundTrip, fixture);
         console.log(`MDTXT_NATIVE_P7 platform=ubuntu widgets=${widgetSelectors.length} liveActivationMs=${duration} mermaid=passed sourceRoundTrip=passed`);
     });
 
