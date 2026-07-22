@@ -253,6 +253,70 @@ describe("mdtxt native Tauri smoke", () => {
         });
     });
 
+    it("renders every P7 Live widget in the native viewport and round-trips source", async () => {
+        const fixture = [
+            "---",
+            "title: Native widgets",
+            "---",
+            "",
+            "# P7 widgets",
+            "",
+            "![pixel](data:image/svg+xml;base64,PHN2Zy8+)",
+            "",
+            "```ts",
+            "const native = true;",
+            "```",
+            "",
+            "| Name | Value |",
+            "| --- | ---: |",
+            "| native | 8 |",
+            "",
+            "$$",
+            "x^2 + y^2 = z^2",
+            "$$",
+            "",
+            "```mermaid",
+            "graph TD; A-->B",
+            "```",
+            "",
+            "Text[^1]",
+            "",
+            "[^1]: Native footnote",
+            "",
+            "> [!NOTE]",
+            "> Native callout",
+        ].join("\n");
+        const sourceMode = await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']");
+        await activate(sourceMode);
+        const editor = await $(".cm-content");
+        await editor.setValue(fixture);
+        const headingLine = (await $$(".cm-line"))[4];
+        await headingLine.click();
+
+        const started = await browser.execute(() => performance.now());
+        await activate(await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']"));
+        const widgetSelectors = [
+            ".cm-live-image-widget",
+            ".cm-live-code-widget",
+            ".cm-live-frontmatter-widget",
+            ".cm-live-table-widget",
+            ".cm-live-math-widget",
+            ".cm-live-mermaid-widget",
+            ".cm-live-footnote-widget",
+            ".cm-live-callout-widget",
+        ];
+        for (const selector of widgetSelectors) await $(selector).waitForExist({ timeout: 20_000 });
+        await $(".cm-live-mermaid-widget svg").waitForExist({ timeout: 20_000 });
+        const duration = await browser.execute((start) => performance.now() - start, started);
+
+        await activate(sourceMode);
+        const roundTrip = await browser.execute(() => (
+            [...document.querySelectorAll(".cm-content .cm-line")].map((line) => line.textContent ?? "").join("\n")
+        ));
+        assert.equal(roundTrip.replaceAll("\u00a0", " "), fixture);
+        console.log(`MDTXT_NATIVE_P7 platform=ubuntu widgets=${widgetSelectors.length} liveActivationMs=${duration} mermaid=passed sourceRoundTrip=passed`);
+    });
+
     it("measures a 10 MiB Source to restricted-Live path in the native WebView", async () => {
         const targetBytes = 10 * 1024 * 1024;
         const staged = await stageSizedRecovery(targetBytes, "Native 10 MiB.md");
