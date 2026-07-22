@@ -234,10 +234,15 @@ async function restoreStagedRecovery({ captureNativeInput = false } = {}) {
                 window.__mdtxtNativeInputSamples = {
                     beforeinput: [],
                     input: [],
+                    beforeinputData: [],
+                    inputData: [],
                     composition: [],
                 };
                 const record = (eventName, event) => {
                     if (!(event.target instanceof Element) || !event.target.closest(".cm-content")) return;
+                    if (typeof event.data === "string") {
+                        window.__mdtxtNativeInputSamples[eventName + "Data"].push(event.data);
+                    }
                     const started = performance.now();
                     queueMicrotask(() => {
                         window.__mdtxtNativeInputSamples[eventName].push(performance.now() - started);
@@ -375,10 +380,11 @@ async function run() {
     sendNativeText("x".repeat(40));
     await wait(250);
     const inputResult = await execute(`
-        const content = document.querySelector(".cm-content");
         const eventSamples = window.__mdtxtNativeInputSamples ?? {
             beforeinput: [],
             input: [],
+            beforeinputData: [],
+            inputData: [],
         };
         window.__mdtxtNativeInputCleanup?.();
         delete window.__mdtxtNativeInputCleanup;
@@ -387,7 +393,6 @@ async function run() {
             ? "beforeinput"
             : "input";
         const samples = eventSamples[inputEvent].sort((left, right) => left - right);
-        const activeLine = content?.querySelector(".cm-activeLine");
         return {
             inputEvent,
             beforeInputSamples: eventSamples.beforeinput.length,
@@ -396,12 +401,12 @@ async function run() {
             inputP50: samples[Math.ceil(samples.length * 0.5) - 1],
             inputP95: samples[Math.ceil(samples.length * 0.95) - 1],
             inputMax: samples.at(-1),
-            suffix: activeLine?.textContent?.slice(-40),
+            inputText: eventSamples[inputEvent + "Data"].join(""),
         };
     `);
     console.log(`MDTXT_NATIVE_PERF platform=windows target=1MiB inputMethod=win32-sendinput inputEvent=${inputResult.inputEvent} beforeInputSamples=${inputResult.beforeInputSamples} inputEventSamples=${inputResult.inputEventSamples} inputProcessingSamples=${inputResult.inputSamples} inputProcessingP50Ms=${inputResult.inputP50} inputProcessingP95Ms=${inputResult.inputP95} inputProcessingMaxMs=${inputResult.inputMax}`);
     assert.equal(inputResult.inputSamples, 40);
-    assert.equal(inputResult.suffix, "x".repeat(40));
+    assert.equal(inputResult.inputText, "x".repeat(40));
     assert.ok(inputResult.inputP95 <= 16, `1 MiB native WebView input-processing P95 was ${inputResult.inputP95} ms`);
 
     console.log("MDTXT_NATIVE_WINDOWS phase=discard-1MiB");

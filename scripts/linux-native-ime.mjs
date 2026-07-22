@@ -117,6 +117,10 @@ async function focusEditorWindow() {
             ["search", "--onlyvisible", "--classname", "mdtxt"],
             ["search", "--onlyvisible", "--name", "mdtxt"],
             ["search", "--onlyvisible", "--name", "Native IBus IME"],
+            ["search", "--pid", String(application.pid)],
+            ["search", "--class", "mdtxt"],
+            ["search", "--classname", "mdtxt"],
+            ["search", "--name", "mdtxt"],
         ]) {
             search = spawnSync("xdotool", args, { encoding: "utf8" });
             if (search.status === 0 && search.stdout.trim()) break;
@@ -141,8 +145,20 @@ async function focusEditorWindow() {
         `finding the mdtxt X11 window failed (${search?.status}): ${search?.stderr || search?.stdout}`,
     );
     const ids = search.stdout.trim().split(/\s+/).filter(Boolean);
-    const windowId = ids.at(-1);
-    assert.ok(windowId, "xdotool returned no visible mdtxt X11 window");
+    const windowId = ids
+        .map((id) => {
+            const geometry = spawnSync(
+                "xdotool",
+                ["getwindowgeometry", "--shell", id],
+                { encoding: "utf8" },
+            );
+            const width = Number(geometry.stdout.match(/^WIDTH=(\d+)$/m)?.[1] ?? 0);
+            const height = Number(geometry.stdout.match(/^HEIGHT=(\d+)$/m)?.[1] ?? 0);
+            return { id, area: width * height };
+        })
+        .sort((left, right) => right.area - left.area)[0]?.id;
+    assert.ok(windowId, "xdotool returned no mdtxt X11 window");
+    runCommand("xdotool", ["windowmap", "--sync", windowId], "mapping the mdtxt X11 window");
     runCommand("xdotool", ["windowactivate", "--sync", windowId], "activating the mdtxt X11 window");
     runCommand("xdotool", ["windowfocus", "--sync", windowId], "focusing the mdtxt X11 window");
     runCommand("xdotool", ["mousemove", "--window", windowId, "80", "115", "click", "1"], "clicking the editor");
