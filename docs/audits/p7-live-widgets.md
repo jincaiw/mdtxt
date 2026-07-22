@@ -1,6 +1,7 @@
 # P7 Live Widget Evidence
 
-Status: **implementation and local gates complete; the candidate native viewport gate is pending its mdtxt-owned CI run.**
+Status: **P7 accepted. All eight source-preserving Widgets passed the native
+Ubuntu WebKit viewport gate and exact Source round trip.**
 
 ## Independent delivery slices
 
@@ -28,10 +29,12 @@ Status: **implementation and local gates complete; the candidate native viewport
 
 - `src/components/CodeEditor.test.tsx` covers all eight Widget types, exact `EditorState.doc` preservation, explicit Live enablement, and Source fallback.
 - `src/utils/localImage.test.ts` covers traversal/absolute-path rejection, Windows/POSIX base directories, and bounded MIME selection.
-- `bun run test`: 51 files / 351 tests passed.
+- `bun run test`: 51 files / 353 tests passed.
 - `bun run build` and `bun run release:check` passed.
-- Candidate native gate `a77d0d0` stages all eight blocks in the Ubuntu WebKit app, waits for every viewport Widget and Mermaid SVG, measures Live activation, switches to Source, and asserts exact round trip. The final CI run/job/metric must replace this pending sentence before P7 acceptance.
+- Commit `a71cea8`, [CI `29954555501`](https://github.com/jincaiw/mdtxt/actions/runs/29954555501), native Ubuntu job `89040211517` scrolled each source block through the real WebKit/CodeMirror viewport and recorded `MDTXT_NATIVE_P7 platform=ubuntu widgets=8 liveActivationMs=1155... mermaid=passed sourceRoundTrip=passed`.
 
 ## Exit decision
 
-P7 may be accepted only after the candidate native gate records all eight Widgets, bounded activation, and exact Source round trip. Live remains Beta and restricted Live continues to omit every complex Widget for oversized documents.
+P7 is accepted for 0.1.0. Live remains Beta and restricted Live continues to
+omit every complex Widget for oversized documents; Source remains the default
+and rollback path.

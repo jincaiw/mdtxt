@@ -1,20 +1,20 @@
 # P8 File Safety, Conflict, and Recovery Tracking
 
-Status: **P8 has started; atomic-save hardening is implemented, but P8 is not
-accepted.**
+Status: **P8 accepted. Atomic-save, conflict, recovery, installed-package
+force-kill, and target-platform filesystem evidence are complete.**
 
 ## Scope and requirement traceability
 
 | Requirement | Evidence | Current status |
 | --- | --- | --- |
-| FR-COMPAT-004: failed replacement never damages the original file | `src-tauri/src/commands.rs::save_file` writes and synchronizes a sibling temporary file before replacement; rename failure removes that temporary file | Implemented and covered by the existing atomic-save test; fault injection is still required |
+| FR-COMPAT-004: failed replacement never damages the original file | `src-tauri/src/commands.rs::save_file` writes and synchronizes a sibling temporary file before replacement; rename failure removes that temporary file | Implemented; write, file-sync, rename and directory-sync fault injection passed |
 | FR-COMPAT-004: detect a newer disk revision before save | `read_file` returns the raw-byte SHA-256; `save_file(..., expected_revision, expected_hash)` checks both values before writing and returns the actual post-rename `{ modified, hash }`; all explicit, automatic, background, close-time and save-as paths update the controller only for the matching document version | P8a implemented. Hash prevents same-mtime overwrite at save time; focus-time change discovery still uses mtime, so a same-mtime external edit is conservatively rejected when the user saves rather than proactively announced |
 | FR-COMPAT-004: preserve existing file access policy | `save_file` copies the target permissions onto the sibling temporary file before it is written and renamed | Implemented on supported filesystems; Unix regression test covers mode `0640` |
 | FR-COMPAT-004: durable replacement metadata | POSIX builds synchronize the containing directory after rename; Windows uses `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)` with verbatim long/UNC paths | Implemented and exercised on all three CI targets; the Windows API requests write-through replacement rather than exposing a directory handle |
 | Overlapping saves do not share a temporary path | `save_temp_path` combines sibling directory, basename, process id, and an atomic process-local sequence | Implemented; unit test proves distinct paths in one process |
-| Save-format fidelity | Existing EOL/BOM/trailing-newline tests in `commands.rs` | Existing coverage remains green; byte-level preservation of all supported formats is not yet complete |
+| Save-format fidelity | EOL/BOM/trailing-newline tests in `commands.rs` | UTF-8, UTF-8 BOM, LF/CRLF and trailing-newline states in the declared 0.1.0 scope round-trip byte-correctly |
 | External modification conflict choice | `useExternalChangeWatcher` does not advance a dirty document's revision; `FileConflictDialog` offers an on-demand read-only side-by-side comparison plus explicit keep-local, reload-disk and save-as choices. A later hash conflict from any save path reopens the same choice point | Active and background dirty tabs use the same non-destructive flow. A background change persists as a localized warning marker on its tab; selecting it opens the decision dialog. Reload or a successful save-as clears only that marker |
-| Crash recovery | `src-tauri/src/recovery.rs` writes app-data recovery entries atomically with SHA-256 validation and seven-day retention; each entry carries a per-launch batch id, tab order, active-tab marker and cursor line; startup lists verified entries in `RecoveryDialog` | Restore creates new unsaved tabs and cannot overwrite disk paths or collide with a prior launch's recovery key. Restore-all is constrained to the newest recovery-session batch. macOS force-terminate/relaunch and Windows/Linux native store/reload/restore are recorded below; installed-package force-termination remains unverified on Windows/Linux |
+| Crash recovery | `src-tauri/src/recovery.rs` writes app-data recovery entries atomically with SHA-256 validation and seven-day retention; each entry carries a per-launch batch id, tab order, active-tab marker and cursor line; startup lists verified entries in `RecoveryDialog` | Restore creates new unsaved tabs and cannot overwrite disk paths or collide with a prior launch's recovery key. Restore-all is constrained to the newest recovery-session batch. macOS force-terminate/relaunch and Windows/Linux installed-package force-kill/relaunch are recorded below |
 
 ## Automated evidence for the atomic-save slice
 
@@ -39,15 +39,15 @@ accepted.**
 | macOS recovery smoke | Debug `mdtxt.app`, Apple M4 / Darwin 25.5.0 / WKWebView | Edited an Untitled draft, waited for recovery debounce, terminated/relaunched the Debug app, observed `RecoveryDialog`, restored into `已恢复 — Untitled-1.md`, and verified the original text remained editable as an unsaved tab |
 | macOS AC-007 two-tab recovery | Isolated Debug `mdtxt Recovery Test.app`, built from `b1b41b4` with only a temporary test bundle identifier (`app.mdtxt.desktop.recoverytest`); Apple M4 / Darwin 25.5.0 / WKWebView | Created two untitled drafts with unique text, left the second active at line 5, verified two same-batch recovery JSON entries (`tabIndex` 0/1, second `wasActive=true`), force-terminated only this isolated PID, relaunched, then used Restore all. `已恢复 — Untitled-1.md` and `已恢复 — Untitled-2.md` appeared in original order; the second was initially active with its full text and `Ln 5`, and the first's full unique text was then observed. This is macOS-only Debug evidence, not a Windows/Linux or release-package pass. |
 | Windows/Ubuntu native recovery round-trip | GitHub-hosted Windows x64 and Ubuntu 24.04 x64, commit `c43653a`, native jobs in [`CI #29483474768`](https://github.com/jincaiw/mdtxt/actions/runs/29483474768) | Both native WebView jobs wrote a recovery entry through the Tauri command, refreshed the app, revalidated persisted id/name/content, restored through the dialog and asserted exact editable editor text before clearing the store. This is automated persistence/reload/restore evidence, not a force-terminated installed-package test. |
+| Ubuntu installed-package recovery | Commit `96d79d2`, [`Installed Package Evidence #29948969306`](https://github.com/jincaiw/mdtxt/actions/runs/29948969306), job `89021545904`, artifact `8541492677` | Installed `/usr/bin/mdtxt` from the production Debian package, created two drafts, sent `SIGKILL`, relaunched, and restored two entries in order with the second active at line 5 and exact content. Marker: `MDTXT_INSTALLED_RECOVERY platform=ubuntu ... drafts=2 order=passed activeTab=second cursorLine=5 content=passed originalOverwrite=impossible`. |
+| Windows installed-package recovery and denied share | Commit `96d79d2` plus recovery-input fix `1783fb6`, same run, job `89021546005`, artifact `8541635821` | Installed the production MSI under `C:\Program Files\mdtxt`, created two drafts, used `taskkill /F`, relaunched, and restored order/active tab/line/exact bytes. The same installed app exercised the denied SMB share and displayed the non-destructive localized failure UX. Marker includes `originalOverwrite=impossible deniedShareUx=passed`. |
 
-## Remaining P8 gates
+## Exit decision
 
-1. Record installed-package Windows and Linux force-termination/relaunch
-   behavior. Native CI proves the recovery contract but does not simulate an
-   operating-system process kill.
-2. Record denied-share UX on Windows and installed-package behavior for the
-   release candidates. POSIX advisory locks remain explicitly non-mandatory;
-   the tested behavior is replacement semantics, not cross-process exclusion.
+P8 is accepted. The platform matrix distinguishes Windows mandatory sharing
+denial from POSIX advisory-lock semantics; no cross-platform lock guarantee is
+claimed. Recovery evidence uses installed production MSI/DEB packages and real
+process kills, and recovery remains unable to overwrite an original path.
 
 ### Superseded local Linux attempt
 

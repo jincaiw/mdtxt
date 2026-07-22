@@ -1,6 +1,7 @@
 # P8 File-System Platform Matrix
 
-Status: **release-blocking evidence matrix; do not infer an unchecked cell from another platform.**
+Status: **accepted target-platform evidence matrix; platform-specific semantics
+remain explicit and are not inferred across operating systems.**
 
 | Behavior | macOS 26.5.2 / arm64 | Windows x64 | Ubuntu LTS x64 | Evidence / release decision |
 | --- | --- | --- | --- | --- |
@@ -10,8 +11,8 @@ Status: **release-blocking evidence matrix; do not infer an unchecked cell from 
 | Symbolic link save | Rejected explicitly; link and target remain unchanged | Passed: `save_file_refuses_to_replace_a_symbolic_link` | Passed | Junction policy remains separately unverified |
 | Long nested path | Passed with a path over 600 characters | Passed with verbatim path handling and `LongPathsEnabled=1` | Passed | Windows policy was explicitly enabled in the runner fixture |
 | File lock | POSIX advisory lock behavior recorded; rename is not automatically blocked | Passed sharing-violation fixture; cleanup re-read confirmed original bytes | POSIX advisory lock behavior passed | Never claim cross-process lock protection on POSIX; Windows sharing denial is enforced |
-| UNC path | Not applicable | Passed loopback SMB share: `save_file_handles_configured_unc_path` | Not applicable | Denied-share UX remains unverified |
-| Crash recovery | Isolated Debug two-draft force-kill/relaunch passed: order, active tab, line and text restored | Native WebView store/reload/dialog/restore passed; installed-package force-kill pending | Native WebView store/reload/dialog/restore passed; installed-package force-kill pending | Recovery never overwrites original paths; automated refresh is not a process-kill claim |
+| UNC path | Not applicable | Passed loopback SMB share: `save_file_handles_configured_unc_path`; installed MSI denied-share UX passed | Not applicable | Sharing denial is visible and non-destructive |
+| Crash recovery | Isolated Debug two-draft force-kill/relaunch passed: order, active tab, line and text restored | Production MSI `taskkill /F` passed two-draft order, active tab, line 5, exact content | Production DEB `SIGKILL` passed the same contract | Run `29948969306`; recovery creates unsaved tabs and cannot overwrite original paths |
 
 ## macOS evidence
 
@@ -39,11 +40,12 @@ Status: **release-blocking evidence matrix; do not infer an unchecked cell from 
   refusal, long paths, directory synchronization and advisory-lock semantics.
 - The same CI run's Windows and Ubuntu native jobs passed recovery
   store/reload/dialog/restore. These are OS-level boundary and native WebView
-  results, not installed-package acceptance passes.
+  results. Installed-package acceptance was subsequently completed by
+  [`Installed Package Evidence #29948969306`](https://github.com/jincaiw/mdtxt/actions/runs/29948969306): Ubuntu job `89021545904` / artifact `8541492677`, and Windows job `89021546005` / artifact `8541635821`.
 
-## Required target-platform record
+## Target-platform record contract
 
-For each pending cell, record: OS version, filesystem, command/test scenario,
+For each platform-specific cell, record: OS version, filesystem, command/test scenario,
 actual result, known OS-specific error, user-visible behavior, and the commit
 that introduced the test or fallback. A CI build alone is not sufficient for
 UNC, locks, recovery, or actual filesystem replacement behavior.
