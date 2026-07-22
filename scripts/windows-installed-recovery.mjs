@@ -16,6 +16,7 @@ assert.ok(binary && existsSync(binary), `Installed mdtxt binary is unavailable: 
 const powershell = resolve(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 const inputScript = resolve(root, "scripts", "windows-send-input.ps1");
 const uiaScript = resolve(root, "scripts", "windows-uia-wait.ps1");
+const uiaInvokeScript = resolve(root, "scripts", "windows-uia-invoke.ps1");
 const captureScript = resolve(root, "scripts", "windows-capture-screen.ps1");
 const recoveryScreenshot = resolve(process.env.RUNNER_TEMP ?? tmpdir(), "mdtxt-windows-installed-recovery.png");
 const deniedScreenshot = resolve(process.env.RUNNER_TEMP ?? tmpdir(), "mdtxt-windows-denied-share.png");
@@ -47,6 +48,15 @@ function send({ text, keys = [] }) {
 
 function waitForUi(pattern, timeoutSeconds = 30) {
     const output = runPowerShell(uiaScript, [
+        "-TargetProcessId", String(application.pid),
+        "-Pattern", pattern,
+        "-TimeoutSeconds", String(timeoutSeconds),
+    ]);
+    console.log(output);
+}
+
+function invokeUi(pattern, timeoutSeconds = 30) {
+    const output = runPowerShell(uiaInvokeScript, [
         "-TargetProcessId", String(application.pid),
         "-Pattern", pattern,
         "-TimeoutSeconds", String(timeoutSeconds),
@@ -113,11 +123,12 @@ async function run() {
 
     await launch();
     waitForUi("New File|新建文件");
+    invokeUi("Just start writing|直接开始写作");
     send({ keys: ["ControlN"] });
-    await wait(500);
+    waitForUi("Ln 1");
     await typeLines(firstLines);
     send({ keys: ["ControlN"] });
-    await wait(500);
+    waitForUi("Untitled-2.md");
     await typeLines(secondLines);
     await wait(3_500);
     assert.equal(readEditorThroughClipboard(), secondText);
