@@ -55,6 +55,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            #[cfg(not(debug_assertions))]
+            let _ = app;
             // UI-automation bridge for the Tauri MCP server. Debug builds
             // only; bound to localhost so nothing on the network can drive
             // the app.

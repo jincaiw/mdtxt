@@ -39,7 +39,7 @@ jobs:
 
       - name: Install production Debian package
         run: |
-          package="$(find src-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)"
+          package="$(find "$PWD/src-tauri/target/release/bundle/deb" -maxdepth 1 -name '*.deb' -print -quit)"
           test -n "$package"
           sha256sum "$package"
           sudo apt-get install -y "$package"
