@@ -86,8 +86,11 @@ async function editorText() {
 async function typeEditorLines(text) {
     const editor = await browser.$(".cm-content");
     for (const delayMs of [50, 100, 200]) {
-        await editor.setValue("");
         await editor.click();
+        if (delayMs !== 50) {
+            await browser.keys(["\uE009", "a", "\uE000", "\uE003"]);
+            await browser.pause(200);
+        }
         const lines = text.split("\n");
         for (let index = 0; index < lines.length; index += 1) {
             for (const character of lines[index]) {
