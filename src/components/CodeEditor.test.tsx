@@ -99,6 +99,14 @@ describe("editor selection theming", () => {
         expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
     });
 
+    it("renders a visible display-math block through bounded KaTeX", async () => {
+        const source = "# formula\n\n$$\nx^2 + y^2 = z^2\n$$";
+        const { container } = render(<CodeEditor documentId="math" content={source} onChange={() => {}} liveMode />);
+        await waitFor(() => expect(container.querySelector(".cm-live-math-widget .katex")).toBeTruthy());
+        const editor = container.querySelector<HTMLElement>(".cm-editor");
+        expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
+    });
+
     it("marks an over-threshold document as restricted without removing its source editor", async () => {
         const { container, rerender } = render(
             <CodeEditor

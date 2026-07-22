@@ -7,6 +7,7 @@ import { liveImageWidgets } from "./liveImageWidgets";
 import { liveCodeWidgets } from "./liveCodeWidgets";
 import { liveFrontmatterWidgets } from "./liveFrontmatterWidgets";
 import { liveTableWidgets } from "./liveTableWidgets";
+import { liveMathWidgets } from "./liveMathWidgets";
 
 const marks: Record<string, Decoration> = {
     ATXHeading1: Decoration.mark({ class: "cm-live-heading-1" }),
@@ -140,6 +141,7 @@ export const liveMarkdownTheme = EditorView.baseTheme({
         padding: "0.45rem 0.6rem", border: "1px solid var(--border)", textAlign: "left",
     },
     ".cm-live-table-widget th": { backgroundColor: "var(--bg-tertiary)", fontWeight: "700" },
+    ".cm-live-math-widget": { overflowX: "auto", color: "var(--text-primary)" },
 });
 
 /**
@@ -187,7 +189,7 @@ const liveRestrictedAttributes: Extension = [
 ];
 const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
 export function createLiveMarkdownPresentation(filePath: string | null): Extension {
-    return [liveMarkdownBase, liveImageWidgets(filePath), liveCodeWidgets, liveFrontmatterWidgets, liveTableWidgets, liveAttributes];
+    return [liveMarkdownBase, liveImageWidgets(filePath), liveCodeWidgets, liveFrontmatterWidgets, liveTableWidgets, liveMathWidgets, liveAttributes];
 }
 export const liveMarkdownPresentation: Extension = createLiveMarkdownPresentation(null);
 /**
