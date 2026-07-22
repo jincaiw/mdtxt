@@ -100,6 +100,47 @@ function runCommand(command, args, description) {
     return result.stdout.trim();
 }
 
+function processWindowIds() {
+    const search = spawnSync("xdotool", ["search", "--onlyvisible", "--pid", String(application.pid)], { encoding: "utf8" });
+    if (search.status !== 0) return [];
+    return search.stdout.trim().split(/\s+/).filter(Boolean);
+}
+
+async function verifySystemPrintDialog() {
+    const existing = new Set(processWindowIds());
+    assert.equal(await execute(`
+        const exportButton = document.querySelector("button[aria-label='导出文档'], button[aria-label='Export document']");
+        if (!(exportButton instanceof HTMLButtonElement)) throw new Error("Export menu is unavailable");
+        exportButton.click();
+        const pdf = [...document.querySelectorAll("[role='menu'] button, [role='menuitem']")]
+            .find((item) => item.textContent?.trim() === "PDF");
+        if (!(pdf instanceof HTMLElement)) throw new Error("PDF export action is unavailable");
+        pdf.click();
+        return true;
+    `), true);
+
+    let printWindow = "";
+    for (let attempt = 0; attempt < 100 && !printWindow; attempt += 1) {
+        await wait(100);
+        printWindow = processWindowIds().find((id) => !existing.has(id)) ?? "";
+        if (!printWindow) {
+            for (const pattern of ["Print", "打印"]) {
+                const named = spawnSync("xdotool", ["search", "--onlyvisible", "--name", pattern], { encoding: "utf8" });
+                if (named.status === 0) {
+                    printWindow = named.stdout.trim().split(/\s+/).find((id) => id && !existing.has(id)) ?? "";
+                }
+            }
+        }
+    }
+    if (!printWindow) {
+        const tree = spawnSync("xwininfo", ["-root", "-tree"], { encoding: "utf8" });
+        throw new Error(`WebKitGTK did not open a system Print dialog. X11 tree:\n${tree.stdout}`);
+    }
+    runCommand("scrot", ["/tmp/mdtxt-ubuntu-system-print-dialog.png"], "print-dialog screenshot");
+    runCommand("xdotool", ["key", "--window", printWindow, "Escape"], "dismiss print dialog");
+    console.log(`MDTXT_NATIVE_PDF platform=ubuntu engine=WebKitGTK systemPrintDialog=passed window=${printWindow}`);
+}
+
 async function focusEditorWindow() {
     assert.deepEqual(await execute(`
         const invoke = window.__TAURI_INTERNALS__?.invoke;
@@ -416,6 +457,8 @@ async function run() {
         return true;
     `);
     assert.equal(await execute(editorTextScript), copiedText);
+
+    await verifySystemPrintDialog();
 
     console.log(`MDTXT_NATIVE_IME platform=ubuntu engine=${configuredIme} input=x11-xdotool-xtest sourcePhrase=${sourceChinese} compositionEvents=${committed.events.length} liveChineseRuns=${allChinese.length} clipboard=passed undoRedo=passed modeTabRoundTrip=passed screenshot=/tmp/mdtxt-linux-ime-preedit.png`);
 }
