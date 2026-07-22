@@ -169,8 +169,8 @@ async function run() {
 
     await browser.execute(() => {
         const first = document.querySelectorAll("[role='tab']")[0];
-        if (!(first instanceof HTMLButtonElement)) throw new Error("first restored tab is unavailable");
-        first.click();
+        if (!(first instanceof HTMLElement)) throw new Error("first restored tab is unavailable");
+        first.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
     });
     assert.equal((await editorText()).replaceAll("\u00a0", " "), firstText);
     await browser.saveScreenshot("/tmp/mdtxt-ubuntu-installed-recovery.png");
