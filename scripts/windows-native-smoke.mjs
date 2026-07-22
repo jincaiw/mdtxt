@@ -378,7 +378,10 @@ async function run() {
     console.log("MDTXT_NATIVE_WINDOWS phase=prepare-native-input");
 
     sendNativeText("x".repeat(40));
-    await wait(250);
+    // Event durations are captured in the input handlers themselves. Give
+    // WebView2's deferred viewport/layout work time to settle before asking
+    // the fixed five-second bridge to return the already-recorded samples.
+    await wait(5_000);
     const inputResult = await execute(`
         const eventSamples = window.__mdtxtNativeInputSamples ?? {
             beforeinput: [],
