@@ -115,6 +115,14 @@ describe("editor selection theming", () => {
         expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
     });
 
+    it("mounts a footnote-definition widget while retaining reference source", async () => {
+        const source = "# notes\n\nText[^1]\n\n[^1]: Source-safe note";
+        const { container } = render(<CodeEditor documentId="footnote" content={source} onChange={() => {}} liveMode />);
+        await waitFor(() => expect(container.querySelector(".cm-live-footnote-widget")).toHaveTextContent("Source-safe note"));
+        const editor = container.querySelector<HTMLElement>(".cm-editor");
+        expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
+    });
+
     it("marks an over-threshold document as restricted without removing its source editor", async () => {
         const { container, rerender } = render(
             <CodeEditor
