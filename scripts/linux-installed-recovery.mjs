@@ -84,15 +84,21 @@ async function editorText() {
 }
 
 async function typeEditorLines(text) {
-    const lines = text.split("\n");
-    await browser.$(".cm-content").click();
-    for (let index = 0; index < lines.length; index += 1) {
-        for (const character of lines[index]) {
-            await browser.keys(character);
-            await browser.pause(20);
+    const editor = await browser.$(".cm-content");
+    for (const delayMs of [50, 100, 200]) {
+        await editor.setValue("");
+        await editor.click();
+        const lines = text.split("\n");
+        for (let index = 0; index < lines.length; index += 1) {
+            for (const character of lines[index]) {
+                await browser.keys(character);
+                await browser.pause(delayMs);
+            }
+            if (index < lines.length - 1) await browser.keys("\uE007");
         }
-        if (index < lines.length - 1) await browser.keys("\uE007");
+        if ((await editorText()).replaceAll("\u00a0", " ") === text) return;
     }
+    throw new Error(`WebKitDriver did not preserve exact input after throttled retries: ${await editorText()}`);
 }
 
 async function run() {
