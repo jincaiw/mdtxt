@@ -9,7 +9,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { generateHTML, prepareExportHtml } from "./exportUtils";
-import { exportToDocx } from "./docxExport";
+import { exportToDocx, resolveDocxFont } from "./docxExport";
 
 describe("generateHTML", () => {
     it("wraps the content in a standalone HTML document", () => {
@@ -107,6 +107,11 @@ describe("prepareExportHtml", () => {
 });
 
 describe("exportToDocx", () => {
+    it("selects an explicit CJK-capable font for Chinese documents", () => {
+        expect(resolveDocxFont("zh-CN")).toBe("Arial Unicode MS");
+        expect(resolveDocxFont("en")).toBe("Calibri");
+    });
+
     it("returns false and writes nothing when the save dialog is cancelled", async () => {
         (save as Mock).mockResolvedValueOnce(null);
         (invoke as Mock).mockClear();

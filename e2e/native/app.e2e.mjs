@@ -289,12 +289,17 @@ describe("mdtxt native Tauri smoke", () => {
         await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
         const editor = await $(".cm-content");
         await editor.setValue(fixture);
-        await browser.waitUntil(async () => (await $$(".cm-line")).length >= 5, {
+        await browser.waitUntil(async () => (await editor.getText()).includes("# P7 widgets"), {
             timeout: 10_000,
-            timeoutMsg: "P7 fixture did not render its heading line in CodeMirror",
+            timeoutMsg: "P7 fixture did not reach CodeMirror",
         });
-        const headingLine = (await $$(".cm-line"))[4];
-        await headingLine.click();
+        // Linux WebKit can temporarily expose the content as one accessibility
+        // node even though CodeMirror already holds every logical line. Place
+        // the cursor with keyboard navigation instead of indexing transient
+        // `.cm-line` elements; widgets only need the cursor outside themselves.
+        await editor.click();
+        await browser.keys(["Control", "Home"]);
+        await browser.keys(["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]);
 
         const started = await browser.execute(() => performance.now());
         await activate(await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']"));

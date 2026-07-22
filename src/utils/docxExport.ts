@@ -10,6 +10,9 @@ type HtmlToDocx = (
     footer?: string | null,
 ) => Promise<ArrayBuffer | Blob | Uint8Array>;
 
+export const resolveDocxFont = (language: "zh-CN" | "en"): string =>
+    language === "zh-CN" ? "Arial Unicode MS" : "Calibri";
+
 const escapeHtml = (text: string): string => text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -59,7 +62,10 @@ export async function exportToDocx(
         lang: language,
         footer: false,
         pageNumber: false,
-        font: "Calibri",
+        // Calibri contains no CJK glyphs. Some DOCX readers do not honor the
+        // theme's fallback and render Chinese as blanks, so emit an explicit
+        // Unicode-capable East Asian font for Chinese-metadata documents.
+        font: resolveDocxFont(language),
         fontSize: 22,
         table: { row: { cantSplit: true } },
     });
