@@ -294,16 +294,11 @@ jobs:
             done
             pgrep -x fcitx5 >/dev/null
             sleep 1
-            fcitx5-remote -c
-            test "$(fcitx5-remote)" = "1"
             bun run test:native
             # Run the real Fcitx5/XTEST proof outside WebKitWebDriver. Linux
             # WebKitGTK suppresses external XTEST events while an automation
             # session owns the page; the Debug-only localhost bridge observes
             # the ordinary packaged WebView without injecting input.
-            fcitx5-remote -o
-            test "$(fcitx5-remote -n)" = "pinyin"
-            sleep 2
             export MDTXT_LINUX_IME_ENGINE=fcitx5-pinyin
             bun scripts/linux-native-ime.mjs
           '

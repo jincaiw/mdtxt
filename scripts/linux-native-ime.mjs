@@ -280,6 +280,21 @@ async function run() {
         return { ok: document.activeElement === content };
     `), { ok: true });
 
+    if ((process.env.MDTXT_LINUX_IME_ENGINE ?? "").startsWith("fcitx5")) {
+        await focusEditorWindow();
+        sendKey("ctrl+space");
+        await wait(300);
+        assert.equal(
+            runCommand("fcitx5-remote", [], "reading the Fcitx5 activation state"),
+            "2",
+            "Fcitx5 did not activate for the focused editor",
+        );
+        assert.equal(
+            runCommand("fcitx5-remote", ["-n"], "reading the active Fcitx5 engine"),
+            "pinyin",
+        );
+    }
+
     await sendText("zhongwen");
     await wait(350);
     const preedit = await execute(`
