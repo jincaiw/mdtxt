@@ -13,6 +13,7 @@ import { useEditorOverlays } from "../interactions/EditorOverlays";
 import { createEditorPasteHandler } from "../interactions/editorPaste";
 import { useLiveMarkdownPresentation } from "../live/liveMarkdownPresentation";
 import type { DocumentTextChange } from "../../utils/documentSessionController";
+import type { LiveLocale } from "../live/liveLocale";
 
 export interface EditorControllerOptions {
     documentId: string;
@@ -39,6 +40,8 @@ export interface EditorControllerOptions {
     liveRestricted?: boolean;
     /** Localized reason displayed when Live is restricted. */
     liveRestrictionReason?: string;
+    /** Locale for source-preserving Live widget labels and fallbacks. */
+    liveLocale?: LiveLocale;
     aiConfig?: { endpoint: string; model: string; apiKey: string };
     reviewDoc?: string | null;
     onReviewResolve?: (finalDoc: string | null) => void;
@@ -52,7 +55,7 @@ export function useEditorController({
     documentId, sessionState, onStateChange, content, onChange, onTextChanges, onCursorChange,
     onSelectionChange, onImagePaste, onError, onNotice, filePath,
     onScrollFraction, registerScroller, typewriterMode, showToolbar,
-    wordWrap = true, spellCheck = false, liveMode = false, liveRestricted = false, aiConfig, reviewDoc, onReviewResolve,
+    wordWrap = true, spellCheck = false, liveMode = false, liveRestricted = false, liveLocale = "zh-CN", aiConfig, reviewDoc, onReviewResolve,
 }: EditorControllerOptions) {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
@@ -99,7 +102,7 @@ export function useEditorController({
         wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
         onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
         typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-        content, wordWrap, spellCheck, liveMode, liveRestricted, filePath, detectSlash, detectTable, openFind, handlePaste,
+        content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste,
     });
     useEditorDocumentSession({
         viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef, contentRef,
@@ -114,7 +117,7 @@ export function useEditorController({
             )),
         });
     }, [sourceSyntaxCompRef, sourceSyntaxRestricted, viewRef]);
-    useLiveMarkdownPresentation({ viewRef, liveCompRef, enabled: liveMode, restricted: liveRestricted, documentId, filePath });
+    useLiveMarkdownPresentation({ viewRef, liveCompRef, enabled: liveMode, restricted: liveRestricted, documentId, filePath, locale: liveLocale });
     useEditorViewportBridge({ viewRef, onScrollFractionRef, registerScroller });
 
     return { containerRef, reviewActive, acceptAllChanges, rejectAllChanges, toolbar, floatingOverlays };

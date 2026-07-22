@@ -20,6 +20,7 @@ import { applyEditorResult, editorTheme, markdownPresentationExtensions, toEdito
 import { spellcheckAttributes } from "../extensions/useEditorPreferences";
 import { createLiveMarkdownPresentation } from "../live/liveMarkdownPresentation";
 import type { DocumentTextChange } from "../../utils/documentSessionController";
+import type { LiveLocale } from "../live/liveLocale";
 
 interface UseCodeMirrorHostOptions {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -48,6 +49,7 @@ interface UseCodeMirrorHostOptions {
     spellCheck: boolean;
     liveMode: boolean;
     liveRestricted: boolean;
+    liveLocale: LiveLocale;
     filePath?: string | null;
     detectSlash: (view: EditorView) => void;
     detectTable: (view: EditorView) => void;
@@ -61,7 +63,7 @@ export function useCodeMirrorHost({
     wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
     onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
     typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-    content, wordWrap, spellCheck, liveMode, liveRestricted, filePath, detectSlash, detectTable, openFind, handlePaste,
+    content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste,
 }: UseCodeMirrorHostOptions) {
     useEffect(() => {
         if (!containerRef.current) return;
@@ -150,7 +152,7 @@ export function useCodeMirrorHost({
                     // useLiveMarkdownPresentation. Keeping this compartment empty
                     // avoids a full CodeMirror configuration transaction for a
                     // multi-megabyte Source document.
-                    liveCompRef.current.of(liveMode && !liveRestricted ? createLiveMarkdownPresentation(filePath ?? null) : []),
+                    liveCompRef.current.of(liveMode && !liveRestricted ? createLiveMarkdownPresentation(filePath ?? null, liveLocale) : []),
                     keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
                     updateListener,
                     EditorView.domEventHandlers({ paste: handlePaste }),

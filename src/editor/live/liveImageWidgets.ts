@@ -2,6 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import type { Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { getCachedLocalImageUrl, isUnsafeRelativeImagePath, markdownBaseDir } from "../../utils/localImage";
+import { liveText, type LiveLocale } from "./liveLocale";
 
 class LiveImageWidget extends WidgetType {
     private destroyed = false;
@@ -11,6 +12,7 @@ class LiveImageWidget extends WidgetType {
         private readonly alt: string,
         private readonly path: string,
         private readonly baseDir: string | null,
+        private readonly locale: LiveLocale,
     ) {
         super();
     }
@@ -57,17 +59,17 @@ class LiveImageWidget extends WidgetType {
             if (!this.destroyed) status.hidden = true;
         } catch {
             if (!this.destroyed) {
-                figureError(image, status, this.path);
+                figureError(image, status, this.path, this.locale);
             }
         }
     }
 }
 
-function figureError(image: HTMLImageElement, status: HTMLElement, path: string) {
+function figureError(image: HTMLImageElement, status: HTMLElement, path: string, locale: LiveLocale) {
     image.removeAttribute("src");
     image.hidden = true;
     status.hidden = false;
-    status.textContent = `Image preview unavailable · ${path}`;
+    status.textContent = `${liveText(locale, "图片预览不可用", "Image preview unavailable")} · ${path}`;
     status.setAttribute("role", "status");
 }
 
@@ -75,7 +77,7 @@ function selectionTouches(view: EditorView, from: number, to: number): boolean {
     return view.compositionStarted || view.state.selection.ranges.some((range) => range.from <= to && range.to >= from);
 }
 
-function imageDecorations(view: EditorView, filePath: string | null): DecorationSet {
+function imageDecorations(view: EditorView, filePath: string | null, locale: LiveLocale): DecorationSet {
     const widgets: Range<Decoration>[] = [];
     const baseDir = markdownBaseDir(filePath);
     for (const visible of view.visibleRanges) {
@@ -92,7 +94,7 @@ function imageDecorations(view: EditorView, filePath: string | null): Decoration
                 const alt = altEnd >= 2 ? source.slice(2, altEnd) : "";
                 const lineEnd = view.state.doc.lineAt(node.to).to;
                 widgets.push(Decoration.widget({
-                    widget: new LiveImageWidget(source, alt, path, baseDir),
+                    widget: new LiveImageWidget(source, alt, path, baseDir, locale),
                     side: 1,
                 }).range(lineEnd));
             },
@@ -101,17 +103,17 @@ function imageDecorations(view: EditorView, filePath: string | null): Decoration
     return Decoration.set(widgets, true);
 }
 
-export function liveImageWidgets(filePath: string | null) {
+export function liveImageWidgets(filePath: string | null, locale: LiveLocale) {
     return ViewPlugin.fromClass(class {
         decorations: DecorationSet;
 
         constructor(view: EditorView) {
-            this.decorations = imageDecorations(view, filePath);
+            this.decorations = imageDecorations(view, filePath, locale);
         }
 
         update(update: ViewUpdate) {
             if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
-                this.decorations = imageDecorations(update.view, filePath);
+                this.decorations = imageDecorations(update.view, filePath, locale);
             }
         }
     }, { decorations: (plugin) => plugin.decorations });

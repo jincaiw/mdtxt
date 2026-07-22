@@ -1,6 +1,7 @@
 import type { Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parseFrontmatter, type FrontmatterValue } from "../../utils/frontmatter";
+import { liveText, type LiveLocale } from "./liveLocale";
 
 const MAX_FRONTMATTER_LINES = 200;
 
@@ -13,6 +14,7 @@ class LiveFrontmatterWidget extends WidgetType {
     constructor(
         private readonly source: string,
         private readonly entries: Array<[string, FrontmatterValue]>,
+        private readonly locale: LiveLocale,
     ) {
         super();
     }
@@ -25,7 +27,7 @@ class LiveFrontmatterWidget extends WidgetType {
         const section = document.createElement("section");
         section.className = "cm-live-block-widget cm-live-frontmatter-widget";
         const title = document.createElement("strong");
-        title.textContent = "Frontmatter";
+        title.textContent = liveText(this.locale, "文档元数据", "Frontmatter");
         const list = document.createElement("dl");
         for (const [key, value] of this.entries) {
             const term = document.createElement("dt");
@@ -55,7 +57,7 @@ function frontmatterRange(view: EditorView): { from: number; to: number; source:
     return null;
 }
 
-function frontmatterDecorations(view: EditorView): DecorationSet {
+function frontmatterDecorations(view: EditorView, locale: LiveLocale): DecorationSet {
     const block = frontmatterRange(view);
     if (!block || view.compositionStarted) return Decoration.none;
     if (!view.visibleRanges.some((range) => range.from <= block.to && range.to >= block.from)) return Decoration.none;
@@ -63,22 +65,24 @@ function frontmatterDecorations(view: EditorView): DecorationSet {
     const parsed = parseFrontmatter(`${block.source}\n`);
     const entries = Object.entries(parsed.data);
     const widgets: Range<Decoration>[] = [Decoration.widget({
-        widget: new LiveFrontmatterWidget(block.source, entries),
+        widget: new LiveFrontmatterWidget(block.source, entries, locale),
         side: 1,
     }).range(block.to)];
     return Decoration.set(widgets, true);
 }
 
-export const liveFrontmatterWidgets = ViewPlugin.fromClass(class {
-    decorations: DecorationSet;
+export function liveFrontmatterWidgets(locale: LiveLocale) {
+    return ViewPlugin.fromClass(class {
+        decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-        this.decorations = frontmatterDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-        if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
-            this.decorations = frontmatterDecorations(update.view);
+        constructor(view: EditorView) {
+            this.decorations = frontmatterDecorations(view, locale);
         }
-    }
-}, { decorations: (plugin) => plugin.decorations });
+
+        update(update: ViewUpdate) {
+            if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
+                this.decorations = frontmatterDecorations(update.view, locale);
+            }
+        }
+    }, { decorations: (plugin) => plugin.decorations });
+}

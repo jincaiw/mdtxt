@@ -1,12 +1,14 @@
 import { syntaxTree } from "@codemirror/language";
 import type { Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { liveText, type LiveLocale } from "./liveLocale";
 
 class LiveCodeWidget extends WidgetType {
     constructor(
         private readonly source: string,
         private readonly language: string,
         private readonly code: string,
+        private readonly locale: LiveLocale,
     ) {
         super();
     }
@@ -20,7 +22,7 @@ class LiveCodeWidget extends WidgetType {
         wrapper.className = "cm-live-block-widget cm-live-code-widget";
         const label = document.createElement("span");
         label.className = "cm-live-widget-label";
-        label.textContent = this.language || "plain text";
+        label.textContent = this.language || liveText(this.locale, "纯文本", "Plain text");
         const pre = document.createElement("pre");
         const code = document.createElement("code");
         code.textContent = this.code;
@@ -34,7 +36,7 @@ class LiveCodeWidget extends WidgetType {
     }
 }
 
-function codeDecorations(view: EditorView): DecorationSet {
+function codeDecorations(view: EditorView, locale: LiveLocale): DecorationSet {
     const widgets: Range<Decoration>[] = [];
     for (const visible of view.visibleRanges) {
         syntaxTree(view.state).iterate({
@@ -50,7 +52,7 @@ function codeDecorations(view: EditorView): DecorationSet {
                 const code = text ? view.state.doc.sliceString(text.from, text.to) : "";
                 const source = view.state.doc.sliceString(node.from, node.to);
                 widgets.push(Decoration.widget({
-                    widget: new LiveCodeWidget(source, language, code),
+                    widget: new LiveCodeWidget(source, language, code, locale),
                     side: 1,
                 }).range(view.state.doc.lineAt(node.to).to));
             },
@@ -59,16 +61,18 @@ function codeDecorations(view: EditorView): DecorationSet {
     return Decoration.set(widgets, true);
 }
 
-export const liveCodeWidgets = ViewPlugin.fromClass(class {
-    decorations: DecorationSet;
+export function liveCodeWidgets(locale: LiveLocale) {
+    return ViewPlugin.fromClass(class {
+        decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-        this.decorations = codeDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-        if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
-            this.decorations = codeDecorations(update.view);
+        constructor(view: EditorView) {
+            this.decorations = codeDecorations(view, locale);
         }
-    }
-}, { decorations: (plugin) => plugin.decorations });
+
+        update(update: ViewUpdate) {
+            if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
+                this.decorations = codeDecorations(update.view, locale);
+            }
+        }
+    }, { decorations: (plugin) => plugin.decorations });
+}

@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { useEditorController, type EditorControllerOptions } from "../editor/core/useEditorController";
 import { ReviewBanner } from "../editor/interactions/ReviewBanner";
+import { useLocale } from "../context/LocaleContext";
 
 export interface CodeEditorProps extends EditorControllerOptions {
     /** When non-null, show this proposed document as an inline diff (CodeMirror
@@ -15,7 +16,11 @@ export interface CodeEditorProps extends EditorControllerOptions {
 
 
 function CodeEditorImpl(options: CodeEditorProps) {
-    const { containerRef, reviewActive, acceptAllChanges, rejectAllChanges, toolbar, floatingOverlays } = useEditorController(options);
+    const { locale } = useLocale();
+    const { containerRef, reviewActive, acceptAllChanges, rejectAllChanges, toolbar, floatingOverlays } = useEditorController({
+        ...options,
+        liveLocale: locale === "zh-CN" ? "zh-CN" : "en",
+    });
 
     return (
         <main className="flex-1 flex flex-col overflow-hidden relative">

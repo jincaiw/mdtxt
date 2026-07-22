@@ -1,5 +1,6 @@
 import type { Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { liveText, type LiveLocale } from "./liveLocale";
 
 const MAX_MATH_LINES = 100;
 const mathCache = new Map<string, string>();
@@ -30,7 +31,7 @@ async function renderMath(source: string): Promise<string> {
 class LiveMathWidget extends WidgetType {
     private destroyed = false;
 
-    constructor(private readonly source: string) {
+    constructor(private readonly source: string, private readonly locale: LiveLocale) {
         super();
     }
 
@@ -41,13 +42,17 @@ class LiveMathWidget extends WidgetType {
     toDOM() {
         const section = document.createElement("section");
         section.className = "cm-live-block-widget cm-live-math-widget";
-        section.textContent = "Rendering math…";
+        section.textContent = liveText(this.locale, "正在渲染公式…", "Rendering math…");
         void renderMath(this.source)
             .then((html) => {
                 if (!this.destroyed && section.isConnected) section.innerHTML = html;
             })
             .catch(() => {
-                if (!this.destroyed) section.textContent = "Math preview unavailable; edit the source above.";
+                if (!this.destroyed) section.textContent = liveText(
+                    this.locale,
+                    "公式预览不可用，请编辑上方源文本。",
+                    "Math preview unavailable; edit the source above.",
+                );
             });
         return section;
     }
@@ -90,26 +95,28 @@ function visibleMathBlocks(view: EditorView): MathBlock[] {
     return blocks;
 }
 
-function mathDecorations(view: EditorView): DecorationSet {
+function mathDecorations(view: EditorView, locale: LiveLocale): DecorationSet {
     if (view.compositionStarted) return Decoration.none;
     const widgets: Range<Decoration>[] = [];
     for (const block of visibleMathBlocks(view)) {
         if (view.state.selection.ranges.some((range) => range.from <= block.to && range.to >= block.from)) continue;
-        widgets.push(Decoration.widget({ widget: new LiveMathWidget(block.expression), side: 1 }).range(block.to));
+        widgets.push(Decoration.widget({ widget: new LiveMathWidget(block.expression, locale), side: 1 }).range(block.to));
     }
     return Decoration.set(widgets, true);
 }
 
-export const liveMathWidgets = ViewPlugin.fromClass(class {
-    decorations: DecorationSet;
+export function liveMathWidgets(locale: LiveLocale) {
+    return ViewPlugin.fromClass(class {
+        decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-        this.decorations = mathDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-        if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
-            this.decorations = mathDecorations(update.view);
+        constructor(view: EditorView) {
+            this.decorations = mathDecorations(view, locale);
         }
-    }
-}, { decorations: (plugin) => plugin.decorations });
+
+        update(update: ViewUpdate) {
+            if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
+                this.decorations = mathDecorations(update.view, locale);
+            }
+        }
+    }, { decorations: (plugin) => plugin.decorations });
+}

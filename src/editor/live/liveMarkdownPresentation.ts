@@ -11,6 +11,7 @@ import { liveMathWidgets } from "./liveMathWidgets";
 import { liveMermaidWidgets } from "./liveMermaidWidgets";
 import { liveFootnoteWidgets } from "./liveFootnoteWidgets";
 import { liveCalloutWidgets } from "./liveCalloutWidgets";
+import type { LiveLocale } from "./liveLocale";
 
 const marks: Record<string, Decoration> = {
     ATXHeading1: Decoration.mark({ class: "cm-live-heading-1" }),
@@ -201,8 +202,8 @@ const liveRestrictedAttributes: Extension = [
     EditorView.contentAttributes.of({ "data-mdtxt-live": "restricted" }),
 ];
 const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
-export function createLiveMarkdownPresentation(filePath: string | null): Extension {
-    return [liveMarkdownBase, liveImageWidgets(filePath), liveCodeWidgets, liveFrontmatterWidgets, liveTableWidgets, liveMathWidgets, liveMermaidWidgets, liveFootnoteWidgets, liveCalloutWidgets, liveAttributes];
+export function createLiveMarkdownPresentation(filePath: string | null, locale: LiveLocale = "zh-CN"): Extension {
+    return [liveMarkdownBase, liveImageWidgets(filePath, locale), liveCodeWidgets(locale), liveFrontmatterWidgets(locale), liveTableWidgets, liveMathWidgets(locale), liveMermaidWidgets(locale), liveFootnoteWidgets, liveCalloutWidgets(locale), liveAttributes];
 }
 export const liveMarkdownPresentation: Extension = createLiveMarkdownPresentation(null);
 /**
@@ -222,6 +223,7 @@ export function useLiveMarkdownPresentation({
     restricted = false,
     documentId,
     filePath = null,
+    locale = "zh-CN",
 }: {
     viewRef: RefObject<EditorView | null>;
     liveCompRef: RefObject<Compartment>;
@@ -230,6 +232,7 @@ export function useLiveMarkdownPresentation({
     /** Reconfigure after retained EditorState switches between documents. */
     documentId: string;
     filePath?: string | null;
+    locale?: LiveLocale;
 }) {
     useEffect(() => {
         const view = viewRef.current;
@@ -257,7 +260,7 @@ export function useLiveMarkdownPresentation({
         }
 
         view.dispatch({
-            effects: liveCompRef.current.reconfigure(enabled ? createLiveMarkdownPresentation(filePath) : []),
+            effects: liveCompRef.current.reconfigure(enabled ? createLiveMarkdownPresentation(filePath, locale) : []),
         });
-    }, [documentId, enabled, filePath, liveCompRef, restricted, viewRef]);
+    }, [documentId, enabled, filePath, liveCompRef, locale, restricted, viewRef]);
 }
