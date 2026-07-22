@@ -115,35 +115,7 @@ async function forceKill() {
     application = undefined;
 }
 
-async function run() {
-    const firstLines = ["installed recovery one"];
-    const secondLines = ["installed recovery two", "line two", "line three", "line four", "active line five"];
-    const firstText = firstLines.join("\n");
-    const secondText = secondLines.join("\n");
-
-    await launch();
-    waitForUi("New File|新建文件");
-    send({ keys: ["ControlN"] });
-    invokeUi("Just start writing|直接开始写作");
-    waitForUi("Ln 1");
-    await typeLines(firstLines);
-    send({ keys: ["ControlN"] });
-    waitForUi("Untitled-2.md");
-    await typeLines(secondLines);
-    await wait(3_500);
-    assert.equal(readEditorThroughClipboard(), secondText);
-    await forceKill();
-
-    await launch();
-    waitForUi("Restore all|恢复全部|Restore latest session|恢复最新会话");
-    send({ keys: ["Enter"] });
-    waitForUi("Ln 5");
-    assert.equal(readEditorThroughClipboard(), secondText);
-    send({ keys: ["ControlShiftTab"] });
-    await wait(500);
-    assert.equal(readEditorThroughClipboard(), firstText);
-    capture(recoveryScreenshot);
-
+async function validateDeniedShare() {
     const lockedPath = resolve(process.env.RUNNER_TEMP ?? tmpdir(), "mdtxt-denied-share.md");
     const lockCommand = [
         `$path = '${lockedPath.replaceAll("'", "''")}';`,
@@ -168,6 +140,39 @@ async function run() {
     await new Promise((resolveExit) => forwarded.once("exit", resolveExit));
     waitForUi("Could not open file|无法打开文件|being used by another process|另一个进程正在使用");
     capture(deniedScreenshot);
+    if (lockProcess.exitCode === null) lockProcess.kill();
+    lockProcess = undefined;
+}
+
+async function run() {
+    const firstLines = ["installed recovery one"];
+    const secondLines = ["installed recovery two", "line two", "line three", "line four", "active line five"];
+    const firstText = firstLines.join("\n");
+    const secondText = secondLines.join("\n");
+
+    await launch();
+    waitForUi("New File|新建文件");
+    await validateDeniedShare();
+    send({ keys: ["ControlN"] });
+    invokeUi("Just start writing|直接开始写作");
+    await wait(800);
+    await typeLines(firstLines);
+    send({ keys: ["ControlN"] });
+    await wait(800);
+    await typeLines(secondLines);
+    await wait(3_500);
+    assert.equal(readEditorThroughClipboard(), secondText);
+    await forceKill();
+
+    await launch();
+    waitForUi("Restore all|全部恢复|Restore latest session|恢复最新会话");
+    send({ keys: ["Enter"] });
+    await wait(1_000);
+    assert.equal(readEditorThroughClipboard(), secondText);
+    send({ keys: ["ControlShiftTab"] });
+    await wait(500);
+    assert.equal(readEditorThroughClipboard(), firstText);
+    capture(recoveryScreenshot);
     console.log(`MDTXT_INSTALLED_RECOVERY platform=windows binary=${binary} signal=taskkill-F drafts=2 order=passed activeTab=second cursorLine=5 content=passed originalOverwrite=impossible deniedShareUx=passed recoveryScreenshot=${recoveryScreenshot} deniedScreenshot=${deniedScreenshot}`);
 }
 
