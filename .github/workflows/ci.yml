@@ -277,6 +277,9 @@ jobs:
             export XMODIFIERS=@im=ibus
             export QT_IM_MODULE=ibus
             export IBUS_ENABLE_SYNC_MODE=1
+            export GDK_BACKEND=x11
+            export LIBGL_ALWAYS_SOFTWARE=1
+            export WEBKIT_DISABLE_COMPOSITING_MODE=1
             openbox --sm-disable >/tmp/mdtxt-openbox.log 2>&1 &
             for attempt in $(seq 1 50); do
               if xprop -root _NET_SUPPORTING_WM_CHECK | grep -q window; then break; fi
@@ -301,6 +304,9 @@ jobs:
               export XMODIFIERS=@im=ibus
               export QT_IM_MODULE=ibus
               export IBUS_ENABLE_SYNC_MODE=1
+              export GDK_BACKEND=x11
+              export LIBGL_ALWAYS_SOFTWARE=1
+              export WEBKIT_DISABLE_COMPOSITING_MODE=1
               ibus-daemon --daemonize --replace --xim
               for attempt in \$(seq 1 50); do
                 if ibus engine libpinyin; then break; fi
