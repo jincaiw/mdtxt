@@ -266,9 +266,20 @@ async function run() {
         if (!(content instanceof HTMLElement)) return { ok: false };
         content.focus();
         window.__mdtxtImeEvents = [];
+        window.__mdtxtImeInputEvents = [];
         for (const type of ["compositionstart", "compositionupdate", "compositionend"]) {
             content.addEventListener(type, (event) => {
                 window.__mdtxtImeEvents.push({ type, data: event.data });
+            });
+        }
+        for (const type of ["beforeinput", "input"]) {
+            content.addEventListener(type, (event) => {
+                window.__mdtxtImeInputEvents.push({
+                    type,
+                    inputType: event.inputType,
+                    data: event.data,
+                    composing: event.isComposing,
+                });
             });
         }
         return { ok: document.activeElement === content };
@@ -279,9 +290,14 @@ async function run() {
     const preedit = await execute(`
         return {
             events: window.__mdtxtImeEvents ?? [],
+            inputEvents: window.__mdtxtImeInputEvents ?? [],
             text: document.querySelector(".cm-activeLine")?.textContent ?? "",
         };
     `);
+    console.log(`MDTXT_IBUS_PREEDIT ${JSON.stringify({
+        engine: runCommand("ibus", ["engine"], "reading the active IBus engine"),
+        ...preedit,
+    })}`);
     runCommand("scrot", ["/tmp/mdtxt-ibus-preedit.png"], "capturing the IBus candidate window");
     assert.equal(preedit.events.some((event) => event.type === "compositionstart"), true);
 

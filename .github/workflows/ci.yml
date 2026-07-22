@@ -299,22 +299,15 @@ jobs:
             # WebKitGTK suppresses external XTEST events while an automation
             # session owns the page; the Debug-only localhost bridge observes
             # the ordinary packaged WebView without injecting input.
-            dbus-run-session -- bash -euxo pipefail -c "
-              export GTK_IM_MODULE=ibus
-              export XMODIFIERS=@im=ibus
-              export QT_IM_MODULE=ibus
-              export IBUS_ENABLE_SYNC_MODE=1
-              export GDK_BACKEND=x11
-              export LIBGL_ALWAYS_SOFTWARE=1
-              export WEBKIT_DISABLE_COMPOSITING_MODE=1
-              ibus-daemon --daemonize --replace --xim
-              for attempt in \$(seq 1 50); do
-                if ibus engine libpinyin; then break; fi
-                sleep 0.1
-              done
-              test \"\$(ibus engine)\" = \"libpinyin\"
-              bun scripts/linux-native-ime.mjs
-            "
+            # Keep the same D-Bus/IBus daemon that owns the XIM selection on
+            # this X server. A nested dbus-run-session can report libpinyin
+            # while the outer XIM owner still handles keys with the US engine.
+            for attempt in $(seq 1 50); do
+              if ibus engine libpinyin; then break; fi
+              sleep 0.1
+            done
+            test "$(ibus engine)" = "libpinyin"
+            bun scripts/linux-native-ime.mjs
           '
 
       - name: Upload Ubuntu IBus preedit evidence
