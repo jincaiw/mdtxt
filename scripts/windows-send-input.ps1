@@ -8,7 +8,7 @@ param(
 
   [switch]$MoveToEnd,
 
-  [ValidateSet('Space', 'Enter', 'Left', 'Right', 'Up', 'Down', 'ControlZ', 'ControlY', 'ControlShiftZ', 'ControlA', 'ControlC', 'ControlV', 'WinSpace', 'ActivateChinese')]
+  [ValidateSet('Space', 'Enter', 'Left', 'Right', 'Up', 'Down', 'ControlN', 'ControlZ', 'ControlY', 'ControlShiftZ', 'ControlShiftTab', 'ControlA', 'ControlC', 'ControlV', 'WinSpace', 'ActivateChinese')]
   [string[]]$Keys = @()
 )
 
@@ -33,6 +33,7 @@ public static class MdtxtNativeInput
     private const ushort VK_RIGHT = 0x27;
     private const ushort VK_DOWN = 0x28;
     private const ushort VK_END = 0x23;
+    private const ushort VK_TAB = 0x09;
     private const uint KLF_ACTIVATE = 0x00000001;
     private const uint KLF_SUBSTITUTE_OK = 0x00000002;
     private const uint WM_INPUTLANGCHANGEREQUEST = 0x0050;
@@ -261,9 +262,11 @@ public static class MdtxtNativeInput
             case "Right": SendChord(new ushort[] { VK_RIGHT }); break;
             case "Up": SendChord(new ushort[] { VK_UP }); break;
             case "Down": SendChord(new ushort[] { VK_DOWN }); break;
+            case "ControlN": SendChord(new ushort[] { VK_CONTROL, 0x4E }); break;
             case "ControlZ": SendChord(new ushort[] { VK_CONTROL, 0x5A }); break;
             case "ControlY": SendChord(new ushort[] { VK_CONTROL, 0x59 }); break;
             case "ControlShiftZ": SendChord(new ushort[] { VK_CONTROL, VK_SHIFT, 0x5A }); break;
+            case "ControlShiftTab": SendChord(new ushort[] { VK_CONTROL, VK_SHIFT, VK_TAB }); break;
             case "ControlA": SendChord(new ushort[] { VK_CONTROL, 0x41 }); break;
             case "ControlC": SendChord(new ushort[] { VK_CONTROL, 0x43 }); break;
             case "ControlV": SendChord(new ushort[] { VK_CONTROL, 0x56 }); break;

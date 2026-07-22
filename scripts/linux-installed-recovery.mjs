@@ -83,6 +83,15 @@ async function editorText() {
     });
 }
 
+async function typeEditorLines(text) {
+    const lines = text.split("\n");
+    await browser.$(".cm-content").click();
+    for (let index = 0; index < lines.length; index += 1) {
+        await browser.keys(lines[index]);
+        if (index < lines.length - 1) await browser.keys("\uE007");
+    }
+}
+
 async function run() {
     const firstText = "# Installed recovery one\n\nUbuntu force-kill keeps draft one intact.";
     const secondText = "# Installed recovery two\nline two\nline three\nline four\nactive line five";
@@ -92,12 +101,12 @@ async function run() {
     await browser.$("//button[contains(., '新建文件') or contains(., 'New File')]").click();
     await browser.$(".cm-content").waitForDisplayed();
     await dismissTour();
-    await browser.$(".cm-content").setValue(firstText);
+    await typeEditorLines(firstText);
     await browser.execute(() => {
         document.querySelector("button[aria-label='新建标签页'], button[aria-label='New tab']")?.click();
     });
     await browser.waitUntil(async () => (await browser.$$("[role='tab']")).length === 2);
-    await browser.$(".cm-content").setValue(secondText);
+    await typeEditorLines(secondText);
     await browser.pause(3_500);
 
     const beforeKill = await browser.execute(() => ({
@@ -107,6 +116,7 @@ async function run() {
     }));
     assert.equal(beforeKill.tabs.length, 2);
     assert.match(beforeKill.body, /Ln 5/);
+    assert.equal((await editorText()).replaceAll("\u00a0", " "), secondText);
 
     const pgrep = spawnSync("pgrep", ["-n", "-x", "mdtxt"], { encoding: "utf8" });
     assert.equal(pgrep.status, 0, `installed mdtxt PID was not found: ${pgrep.stderr}`);
