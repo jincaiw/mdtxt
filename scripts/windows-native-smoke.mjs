@@ -512,30 +512,45 @@ async function run() {
     const preedit = await execute(`
         return {
             events: window.__mdtxtNativeInputSamples?.composition ?? [],
+            beforeinputData: window.__mdtxtNativeInputSamples?.beforeinputData ?? [],
+            inputData: window.__mdtxtNativeInputSamples?.inputData ?? [],
             activeLine: document.querySelector(".cm-activeLine")?.textContent ?? "",
         };
     `);
     console.log(runPowerShell(captureScreenScript, ["-Path", pinyinScreenshot]));
-    assert.equal(
-        preedit.events.some((event) => event.type === "compositionstart"),
-        true,
-        `Microsoft Pinyin emitted no compositionstart: ${JSON.stringify(preedit)}`,
-    );
+    // WebView2 can expose TSF preedit either through DOM composition events or
+    // entirely through the native candidate surface. In the latter path the
+    // screenshot is the visible preedit evidence and the editor must remain
+    // free of prematurely committed Latin input until Space commits below.
+    if (!preedit.events.some((event) => event.type === "compositionstart")) {
+        assert.equal(preedit.activeLine.includes("zhongwen"), false);
+        assert.equal(preedit.beforeinputData.join(""), "");
+        assert.equal(preedit.inputData.join(""), "");
+    }
     sendNativeKeys("Space");
     await wait(500);
     const committed = await execute(`
         const content = document.querySelector(".cm-content");
         return {
             events: window.__mdtxtNativeInputSamples?.composition ?? [],
+            beforeinputData: window.__mdtxtNativeInputSamples?.beforeinputData ?? [],
+            inputData: window.__mdtxtNativeInputSamples?.inputData ?? [],
             text: content
                 ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
                 : null,
         };
     `);
-    assert.equal(committed.events.some((event) => event.type === "compositionend"), true);
     const sourceChinese = committed.text.match(/[\u3400-\u9fff]{2,}/u)?.[0];
     assert.ok(sourceChinese, `Microsoft Pinyin did not commit multi-character Chinese: ${committed.text}`);
     assert.equal(committed.text.includes("zhongwen"), false);
+    assert.equal(
+        committed.events.some((event) => event.type === "compositionend")
+            || [...committed.beforeinputData, ...committed.inputData].some((data) =>
+                typeof data === "string" && /[\u3400-\u9fff]{2,}/u.test(data)
+            ),
+        true,
+        `Microsoft Pinyin commit emitted no Chinese editor input: ${JSON.stringify(committed)}`,
+    );
 
     sendNativeKeys("ControlZ");
     await wait(200);
