@@ -160,7 +160,6 @@ async function focusEditorWindow() {
     assert.ok(windowId, "xdotool returned no mdtxt X11 window");
     runCommand("xdotool", ["windowmap", "--sync", windowId], "mapping the mdtxt X11 window");
     runCommand("xdotool", ["windowactivate", "--sync", windowId], "activating the mdtxt X11 window");
-    runCommand("xdotool", ["windowfocus", "--sync", windowId], "focusing the mdtxt X11 window");
     runCommand("xdotool", ["mousemove", "--window", windowId, "80", "115", "click", "1"], "clicking the editor");
     const actualFocus = runCommand("xdotool", ["getwindowfocus"], "reading X11 keyboard focus");
     assert.equal(actualFocus, windowId);
