@@ -67,6 +67,33 @@ describe("mdtxt native Tauri smoke", () => {
             .catch((error) => done({ ok: false, error: String(error) }));
     }, targetBytes, name);
 
+    const stageExactRecovery = async (content, name) => browser.executeAsync((entryContent, entryName, done) => {
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (!invoke) {
+            done({ ok: false, error: "Tauri invoke bridge is unavailable" });
+            return;
+        }
+        const timestamp = Date.now();
+        const entry = {
+            documentId: `native-exact-${timestamp}`,
+            path: null,
+            name: entryName,
+            content: entryContent,
+            version: 1,
+            context: {
+                recoverySessionId: `native-exact-session-${timestamp}`,
+                tabIndex: 0,
+                wasActive: true,
+                cursorLine: 5,
+            },
+        };
+        invoke("list_recoveries")
+            .then((existing) => Promise.all(existing.map((item) => invoke("discard_recovery", { documentId: item.documentId }))))
+            .then(() => invoke("write_recovery", entry))
+            .then(() => done({ ok: true }))
+            .catch((error) => done({ ok: false, error: String(error) }));
+    }, content, name);
+
     const restoreStagedRecovery = async () => {
         await browser.refresh();
         const dialog = await $("[role='alertdialog']");
@@ -287,13 +314,10 @@ describe("mdtxt native Tauri smoke", () => {
             "> [!NOTE]",
             "> Native callout",
         ].join("\n");
-        await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
+        assert.deepEqual(await stageExactRecovery(fixture, "P7 Native Widgets.md"), { ok: true });
+        await restoreStagedRecovery();
+        await dismissTourIfPresent();
         const editor = await $(".cm-content");
-        await editor.setValue(fixture);
-        await browser.waitUntil(async () => (await editor.getText()).includes("# P7 widgets"), {
-            timeout: 10_000,
-            timeoutMsg: "P7 fixture did not reach CodeMirror",
-        });
         // Linux WebKit can temporarily expose the content as one accessibility
         // node even though CodeMirror already holds every logical line. Place
         // the cursor with keyboard navigation instead of indexing transient
