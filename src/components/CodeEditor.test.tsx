@@ -68,6 +68,14 @@ describe("editor selection theming", () => {
         expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
     });
 
+    it("mounts a source-preserving code widget for a visible fenced block", async () => {
+        const source = "# code\n\n```ts\nconst answer = 42;\n```";
+        const { container } = render(<CodeEditor documentId="code" content={source} onChange={() => {}} liveMode />);
+        await waitFor(() => expect(container.querySelector(".cm-live-code-widget code")).toHaveTextContent("const answer = 42;"));
+        const editor = container.querySelector<HTMLElement>(".cm-editor");
+        expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
+    });
+
     it("marks an over-threshold document as restricted without removing its source editor", async () => {
         const { container, rerender } = render(
             <CodeEditor
