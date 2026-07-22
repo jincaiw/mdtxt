@@ -90,6 +90,15 @@ describe("editor selection theming", () => {
         expect(view.state.doc.toString()).toBe(source);
     });
 
+    it("mounts a source-compatible GFM table widget", async () => {
+        const source = "# data\n\n| Name | Value |\n| :--- | ---: |\n| alpha | 42 |";
+        const { container } = render(<CodeEditor documentId="table" content={source} onChange={() => {}} liveMode />);
+        await waitFor(() => expect(container.querySelector(".cm-live-table-widget table")).toHaveTextContent("alpha"));
+        expect(container.querySelectorAll(".cm-live-table-widget th")).toHaveLength(2);
+        const editor = container.querySelector<HTMLElement>(".cm-editor");
+        expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
+    });
+
     it("marks an over-threshold document as restricted without removing its source editor", async () => {
         const { container, rerender } = render(
             <CodeEditor

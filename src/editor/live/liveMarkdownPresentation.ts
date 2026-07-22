@@ -6,6 +6,7 @@ import { resolveEditFocus } from "./editFocusResolver";
 import { liveImageWidgets } from "./liveImageWidgets";
 import { liveCodeWidgets } from "./liveCodeWidgets";
 import { liveFrontmatterWidgets } from "./liveFrontmatterWidgets";
+import { liveTableWidgets } from "./liveTableWidgets";
 
 const marks: Record<string, Decoration> = {
     ATXHeading1: Decoration.mark({ class: "cm-live-heading-1" }),
@@ -133,6 +134,12 @@ export const liveMarkdownTheme = EditorView.baseTheme({
     },
     ".cm-live-frontmatter-widget dt": { color: "var(--text-secondary)", fontWeight: "650" },
     ".cm-live-frontmatter-widget dd": { margin: "0", overflowWrap: "anywhere" },
+    ".cm-live-table-widget": { alignItems: "stretch", overflowX: "auto" },
+    ".cm-live-table-widget table": { width: "100%", borderCollapse: "collapse" },
+    ".cm-live-table-widget th, .cm-live-table-widget td": {
+        padding: "0.45rem 0.6rem", border: "1px solid var(--border)", textAlign: "left",
+    },
+    ".cm-live-table-widget th": { backgroundColor: "var(--bg-tertiary)", fontWeight: "700" },
 });
 
 /**
@@ -180,7 +187,7 @@ const liveRestrictedAttributes: Extension = [
 ];
 const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
 export function createLiveMarkdownPresentation(filePath: string | null): Extension {
-    return [liveMarkdownBase, liveImageWidgets(filePath), liveCodeWidgets, liveFrontmatterWidgets, liveAttributes];
+    return [liveMarkdownBase, liveImageWidgets(filePath), liveCodeWidgets, liveFrontmatterWidgets, liveTableWidgets, liveAttributes];
 }
 export const liveMarkdownPresentation: Extension = createLiveMarkdownPresentation(null);
 /**
