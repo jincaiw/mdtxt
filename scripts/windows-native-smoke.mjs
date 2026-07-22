@@ -498,7 +498,9 @@ async function run() {
     await restoreStagedRecovery({ captureNativeInput: true });
     await wait(500);
 
-    let layout = readNativeLayout();
+    let layout = sendNativeKeys("ActivateChinese");
+    await wait(500);
+    layout = readNativeLayout();
     for (let attempt = 0; attempt < 3 && !/languageId=0x0804/i.test(layout); attempt += 1) {
         layout = sendNativeKeys("WinSpace");
         await wait(500);

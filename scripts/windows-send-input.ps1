@@ -8,7 +8,7 @@ param(
 
   [switch]$MoveToEnd,
 
-  [ValidateSet('Space', 'Enter', 'Left', 'Right', 'Up', 'Down', 'ControlZ', 'ControlShiftZ', 'ControlA', 'ControlC', 'ControlV', 'WinSpace')]
+  [ValidateSet('Space', 'Enter', 'Left', 'Right', 'Up', 'Down', 'ControlZ', 'ControlShiftZ', 'ControlA', 'ControlC', 'ControlV', 'WinSpace', 'ActivateChinese')]
   [string[]]$Keys = @()
 )
 
@@ -33,6 +33,9 @@ public static class MdtxtNativeInput
     private const ushort VK_RIGHT = 0x27;
     private const ushort VK_DOWN = 0x28;
     private const ushort VK_END = 0x23;
+    private const uint KLF_ACTIVATE = 0x00000001;
+    private const uint KLF_SUBSTITUTE_OK = 0x00000002;
+    private const uint WM_INPUTLANGCHANGEREQUEST = 0x0050;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
@@ -100,6 +103,12 @@ public static class MdtxtNativeInput
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetKeyboardLayout(uint threadId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr LoadKeyboardLayout(string layoutId, uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
     public static void Focus(IntPtr window)
     {
@@ -233,6 +242,23 @@ public static class MdtxtNativeInput
         }
     }
 
+    public static void ActivateChinese(IntPtr window)
+    {
+        IntPtr layout = LoadKeyboardLayout("00000804", KLF_ACTIVATE | KLF_SUBSTITUTE_OK);
+        if (layout == IntPtr.Zero)
+        {
+            throw new InvalidOperationException(
+                "LoadKeyboardLayout(00000804) failed. Win32=" + Marshal.GetLastWin32Error()
+            );
+        }
+        if (!PostMessage(window, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, layout))
+        {
+            throw new InvalidOperationException(
+                "WM_INPUTLANGCHANGEREQUEST failed. Win32=" + Marshal.GetLastWin32Error()
+            );
+        }
+    }
+
     public static ushort GetLanguageId(IntPtr window)
     {
         uint processId;
@@ -263,7 +289,11 @@ foreach ($character in $Text.ToCharArray()) {
 }
 
 foreach ($key in $Keys) {
-  [MdtxtNativeInput]::SendNamedKey($key)
+  if ($key -eq 'ActivateChinese') {
+    [MdtxtNativeInput]::ActivateChinese($process.MainWindowHandle)
+  } else {
+    [MdtxtNativeInput]::SendNamedKey($key)
+  }
   if ($DelayMilliseconds -gt 0) {
     Start-Sleep -Milliseconds $DelayMilliseconds
   }
