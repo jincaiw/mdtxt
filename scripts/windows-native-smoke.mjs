@@ -600,9 +600,10 @@ async function run() {
     await execute(`
         const tab = document.querySelectorAll("[role='tab']")[0];
         if (!(tab instanceof HTMLElement)) throw new Error("Original tab is unavailable");
-        tab.click();
+        tab.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
         return true;
     `);
+    await wait(200);
     assert.equal(
         await execute("return document.querySelector('.cm-content')?.textContent ?? '';"),
         copiedText,

@@ -406,9 +406,10 @@ async function run() {
     await execute(`
         const tab = document.querySelectorAll("[role='tab']")[0];
         if (!(tab instanceof HTMLElement)) throw new Error("Original tab is unavailable");
-        tab.click();
+        tab.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
         return true;
     `);
+    await wait(200);
     assert.equal(await execute(editorTextScript), copiedText);
     await execute(`
         document.querySelector("button[aria-label='源码编辑器'], button[aria-label='Code editor']")?.click();
