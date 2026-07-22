@@ -308,7 +308,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ubuntu-chinese-ime-preedit-${{ github.sha }}
-          path: /tmp/mdtxt-linux-ime-preedit.png
+          path: |
+            /tmp/mdtxt-linux-ime-preedit.png
+            /tmp/mdtxt-ubuntu-system-print-dialog.png
           if-no-files-found: error
           retention-days: 14
 
@@ -324,6 +326,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-microsoft-pinyin-preedit-${{ github.sha }}
-          path: ${{ runner.temp }}/mdtxt-microsoft-pinyin-preedit.png
+          path: |
+            ${{ runner.temp }}/mdtxt-microsoft-pinyin-preedit.png
+            ${{ runner.temp }}/mdtxt-windows-native-export.pdf
           if-no-files-found: error
           retention-days: 14

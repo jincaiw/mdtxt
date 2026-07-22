@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 
 describe("mdtxt native Tauri smoke", () => {
     const activate = async (element) => {
@@ -323,6 +324,26 @@ describe("mdtxt native Tauri smoke", () => {
         ));
         assert.equal(roundTrip.replaceAll("\u00a0", " "), fixture);
         console.log(`MDTXT_NATIVE_P7 platform=ubuntu widgets=${widgetSelectors.length} liveActivationMs=${duration} mermaid=passed sourceRoundTrip=passed`);
+    });
+
+    it("hands Linux PDF export to the WebKitGTK system print dialog", async () => {
+        await activate(await $("button[aria-label='导出文档'], button[aria-label='Export document']"));
+        const pdf = await $("//*[@role='menu']//*[normalize-space(.)='PDF']");
+        await pdf.waitForDisplayed();
+        await activate(pdf);
+
+        let printWindow = "";
+        for (let attempt = 0; attempt < 50 && !printWindow; attempt += 1) {
+            await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+            const search = spawnSync("xdotool", ["search", "--name", "Print"], { encoding: "utf8" });
+            if (search.status === 0) printWindow = search.stdout.trim().split(/\s+/)[0] ?? "";
+        }
+        assert.ok(printWindow, "WebKitGTK did not open its native Print dialog");
+        const captured = spawnSync("scrot", ["/tmp/mdtxt-ubuntu-system-print-dialog.png"], { encoding: "utf8" });
+        assert.equal(captured.status, 0, captured.stderr || captured.stdout);
+        const dismissed = spawnSync("xdotool", ["key", "--window", printWindow, "Escape"], { encoding: "utf8" });
+        assert.equal(dismissed.status, 0, dismissed.stderr || dismissed.stdout);
+        console.log(`MDTXT_NATIVE_PDF platform=ubuntu engine=WebKitGTK systemPrintDialog=passed window=${printWindow}`);
     });
 
     it("measures a 10 MiB Source to restricted-Live path in the native WebView", async () => {

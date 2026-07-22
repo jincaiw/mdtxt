@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { connect } from "node:net";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +18,7 @@ const sendInputScript = resolve(root, "scripts", "windows-send-input.ps1");
 const enablePinyinScript = resolve(root, "scripts", "windows-enable-pinyin.ps1");
 const captureScreenScript = resolve(root, "scripts", "windows-capture-screen.ps1");
 const pinyinScreenshot = resolve(process.env.RUNNER_TEMP ?? process.env.TEMP ?? root, "mdtxt-microsoft-pinyin-preedit.png");
+const pdfEvidence = resolve(process.env.RUNNER_TEMP ?? process.env.TEMP ?? root, "mdtxt-windows-native-export.pdf");
 const userDataFolderBase = resolve(process.env.RUNNER_TEMP ?? process.env.TEMP ?? root, `mdtxt-mcp-${process.pid}`);
 
 let application;
@@ -354,6 +356,21 @@ async function run() {
         "mdtxt welcome screen",
     );
     console.log("MDTXT_NATIVE_WINDOWS welcome=passed bridge=mcp-9223");
+
+    const pdfResult = await execute(`
+        const invoke = window.__TAURI_INTERNALS__?.invoke;
+        if (!invoke) throw new Error("Tauri invoke bridge is unavailable");
+        await invoke("export_pdf", {
+            html: "<!doctype html><html lang='zh-CN'><meta charset='utf-8'><body><h1>mdtxt Windows PDF 验收</h1><p>中文向量文本</p></body></html>",
+            path: ${JSON.stringify(pdfEvidence)},
+        });
+        return true;
+    `, 120_000);
+    assert.equal(pdfResult, true);
+    const pdfBytes = readFileSync(pdfEvidence);
+    assert.equal(pdfBytes.subarray(0, 5).toString("ascii"), "%PDF-");
+    assert.ok(pdfBytes.length > 1_000, `Windows PDF export was only ${pdfBytes.length} bytes`);
+    console.log(`MDTXT_NATIVE_PDF platform=windows engine=WebView2 bytes=${pdfBytes.length} header=passed path=${pdfEvidence}`);
 
     await execute(`
         localStorage.setItem("mdtxt:liveBeta", "true");
