@@ -9,6 +9,7 @@ import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { render, waitFor, cleanup } from "@testing-library/react";
 import { CodeEditor } from "./CodeEditor";
 import { installCodeMirrorDomPolyfills } from "../test/codemirrorDom";
+import { EditorView } from "@codemirror/view";
 
 beforeAll(installCodeMirrorDomPolyfills);
 afterEach(cleanup);
@@ -53,6 +54,18 @@ describe("editor selection theming", () => {
         rerender(<CodeEditor documentId="test" content="# heading" onChange={() => {}} liveMode={false} />);
         await waitFor(() => expect(content.querySelector(".cm-live-heading-1")).toBeNull());
         expect(container.querySelector(".cm-content")).toBe(content);
+    });
+
+    it("mounts a viewport image widget without replacing its Markdown source", async () => {
+        const source = "# image\n\n![diagram](data:image/svg+xml;base64,PHN2Zy8+)";
+        const { container } = render(<CodeEditor documentId="image" content={source} onChange={() => {}} liveMode />);
+        await waitFor(() => expect(container.querySelector(".cm-live-image-widget img")).toHaveAttribute(
+            "src",
+            "data:image/svg+xml;base64,PHN2Zy8+",
+        ));
+        const editor = container.querySelector<HTMLElement>(".cm-editor");
+        expect(editor).toBeTruthy();
+        expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
     });
 
     it("marks an over-threshold document as restricted without removing its source editor", async () => {

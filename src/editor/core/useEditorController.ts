@@ -99,7 +99,7 @@ export function useEditorController({
         wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
         onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
         typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-        content, wordWrap, spellCheck, liveMode, liveRestricted, detectSlash, detectTable, openFind, handlePaste,
+        content, wordWrap, spellCheck, liveMode, liveRestricted, filePath, detectSlash, detectTable, openFind, handlePaste,
     });
     useEditorDocumentSession({
         viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef, contentRef,
@@ -114,7 +114,7 @@ export function useEditorController({
             )),
         });
     }, [sourceSyntaxCompRef, sourceSyntaxRestricted, viewRef]);
-    useLiveMarkdownPresentation({ viewRef, liveCompRef, enabled: liveMode, restricted: liveRestricted, documentId });
+    useLiveMarkdownPresentation({ viewRef, liveCompRef, enabled: liveMode, restricted: liveRestricted, documentId, filePath });
     useEditorViewportBridge({ viewRef, onScrollFractionRef, registerScroller });
 
     return { containerRef, reviewActive, acceptAllChanges, rejectAllChanges, toolbar, floatingOverlays };

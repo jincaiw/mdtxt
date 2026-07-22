@@ -8,12 +8,12 @@ import remarkCustomHeadingId from "../utils/remarkCustomHeadingId";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { parseFrontmatter, serializeFrontmatter, type FrontmatterValue } from "../utils/frontmatter";
 import type { Scroller } from "../utils/scrollSync";
 import { MermaidBlock, isMermaidLanguage } from "./MermaidBlock";
 import { useLocale } from "../context/LocaleContext";
+import { getCachedLocalImageUrl, isUnsafeRelativeImagePath } from "../utils/localImage";
 
 // Detect KaTeX-style math so we only load the heavy katex bundle when needed.
 // $$...$$ for block math, $...$ for inline math (not preceded/followed by digit
@@ -233,69 +233,6 @@ function nodeText(node: React.ReactNode): string {
     return "";
 }
 
-// MIME type lookup for image extensions
-const IMAGE_MIME_TYPES: Record<string, string> = {
-    'png': 'image/png',
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'gif': 'image/gif',
-    'webp': 'image/webp',
-    'svg': 'image/svg+xml',
-    'bmp': 'image/bmp'
-};
-
-// Module-level shared cache for local image blobs. Without this, a doc that
-// references the same image 50 times reads the file 50 times and creates 50
-// independent ObjectURLs. With it, repeat references hit memory.
-//
-// LRU eviction at CACHE_CAP entries: the Map preserves insertion order, so we
-// re-insert on hit (move to end) and evict from the front when full. Evicted
-// URLs are revoked so the image data can be GC'd.
-const LOCAL_IMAGE_CACHE = new Map<string, string>();
-const LOCAL_IMAGE_CACHE_CAP = 100;
-
-async function getCachedLocalImageUrl(baseDir: string, relPath: string, mimeType: string): Promise<string> {
-    const cacheKey = `${baseDir}\u0000${relPath}`;
-    const hit = LOCAL_IMAGE_CACHE.get(cacheKey);
-    if (hit !== undefined) {
-        // Move-to-end so this entry is now most-recently-used.
-        LOCAL_IMAGE_CACHE.delete(cacheKey);
-        LOCAL_IMAGE_CACHE.set(cacheKey, hit);
-        return hit;
-    }
-    // Read via the validated Rust command (containment + symlink-safe) instead of
-    // the broad plugin-fs readFile. Returns an ArrayBuffer (tauri::ipc::Response).
-    const buf = await invoke<ArrayBuffer>("read_image_file", { baseDir, relPath });
-    const blob = new Blob([buf], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    LOCAL_IMAGE_CACHE.set(cacheKey, url);
-    if (LOCAL_IMAGE_CACHE.size > LOCAL_IMAGE_CACHE_CAP) {
-        const oldestKey = LOCAL_IMAGE_CACHE.keys().next().value;
-        if (oldestKey !== undefined) {
-            const oldUrl = LOCAL_IMAGE_CACHE.get(oldestKey);
-            if (oldUrl) URL.revokeObjectURL(oldUrl);
-            LOCAL_IMAGE_CACHE.delete(oldestKey);
-        }
-    }
-    return url;
-}
-
-/**
- * Reject paths that would escape the markdown file's directory or name an
- * absolute location. The capabilities allow `**` reads, so we have to enforce
- * the boundary in code: a malicious .md must not be able to use
- * `![pwn](../../../etc/passwd)` to peek at arbitrary files.
- */
-function isUnsafeRelativePath(p: string): boolean {
-    if (!p) return true;
-    if (/\0/.test(p)) return true;
-    // Absolute paths: leading slash, leading backslash, or drive letter.
-    if (/^([a-zA-Z]:|\/|\\)/.test(p)) return true;
-    // Any segment that is exactly `..` (handles foo/../etc, ../etc, etc.).
-    const segments = p.split(/[/\\]+/);
-    return segments.some((seg) => seg === "..");
-}
-
 // Component to handle local image loading
 function LocalImage({ src, alt, baseDir, ...props }: { src: string; alt: string; baseDir: string | null } & React.ImgHTMLAttributes<HTMLImageElement>) {
     const [imageSrc, setImageSrc] = useState<string>('');
@@ -315,18 +252,15 @@ function LocalImage({ src, alt, baseDir, ...props }: { src: string; alt: string;
         // absolute prefix, or a drive letter is rejected — see
         // isUnsafeRelativePath above.
         const cleanPath = src.startsWith('./') ? src.slice(2) : src;
-        if (isUnsafeRelativePath(cleanPath)) {
+        if (isUnsafeRelativeImagePath(cleanPath)) {
             setError(true);
             return;
         }
 
-        const ext = cleanPath.split('.').pop()?.toLowerCase() || 'png';
-        const mimeType = IMAGE_MIME_TYPES[ext] || 'image/png';
-
         let cancelled = false;
         // baseDir + cleanPath are joined + validated in the Rust read_image_file
         // command; we no longer build an absolute path on the JS side.
-        getCachedLocalImageUrl(baseDir, cleanPath, mimeType)
+        getCachedLocalImageUrl(baseDir, cleanPath)
             .then((url) => {
                 if (!cancelled) {
                     setImageSrc(url);

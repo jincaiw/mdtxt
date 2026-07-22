@@ -3,6 +3,7 @@ import { RangeSetBuilder, StateField, type Compartment, type EditorState, type E
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { resolveEditFocus } from "./editFocusResolver";
+import { liveImageWidgets } from "./liveImageWidgets";
 
 const marks: Record<string, Decoration> = {
     ATXHeading1: Decoration.mark({ class: "cm-live-heading-1" }),
@@ -109,6 +110,14 @@ export const liveMarkdownTheme = EditorView.baseTheme({
     ".cm-live-quote": { color: "var(--text-secondary)" },
     ".cm-live-list-mark, .cm-live-task-marker": { color: "var(--accent)" },
     ".cm-live-rule": { color: "var(--border)", fontWeight: "700" },
+    ".cm-live-block-widget": {
+        display: "flex", flexDirection: "column", alignItems: "center", gap: "0.35rem",
+        width: "100%", margin: "0.65rem 0 0.25rem", padding: "0.65rem",
+        border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+        backgroundColor: "var(--bg-secondary)", boxSizing: "border-box",
+    },
+    ".cm-live-image-widget img": { maxWidth: "100%", maxHeight: "28rem", borderRadius: "var(--radius-sm)" },
+    ".cm-live-image-widget figcaption": { color: "var(--text-secondary)", fontSize: "0.78rem" },
 });
 
 /**
@@ -155,7 +164,10 @@ const liveRestrictedAttributes: Extension = [
     EditorView.contentAttributes.of({ "data-mdtxt-live": "restricted" }),
 ];
 const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
-export const liveMarkdownPresentation: Extension = [liveMarkdownBase, liveAttributes];
+export function createLiveMarkdownPresentation(filePath: string | null): Extension {
+    return [liveMarkdownBase, liveImageWidgets(filePath), liveAttributes];
+}
+export const liveMarkdownPresentation: Extension = createLiveMarkdownPresentation(null);
 /**
  * Restricted Live is an admission-control fallback, not a second renderer.
  * Keep the existing Source geometry and extensions intact and expose only a
@@ -172,6 +184,7 @@ export function useLiveMarkdownPresentation({
     enabled,
     restricted = false,
     documentId,
+    filePath = null,
 }: {
     viewRef: RefObject<EditorView | null>;
     liveCompRef: RefObject<Compartment>;
@@ -179,6 +192,7 @@ export function useLiveMarkdownPresentation({
     restricted?: boolean;
     /** Reconfigure after retained EditorState switches between documents. */
     documentId: string;
+    filePath?: string | null;
 }) {
     useEffect(() => {
         const view = viewRef.current;
@@ -206,7 +220,7 @@ export function useLiveMarkdownPresentation({
         }
 
         view.dispatch({
-            effects: liveCompRef.current.reconfigure(enabled ? liveMarkdownPresentation : []),
+            effects: liveCompRef.current.reconfigure(enabled ? createLiveMarkdownPresentation(filePath) : []),
         });
-    }, [documentId, enabled, liveCompRef, restricted, viewRef]);
+    }, [documentId, enabled, filePath, liveCompRef, restricted, viewRef]);
 }

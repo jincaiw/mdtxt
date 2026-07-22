@@ -18,7 +18,7 @@ import { getOriginalDoc } from "@codemirror/merge";
 import { handleTab, handleEnter, wrapSelection, insertLink, type EditorResult, type EditorState } from "../../utils/editorActions";
 import { applyEditorResult, editorTheme, markdownPresentationExtensions, toEditorActionState } from "./editorPresentation";
 import { spellcheckAttributes } from "../extensions/useEditorPreferences";
-import { liveMarkdownPresentation } from "../live/liveMarkdownPresentation";
+import { createLiveMarkdownPresentation } from "../live/liveMarkdownPresentation";
 import type { DocumentTextChange } from "../../utils/documentSessionController";
 
 interface UseCodeMirrorHostOptions {
@@ -48,6 +48,7 @@ interface UseCodeMirrorHostOptions {
     spellCheck: boolean;
     liveMode: boolean;
     liveRestricted: boolean;
+    filePath?: string | null;
     detectSlash: (view: EditorView) => void;
     detectTable: (view: EditorView) => void;
     openFind: (mode: "find" | "replace", selectionStart: number) => void;
@@ -60,7 +61,7 @@ export function useCodeMirrorHost({
     wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
     onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
     typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-    content, wordWrap, spellCheck, liveMode, liveRestricted, detectSlash, detectTable, openFind, handlePaste,
+    content, wordWrap, spellCheck, liveMode, liveRestricted, filePath, detectSlash, detectTable, openFind, handlePaste,
 }: UseCodeMirrorHostOptions) {
     useEffect(() => {
         if (!containerRef.current) return;
@@ -149,7 +150,7 @@ export function useCodeMirrorHost({
                     // useLiveMarkdownPresentation. Keeping this compartment empty
                     // avoids a full CodeMirror configuration transaction for a
                     // multi-megabyte Source document.
-                    liveCompRef.current.of(liveMode && !liveRestricted ? liveMarkdownPresentation : []),
+                    liveCompRef.current.of(liveMode && !liveRestricted ? createLiveMarkdownPresentation(filePath ?? null) : []),
                     keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
                     updateListener,
                     EditorView.domEventHandlers({ paste: handlePaste }),
