@@ -86,6 +86,29 @@ public static class MdtxtNativeInput
         public ushort parameterHigh;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int left;
+        public int top;
+        public int right;
+        public int bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GUITHREADINFO
+    {
+        public uint size;
+        public uint flags;
+        public IntPtr active;
+        public IntPtr focus;
+        public IntPtr capture;
+        public IntPtr menuOwner;
+        public IntPtr moveSize;
+        public IntPtr caret;
+        public RECT caretRect;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint count, INPUT[] inputs, int size);
 
@@ -100,6 +123,12 @@ public static class MdtxtNativeInput
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetGUIThreadInfo(uint threadId, ref GUITHREADINFO info);
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetKeyboardLayout(uint threadId);
@@ -251,7 +280,8 @@ public static class MdtxtNativeInput
                 "LoadKeyboardLayout(00000804) failed. Win32=" + Marshal.GetLastWin32Error()
             );
         }
-        if (!PostMessage(window, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, layout))
+        IntPtr inputWindow = GetInputWindow(window);
+        if (!PostMessage(inputWindow, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, layout))
         {
             throw new InvalidOperationException(
                 "WM_INPUTLANGCHANGEREQUEST failed. Win32=" + Marshal.GetLastWin32Error()
@@ -259,8 +289,23 @@ public static class MdtxtNativeInput
         }
     }
 
+    private static IntPtr GetInputWindow(IntPtr fallback)
+    {
+        IntPtr foreground = GetForegroundWindow();
+        if (foreground == IntPtr.Zero) foreground = fallback;
+        uint processId;
+        uint threadId = GetWindowThreadProcessId(foreground, out processId);
+        var info = new GUITHREADINFO { size = (uint)Marshal.SizeOf<GUITHREADINFO>() };
+        if (threadId != 0 && GetGUIThreadInfo(threadId, ref info) && info.focus != IntPtr.Zero)
+        {
+            return info.focus;
+        }
+        return foreground;
+    }
+
     public static ushort GetLanguageId(IntPtr window)
     {
+        window = GetInputWindow(window);
         uint processId;
         uint threadId = GetWindowThreadProcessId(window, out processId);
         long layout = GetKeyboardLayout(threadId).ToInt64();
