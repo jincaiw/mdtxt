@@ -8,6 +8,7 @@ import { liveCodeWidgets } from "./liveCodeWidgets";
 import { liveFrontmatterWidgets } from "./liveFrontmatterWidgets";
 import { liveTableWidgets } from "./liveTableWidgets";
 import { liveMathWidgets } from "./liveMathWidgets";
+import { liveMermaidWidgets } from "./liveMermaidWidgets";
 
 const marks: Record<string, Decoration> = {
     ATXHeading1: Decoration.mark({ class: "cm-live-heading-1" }),
@@ -142,6 +143,8 @@ export const liveMarkdownTheme = EditorView.baseTheme({
     },
     ".cm-live-table-widget th": { backgroundColor: "var(--bg-tertiary)", fontWeight: "700" },
     ".cm-live-math-widget": { overflowX: "auto", color: "var(--text-primary)" },
+    ".cm-live-mermaid-widget": { overflowX: "auto" },
+    ".cm-live-mermaid-widget svg": { maxWidth: "100%", height: "auto" },
 });
 
 /**
@@ -189,7 +192,7 @@ const liveRestrictedAttributes: Extension = [
 ];
 const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
 export function createLiveMarkdownPresentation(filePath: string | null): Extension {
-    return [liveMarkdownBase, liveImageWidgets(filePath), liveCodeWidgets, liveFrontmatterWidgets, liveTableWidgets, liveMathWidgets, liveAttributes];
+    return [liveMarkdownBase, liveImageWidgets(filePath), liveCodeWidgets, liveFrontmatterWidgets, liveTableWidgets, liveMathWidgets, liveMermaidWidgets, liveAttributes];
 }
 export const liveMarkdownPresentation: Extension = createLiveMarkdownPresentation(null);
 /**
