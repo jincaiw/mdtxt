@@ -109,8 +109,19 @@ function processWindowIds() {
 async function verifySystemPrintDialog() {
     const existing = new Set(processWindowIds());
     assert.equal(await execute(`
+        const reader = document.querySelector("button[aria-label='阅读模式'], button[aria-label='Reader mode']");
+        if (!(reader instanceof HTMLButtonElement)) throw new Error("Reader mode is unavailable");
+        reader.click();
+        return true;
+    `), true);
+    await waitForScript(`
+        return document.querySelector("button[aria-label='阅读模式'][aria-pressed='true'], button[aria-label='Reader mode'][aria-pressed='true']")
+            && Boolean(document.querySelector(".markdown-body"));
+    `, "Reader preview before PDF export");
+    assert.equal(await execute(`
         const exportButton = document.querySelector("button[aria-label='导出文档'], button[aria-label='Export document']");
         if (!(exportButton instanceof HTMLButtonElement)) throw new Error("Export menu is unavailable");
+        if (exportButton.disabled) throw new Error("Export menu is disabled");
         exportButton.click();
         return true;
     `), true);
