@@ -123,6 +123,15 @@ describe("editor selection theming", () => {
         expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
     });
 
+    it("mounts only recognized callout types and preserves the quote source", async () => {
+        const source = "# warning\n\n> [!WARNING]\n> Keep the original Markdown.";
+        const { container } = render(<CodeEditor documentId="callout" content={source} onChange={() => {}} liveMode />);
+        await waitFor(() => expect(container.querySelector(".cm-live-callout-widget")).toHaveTextContent("Keep the original Markdown."));
+        expect(container.querySelector(".cm-live-callout-widget")).toHaveAttribute("data-callout", "warning");
+        const editor = container.querySelector<HTMLElement>(".cm-editor");
+        expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
+    });
+
     it("marks an over-threshold document as restricted without removing its source editor", async () => {
         const { container, rerender } = render(
             <CodeEditor
