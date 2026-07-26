@@ -1,6 +1,6 @@
 # mdtxt 0.1.0 实施计划（评估优化定稿）
 
-> 状态：**Final v1.0，执行证据更新至 2026-07-22**（A3 为唯一 UI 基线；P6 简体中文 IME/原生性能、P7 Widgets、P8 文件安全恢复、P9 AI/导出及 P10a 三平台证据均已实施；P11 正在执行最终候选 CI 与公开预发布收口）
+> 状态：**Final v1.0，发布收口更新至 2026-07-26**（A3 为唯一 UI 基线；P6 简体中文 IME/原生性能、P7 Widgets、P8 文件安全恢复、P9 AI/导出及 P10a 三平台证据均已实施；P11 已完成 `v0.1.0` 公开 unsigned prerelease 收口）
 > 适用仓库：当前工作树及 mdtxt 专属远端
 > 工作分支：`codex/refactor-mdtxt-0.1.0`
 > 目标：将既有 Paperling 渐进迁移为独立、双语、跨平台的 `mdtxt` 0.1.0。
@@ -12,10 +12,9 @@
 ```text
 已完成：P0 基线 → P1 安全契约 → P2 身份隔离 → P3 双语底座
 已完成：P4 文档会话单一事实源
-进行中：P6 Live Beta（最小、可逆、默认关闭）与 P8 文件安全（不改变正文所有权）
-并行基础设施：P10a 三平台构建与证据采集基座（不改变产品行为、不产出 GA 包）
-后续：P6 的 Beta 证据闭环 → P7 Widgets；P8 在 P7 期间继续完成恢复与文件系统证据
-      P7 + P8 均验收 → P9 AI/导出/平台 → P10b 发布工程收口 → P11 发布判定
+已完成：P6 Live Beta（最小、可逆、默认关闭）与 P8 文件安全（不改变正文所有权）
+已完成：P10a 三平台构建与证据采集基座（不改变产品行为、不产出 GA 包）
+已完成：P7 Widgets → P9 AI/导出/平台 → P10b 发布工程收口 → P11 发布判定
 ```
 
 唯一可接受的主路径仍是：**先消除 React 与 CodeMirror 的双全文状态，再拆分编辑器，再引入 Live 与 Widgets**。不得以“模型已建立”代替状态迁移完成；`DocumentSession`、版本令牌、按标签模式、版本化保存和展示投影均已落地，`App.tsx` 不再保存活动全文或 tab 正文副本。P5 不得重新引入该桥接状态。
@@ -43,8 +42,8 @@
 | P8 文件安全、冲突与恢复 | 已验收 | 原子替换、版本/哈希冲突、可见比较选择、耐久性告警及恢复已覆盖；生产 MSI `taskkill /F` 与 DEB `SIGKILL` 两草稿恢复和 Windows denied-share UX 在运行 `29948969306` 通过 | 平台锁语义继续按 Windows mandatory / POSIX advisory 分开声明 |
 | P10a 平台证据基座 | 已完成 | mdtxt 专属远端、三平台构建、Windows/Linux 原生 WebView、简体中文 IME、性能、安装包恢复和文件系统证据齐全；上游 Paperling 工作流未被引用为 mdtxt 证据 | 证据由 P11 最终提交的 CI 与 Release 资产固定 |
 | P9 AI/导出/平台安全 | 已验收 | AI 显式启用、钥匙串、取消/超时/审阅；真实 macOS HTML/PDF/DOCX、Windows WebView2 PDF 与 Ubuntu WebKitGTK 系统打印均通过；生产 CSP/权限和导出写入边界通过 | 正式签名仍由 P11 GA 边界约束 |
-| P10b 发布工程 | 已实现 | 三平台安装包、Portable、ad-hoc macOS 完整签名、SHA256SUMS、SPDX SBOM、第三方许可证、双语说明和 prerelease 工作流 | P11 通过后打 `v0.1.0` 标签并验证实际 Release 资产 |
-| P11 最终判定 | 进行中 | 本地全量门禁、macOS 包/导出、Paperling 并存均通过；`docs/audits/p11-release-candidate.md` 维护最终判定 | 最终 CI、tag、三平台 Release、校验和与公开 prerelease 验证 |
+| P10b 发布工程 | 已完成 | 三平台安装包、Portable、ad-hoc macOS 完整签名、SHA256SUMS、SPDX SBOM、第三方许可证、双语说明和 prerelease 工作流；发布运行 `29956211349` 成功 | 维持 unsigned prerelease 边界；GA 仍需签名/公证 |
+| P11 最终判定 | 已完成（公开 prerelease） | `72294ad` 的 CI `29955450032` 与 Release `29956211349` 成功；`v0.1.0` 标签精确指向该 SHA，下载资产全部通过 `SHA256SUMS`，Release 已公开且 `isPrerelease=true` | GA 仍受 Developer ID、公证和 Windows 代码签名阻断 |
 
 截至本次定稿，最低本地门禁已通过：`bun run release:check`、前端测试与构建、`cargo fmt --check`、Clippy 和 Rust 测试。后续每一个阶段都必须重新执行与该阶段相称的门禁，不能借用历史通过结果。
 
@@ -204,7 +203,7 @@ bun run tauri build --debug
 
 ## 7. 当前执行边界
 
-当前执行边界已进入 **P11 发布候选收口**：P6/P8/P10a 的原生平台阻塞均已关闭，P7 与 P9 的最终原生标记由同一 mdtxt-owned CI 固定。CI 全绿后执行 v0.1.0 标签、三平台 Release 构建、供应链资产和公开 prerelease 验证。由于没有 Developer ID/notarization 与 Windows 代码签名，任何结果均不得标记为 GA；Live 仍为显式 Beta。
+`v0.1.0` 的 **P11 公开 prerelease 收口已完成**：P6/P8/P10a 的原生平台阻塞均已关闭，P7 与 P9 的最终原生标记由 mdtxt-owned CI 固定。候选 `72294ad` 的 CI `29955450032`、三平台 Release/供应链运行 `29956211349` 均成功；带注释的 `v0.1.0` 标签精确指向该 SHA，下载全部可执行/安装包后复算的 `SHA256SUMS` 全部通过，且 [公开 Release](https://github.com/jincaiw/mdtxt/releases/tag/v0.1.0) 保持 `isPrerelease=true`。由于没有 Developer ID/notarization 与 Windows 代码签名，任何结果均不得标记为 GA；Live 仍为显式 Beta。
 
 执行约束如下：
 
@@ -212,7 +211,7 @@ bun run tauri build --debug
 2. P6 的焦点/IME 保守策略继续约束 P7；任何输入回归均回退到 Source，不以 Widget 覆盖源码。
 3. 10 MiB 只承诺 Source 与受限 Live；完整复杂 Widget 渲染不属于大文件承诺。
 4. P8 的目录同步不确定性只允许“成功 + 耐久性告警”；不得恢复 React 全文副本或绕过 `DocumentSessionController`。
-5. P11 只接受当前候选 SHA 的完整 CI 与 Release 证据；旧 SHA 的绿灯不得替代最终提交。
+5. P11 仅以 `72294ad` 的完整 CI、Release、标签目标和下载哈希为 v0.1.0 prerelease 证据；旧 SHA 的绿灯不得替代最终提交。
 6. 每完成一个子关卡，更新对应的 `docs/audits/p6-live-beta-tracking.md` 或 `docs/audits/p8-file-safety-tracking.md`，记录提交、命令、机器/平台、未覆盖原因和回滚点；申请阶段验收时按第 6 节提交完整证据包，而非仅更新状态文字。
 7. P10a 仅维护环境与原始证据索引（`docs/audits/p10a-platform-evidence.md`）；当目标平台不可用时记录阻塞原因、最后尝试时间和替代方案，不得以容器、交叉编译或其他 OS 的结果填充 P6/P8 通过单元格。
 
@@ -222,10 +221,10 @@ bun run tauri build --debug
 
 | 优先级 | 仅在前置条件满足后执行 | 产出与验收记录 | 暂停条件 |
 | --- | --- | --- | --- |
-| 1 | 最终候选 CI | P7 八 Widget round-trip、Windows PDF、Ubuntu系统打印及所有常规门禁 | 任一失败修复后必须以新 SHA 重跑完整 CI |
-| 2 | 候选 CI 全绿 | 更新 P7/P9/P10a/P11 证据并运行本地发布预检 | 文档状态与原始日志不一致即暂停打标签 |
-| 3 | 证据与工作区干净 | 创建并推送带注释的 `v0.1.0` 标签 | 标签不指向最终 SHA 或版本三处不一致即停止 |
-| 4 | Release 工作流全绿 | 下载全部资产、复算 SHA-256、检查 SBOM/许可证/预发布属性并公开 draft prerelease | 缺资产、哈希不一致、出现 updater JSON 或 GA 标记即不发布 |
+| 1 | 最终候选 CI | P7 八 Widget round-trip、Windows PDF、Ubuntu系统打印及所有常规门禁 | 已完成：`29955450032` 通过 |
+| 2 | 候选 CI 全绿 | 更新 P7/P9/P10a/P11 证据并运行本地发布预检 | 已完成：本地预检与证据记录一致 |
+| 3 | 证据与工作区干净 | 创建并推送带注释的 `v0.1.0` 标签 | 已完成：标签 peeled target 为 `72294ad` |
+| 4 | Release 工作流全绿 | 下载全部资产、复算 SHA-256、检查 SBOM/许可证/预发布属性并公开 draft prerelease | 已完成：`29956211349`、全部资产哈希和公开 prerelease 均已验证 |
 
 当前不存在需要用户补充的目标平台设备阻塞；Windows/Linux 证据由 mdtxt
 专属 GitHub-hosted 原生运行环境采集。唯一不可自行补齐的是正式签名/公证密钥，

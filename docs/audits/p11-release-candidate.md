@@ -1,8 +1,7 @@
 # P11 v0.1.0 Release-Candidate Decision
 
-Status: **candidate evidence accepted and ready for the final documentation-SHA
-CI/tag gate. Publication is authorized only as an unsigned public prerelease,
-never GA.**
+Status: **accepted and published as the unsigned public `v0.1.0` prerelease.
+This is never a GA declaration.**
 
 ## Acceptance summary
 
@@ -32,16 +31,23 @@ never GA.**
   print-dialog assertions are part of the final native CI gate.
 - Supply chain: release workflow generates aggregate SHA-256, SPDX SBOM and a
   third-party license inventory after all three build jobs finish.
-- Candidate CI: commit `a71cea8`, run `29954555501`, all seven jobs passed;
-  native artifacts `8543662129` (Windows PDF/Pinyin) and `8543607953`
-  (Ubuntu print dialog/Fcitx5) were retained.
+- Final CI: release candidate commit `72294ad`, run `29955450032`, all seven
+  jobs passed. It retains the P7/P9 native coverage established by `a71cea8`
+  / `29954555501`, including artifacts `8543662129` (Windows PDF/Pinyin) and
+  `8543607953` (Ubuntu print dialog/Fcitx5).
+- Release: workflow `29956211349` succeeded for the same candidate, producing
+  the macOS Apple Silicon, Windows x64 and Ubuntu x64 packages, Portable,
+  `SHA256SUMS`, SPDX SBOM and third-party license inventory. The annotated
+  `v0.1.0` tag peels to `72294ad`; downloaded payloads all passed
+  `sha256sum -c SHA256SUMS`; the public release is `isDraft=false` and
+  `isPrerelease=true`.
 
 ## Publication boundary
 
 The PRD's V1 GA Definition of Done requires macOS Developer ID notarization and
-Windows code signing. Those credentials do not exist for mdtxt, so v0.1.0 must
-remain `prerelease=true`; updater metadata stays disabled. The release workflow
-first creates a draft prerelease. P11 may publish that prerelease only after:
+Windows code signing. Those credentials do not exist for mdtxt, so v0.1.0
+remains `prerelease=true`; updater metadata stays disabled. Its draft was
+published only after:
 
 1. the final commit's complete CI is green and contains P7 plus Windows/Ubuntu
    native PDF markers;
@@ -50,4 +56,6 @@ first creates a draft prerelease. P11 may publish that prerelease only after:
 4. downloaded assets match `SHA256SUMS`; and
 5. the GitHub release still reports prerelease and contains no updater JSON.
 
-No missing signature/notarization item may be described as GA completion.
+All five conditions above are now evidenced for `72294ad` and the public
+release at https://github.com/jincaiw/mdtxt/releases/tag/v0.1.0. No missing
+signature/notarization item may be described as GA completion.
