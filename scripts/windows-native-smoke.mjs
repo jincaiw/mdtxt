@@ -639,6 +639,10 @@ async function run() {
             ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
             : null;
     `);
+    const liveDocument = await execute(`
+        const content = document.querySelector(".cm-content");
+        return content?.cmView?.view?.state.doc.toString() ?? null;
+    `);
     const liveChinese = liveText.match(/[\u3400-\u9fff]{2,}/gu) ?? [];
     assert.ok(liveChinese.length >= 2, `Live did not commit a second Chinese phrase: ${liveText}`);
 
@@ -657,7 +661,7 @@ async function run() {
         const content = document.querySelector(".cm-content");
         return content?.cmView?.view?.state.doc.toString() ?? null;
     `);
-    assert.ok(copiedText.endsWith(liveText), "Microsoft Pinyin clipboard round trip changed the document text");
+    assert.ok(copiedDocument.endsWith(liveDocument), "Microsoft Pinyin clipboard round trip changed the Markdown source");
 
     await execute(`
         document.querySelector("button[aria-label='新建标签页'], button[aria-label='New tab']")?.click();
