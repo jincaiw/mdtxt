@@ -653,6 +653,10 @@ async function run() {
             ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
             : null;
     `);
+    const copiedDocument = await execute(`
+        const content = document.querySelector(".cm-content");
+        return content?.cmView?.view?.state.doc.toString() ?? null;
+    `);
     assert.ok(copiedText.endsWith(liveText), "Microsoft Pinyin clipboard round trip changed the document text");
 
     await execute(`
@@ -669,11 +673,9 @@ async function run() {
     assert.equal(
         await execute(`
             const content = document.querySelector(".cm-content");
-            return content
-                ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
-                : null;
+            return content?.cmView?.view?.state.doc.toString() ?? null;
         `),
-        copiedText,
+        copiedDocument,
     );
     await execute(`
         document.querySelector("button[aria-label='源码编辑器'], button[aria-label='Code editor']")?.click();
