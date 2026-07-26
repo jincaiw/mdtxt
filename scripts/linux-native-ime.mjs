@@ -259,6 +259,11 @@ const editorTextScript = `
         : null;
 `;
 
+const editorDocumentScript = `
+    const content = document.querySelector(".cm-content");
+    return content?.cmView?.view?.state.doc.toString() ?? null;
+`;
+
 async function run() {
     application = spawn(binary, [], {
         cwd: root,
@@ -458,6 +463,7 @@ async function run() {
     sendKey("ctrl+v");
     await wait(300);
     const copiedText = await execute(editorTextScript);
+    const copiedDocument = await execute(editorDocumentScript);
     assert.ok(copiedText.endsWith(liveText), "Native Chinese clipboard paste did not preserve the document text");
 
     await execute(`
@@ -476,7 +482,7 @@ async function run() {
         document.querySelector("button[aria-label='源码编辑器'], button[aria-label='Code editor']")?.click();
         return true;
     `);
-    assert.equal(await execute(editorTextScript), copiedText);
+    assert.equal(await execute(editorDocumentScript), copiedDocument);
 
     await verifySystemPrintDialog();
 
