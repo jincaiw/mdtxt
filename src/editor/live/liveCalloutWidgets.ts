@@ -38,7 +38,7 @@ class LiveCalloutWidget extends WidgetType {
     }
 
     ignoreEvent() {
-        return true;
+        return false;
     }
 }
 
@@ -55,8 +55,7 @@ function calloutDecorations(view: EditorView, locale: LiveLocale): DecorationSet
                 if (!callout) return;
                 if (view.compositionStarted || view.state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from)) return;
                 widgets.push(Decoration.widget({
-                    widget: new LiveCalloutWidget(source, callout, locale),
-                    side: 1,
+                    widget: new LiveCalloutWidget(source, callout, locale), side: 1,
                 }).range(view.state.doc.lineAt(node.to).to));
             },
         });

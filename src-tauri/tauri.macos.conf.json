@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "mdtxt",
+        "width": 1000,
+        "height": 700,
+        "minWidth": 600,
+        "minHeight": 400,
+        "decorations": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "transparent": false,
+        "center": true,
+        "useHttpsScheme": true,
+        "visible": false,
+        "backgroundColor": "#0a0a0a"
+      }
+    ]
+  }
+}

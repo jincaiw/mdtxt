@@ -15,12 +15,13 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree } from "@codemirror/language";
 import { autocompletion, closeBrackets, closeBracketsKeymap, type CompletionSource } from "@codemirror/autocomplete";
 import { getOriginalDoc } from "@codemirror/merge";
-import { handleTab, handleEnter, wrapSelection, insertLink, type EditorResult, type EditorState } from "../../utils/editorActions";
+import { handleTab, handleEnter, type EditorResult, type EditorState } from "../../utils/editorActions";
 import { applyEditorResult, editorTheme, markdownPresentationExtensions, toEditorActionState } from "./editorPresentation";
 import { spellcheckAttributes } from "../extensions/useEditorPreferences";
 import { createLiveMarkdownPresentation } from "../live/liveMarkdownPresentation";
 import type { DocumentTextChange } from "../../utils/documentSessionController";
 import type { LiveLocale } from "../live/liveLocale";
+import { runEditorCommand } from "../commands/editorCommands";
 
 interface UseCodeMirrorHostOptions {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -72,22 +73,23 @@ export function useCodeMirrorHost({
         const editingKeymap = Prec.highest(keymap.of([
             { key: "Tab", run: (view) => runAction(view, (state) => handleTab(state, false)), shift: (view) => runAction(view, (state) => handleTab(state, true)) },
             { key: "Enter", run: (view) => runAction(view, handleEnter) },
-            { key: "Mod-b", run: (view) => { applyEditorResult(view, wrapSelection(toEditorActionState(view), "**", "**", "bold")); return true; } },
-            { key: "Mod-i", run: (view) => { applyEditorResult(view, wrapSelection(toEditorActionState(view), "*", "*", "italic")); return true; } },
-            { key: "Mod-k", run: (view) => { applyEditorResult(view, insertLink(toEditorActionState(view))); return true; } },
-            {
-                key: "Mod-/", run: (view) => {
-                    const state = toEditorActionState(view);
-                    const lineStart = state.text.lastIndexOf("\n", state.selStart - 1) + 1;
-                    const lineEnd = state.text.indexOf("\n", state.selStart);
-                    const end = lineEnd === -1 ? state.text.length : lineEnd;
-                    const line = state.text.slice(lineStart, end);
-                    const replacement = line.startsWith("> ") ? line.slice(2) : "> " + line;
-                    const delta = replacement.length - line.length;
-                    applyEditorResult(view, { text: state.text.slice(0, lineStart) + replacement + state.text.slice(end), selStart: state.selStart + delta, selEnd: state.selEnd + delta });
-                    return true;
-                },
-            },
+            { key: "Mod-b", run: (view) => applyCommand(view, "format.bold") },
+            { key: "Mod-i", run: (view) => applyCommand(view, "format.italic") },
+            { key: "Mod-k", run: (view) => applyCommand(view, "format.link") },
+            { key: "Mod-/", run: (view) => applyCommand(view, "format.blockquote") },
+            { key: "Mod-Shift-x", run: (view) => applyCommand(view, "format.strike") },
+            { key: "Mod-Shift-`", run: (view) => applyCommand(view, "format.inlineCode") },
+            { key: "Mod-Shift-1", run: (view) => applyCommand(view, "format.heading1") },
+            { key: "Mod-Shift-2", run: (view) => applyCommand(view, "format.heading2") },
+            { key: "Mod-Shift-3", run: (view) => applyCommand(view, "format.heading3") },
+            { key: "Mod-Shift-4", run: (view) => applyCommand(view, "format.heading4") },
+            { key: "Mod-Shift-5", run: (view) => applyCommand(view, "format.heading5") },
+            { key: "Mod-Shift-6", run: (view) => applyCommand(view, "format.heading6") },
+            { key: "Mod-Shift-0", run: (view) => applyCommand(view, "format.paragraph") },
+            { key: "Mod-Shift-7", run: (view) => applyCommand(view, "format.orderedList") },
+            { key: "Mod-Shift-8", run: (view) => applyCommand(view, "format.bulletList") },
+            { key: "Mod-Shift-9", run: (view) => applyCommand(view, "format.taskList") },
+            { key: "Mod-Shift-c", run: (view) => applyCommand(view, "insert.codeBlock") },
             { key: "Mod-f", run: (view) => { openFind("find", view.state.selection.main.from); return true; } },
             { key: "Mod-h", run: (view) => { openFind("replace", view.state.selection.main.from); return true; } },
         ]));
@@ -224,5 +226,10 @@ function runAction(view: EditorView, action: (state: EditorState) => EditorResul
     const result = action(toEditorActionState(view));
     if (!result) return false;
     applyEditorResult(view, result);
+    return true;
+}
+
+function applyCommand(view: EditorView, command: import("../commands/editorCommands").EditorCommandId): boolean {
+    applyEditorResult(view, runEditorCommand(toEditorActionState(view), command));
     return true;
 }

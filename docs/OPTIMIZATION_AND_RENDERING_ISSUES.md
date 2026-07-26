@@ -1,6 +1,6 @@
-# Paperling: Optimization, Rendering & Logical Issues
+# mdtxt: Optimization, Rendering & Logical Issues
 
-> Deep analysis of performance bottlenecks, rendering problems, and logical issues found in the Paperling codebase.
+> Historical upstream analysis retained for attribution; findings are re-evaluated against the mdtxt codebase before action.
 
 ---
 

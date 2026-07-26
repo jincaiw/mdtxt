@@ -349,6 +349,21 @@ function readNativeLayout() {
     ]);
 }
 
+function readNativeWindowTitle() {
+    const result = spawnSync(powershell, [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `(Get-Process -Id ${application.pid}).MainWindowTitle`,
+    ], {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+    assert.equal(result.status, 0, `Could not read native window title: ${result.stderr}`);
+    return result.stdout.trim();
+}
+
 async function run() {
     await launchApplication();
     await waitForScript(
@@ -356,6 +371,21 @@ async function run() {
         "mdtxt welcome screen",
     );
     console.log("MDTXT_NATIVE_WINDOWS welcome=passed bridge=mcp-9223");
+    assert.equal(readNativeWindowTitle(), "mdtxt");
+    assert.deepEqual(await execute(`
+        return {
+            title: document.title,
+            hasAppDragRegion: Boolean(document.querySelector("header.drag-region")),
+            simulatedControls: [...document.querySelectorAll("button")]
+                .map((button) => button.getAttribute("aria-label"))
+                .filter((label) => /^(minimize|maximize|restore|close)$/i.test(label ?? "")),
+        };
+    `), {
+        title: "mdtxt",
+        hasAppDragRegion: false,
+        simulatedControls: [],
+    });
+    console.log("MDTXT_NATIVE_WINDOWS chrome=system-titlebar title=passed simulated-controls=absent");
 
     const pdfResult = await execute(`
         const invoke = window.__TAURI_INTERNALS__?.invoke;

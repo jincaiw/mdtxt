@@ -1,5 +1,14 @@
 # P10a Platform Build and Evidence Tracking
 
+## v0.2.0 window-chrome addendum
+
+The next candidate reruns native window evidence after restoring system window
+decorations: macOS uses `titleBarStyle: "Overlay"` with native traffic lights;
+Windows and Linux delegate dragging, minimize/maximize/close, and the title bar
+to their window manager. Native smoke must prove there are no React-emulated
+window controls, the system title follows the active document, and F11/native
+fullscreen state stays synchronized.
+
 Status: **mdtxt-owned macOS, Windows and Ubuntu environments are complete for
 the 0.1.0 prerelease evidence scope. Build, native WebView, IME, performance,
 filesystem and installed-package recovery records remain separately identified.**

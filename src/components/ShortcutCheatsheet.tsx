@@ -54,6 +54,8 @@ const groups: ShortcutGroup[] = [
         items: [
             { keys: `${cmd}+E`, description: "Toggle Reader / Code" },
             { keys: `${cmd}+\\`, description: "Toggle split view" },
+            { keys: `${cmd}+Shift+L`, description: "Toggle Live Beta" },
+            { keys: "F9", description: "Toggle Typewriter mode" },
             { keys: "F11", description: "Toggle fullscreen" },
             { keys: `${cmd}+Shift+E`, description: "Toggle file explorer" },
             { keys: `${cmd}+Shift+F`, description: "Search across files" },
@@ -76,6 +78,12 @@ const groups: ShortcutGroup[] = [
             { keys: `${cmd}+I`, description: "Italic (toggle)" },
             { keys: `${cmd}+K`, description: "Insert link" },
             { keys: `${cmd}+/`, description: "Toggle blockquote on line" },
+            { keys: `${cmd}+Shift+1-6`, description: "Set heading level 1–6" },
+            { keys: `${cmd}+Shift+0`, description: "Convert line to paragraph" },
+            { keys: `${cmd}+Shift+X`, description: "Toggle strikethrough" },
+            { keys: `${cmd}+Shift+\``, description: "Toggle inline code" },
+            { keys: `${cmd}+Shift+7/8/9`, description: "Ordered / bullet / task list" },
+            { keys: `${cmd}+Shift+C`, description: "Insert code block" },
         ],
     },
     {

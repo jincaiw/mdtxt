@@ -116,6 +116,17 @@ export function ExportMenu({ fileName, getExportHtml, onSuccess, onError }: Expo
         }
     };
 
+    useEffect(() => {
+        const listener = (event: Event) => {
+            const format = (event as CustomEvent<ExportFormat>).detail;
+            if (format === "html" || format === "pdf" || format === "docx") void handleExport(format);
+        };
+        window.addEventListener("mdtxt:export", listener);
+        return () => window.removeEventListener("mdtxt:export", listener);
+    // handleExport intentionally changes with visual export preferences; the
+    // listener is refreshed with those preferences rather than retaining them.
+    }, [handleExport]);
+
     return (
         <div ref={menuRef} className="relative shrink-0 no-drag">
             {/* Export Button */}

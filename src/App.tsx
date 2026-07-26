@@ -18,6 +18,7 @@ import { SplitDivider } from "./components/SplitDivider";
 import { type PaletteCommand } from "./components/CommandPalette";
 import { useToast } from "./hooks/useToast";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import { useNativeMenu } from "./hooks/useNativeMenu";
 import { useDocumentPresentationSnapshot } from "./hooks/useDocumentPresentationSnapshot";
 import { usePersistedState } from "./hooks/usePersistedState";
 import { useFullscreen } from "./hooks/useFullscreen";
@@ -103,6 +104,7 @@ import { getAutoSave } from "./utils/persistence";
 import { resolveRelativePath } from "./utils/resolveRelativePath";
 import { errMessage } from "./utils/errors";
 import { revealMainWindow } from "./utils/appWindow";
+import { useNativeWindowTitle } from "./utils/nativeWindowTitle";
 import { TabBar, type TabBarItem } from "./components/TabBar";
 import { TabContextMenu } from "./components/TabContextMenu";
 import {
@@ -130,6 +132,7 @@ import { DocumentSessionController } from "./utils/documentSessionController";
 import { DocumentEditorStateStore } from "./utils/documentEditorStateStore";
 import { assessLiveEligibilityForTransition, LIVE_LIMITS, selectLiveEligibilitySource } from "./editor/live/liveEligibility";
 import { latestRecoveryBatch, orderRecoveryEntries, recoveredDraftName, selectRecoveredActive } from "./utils/recoveryModel";
+import { EDITOR_COMMAND_EVENT, type EditorCommandId } from "./editor/commands/editorCommands";
 // The interactive feature guide, shipped as raw markdown so it opens as a real,
 // editable document (offered at the end of the welcome tour / from the palette).
 import tutorialMarkdown from "./assets/tutorial.md?raw";
@@ -1717,6 +1720,10 @@ function AppContent() {
     setMode((prev) => (prev === "split" ? "preview" : "split"));
   }, []);
 
+  const handleToggleLive = useCallback(() => {
+    setMode((prev) => (prev === "live" ? "code" : "live"));
+  }, [setMode]);
+
   // Toggle file explorer (mutually exclusive with TOC)
   const handleToggleFileExplorer = useCallback(() => {
     setShowFileExplorer((prev) => !prev);
@@ -1821,10 +1828,10 @@ function AppContent() {
     showToast(message, 'info');
   }, [showToast]);
 
-  // Fullscreen (F11). The hook masks the resize behind a fade and works around
-  // two Windows frameless-window footguns — see useFullscreen. The "press F11 to
-  // exit" hint surfaces as an info toast via handleNotice. FULLSCREEN-01.
+  // Fullscreen (F11). Native title-bar controls, the Window menu, and F11 all
+  // converge on the same OS state; the hook keeps React in sync with it.
   const { isFullscreen, fsTransition, toggleFullscreen } = useFullscreen(handleNotice);
+  useNativeWindowTitle(fileName ?? undefined, isDirty);
 
   // Stable export-result callbacks so TitleBar's props are reference-equal
   // across renders. Inline arrows here would re-create the closures on every
@@ -1841,7 +1848,8 @@ function AppContent() {
   // App-wide keyboard shortcuts (window-level, mounted once). See the hook.
   useGlobalShortcuts({
     handleOpenFile, handleSaveFile, handleSaveAs, handleNewFile,
-    handleToggleMode, handleToggleSplit, handleToggleFileExplorer, handleToggleTOC,
+    handleToggleMode, handleToggleSplit, handleToggleLive, handleToggleFileExplorer, handleToggleTOC,
+    handleToggleTypewriter: () => setTypewriterModeEnabled((value) => !value),
     toggleFullscreen,
     openCheatsheet: () => setShowCheatsheet(true),
     openPalette: () => setShowPalette(true),
@@ -1857,6 +1865,51 @@ function AppContent() {
     gotoTab: gotoTabByIndex,
     hasFile, content: editorContent, mode,
   });
+
+  const nativeMenuCommands = useMemo<Record<string, () => void>>(() => {
+    const editor = (command: EditorCommandId) => () => window.dispatchEvent(new CustomEvent(EDITOR_COMMAND_EVENT, { detail: command }));
+    const exportDocument = (format: "html" | "pdf" | "docx") => () => window.dispatchEvent(new CustomEvent("mdtxt:export", { detail: format }));
+    return {
+      "file.new": handleNewFile,
+      "file.open": handleOpenFile,
+      "file.save": handleSaveFile,
+      "file.saveAs": handleSaveAs,
+      "file.reveal": () => { if (filePath) void revealItemInDir(filePath).catch(() => showToast(tr("Could not reveal file"), "error")); },
+      "file.copyPath": () => { if (filePath) void navigator.clipboard.writeText(filePath).then(() => showToast(tr("File path copied"), "success"), () => showToast(tr("Could not copy path"), "error")); },
+      "file.stats": () => setShowStats(true),
+      "tab.close": () => { if (activeTabIdRef.current) closeTab(activeTabIdRef.current); },
+      "export.html": exportDocument("html"), "export.pdf": exportDocument("pdf"), "export.docx": exportDocument("docx"),
+      "editor.find": () => window.dispatchEvent(new CustomEvent("mdtxt:editor-find", { detail: "find" })),
+      "editor.replace": () => window.dispatchEvent(new CustomEvent("mdtxt:editor-find", { detail: "replace" })),
+      "view.code": () => setMode("code"), "view.live": () => setMode("live"), "view.split": () => setMode("split"), "view.preview": () => setMode("preview"),
+      "view.explorer": handleToggleFileExplorer, "view.outline": handleToggleTOC,
+      "view.toolbar": () => setToolbarVisible((value) => !value), "view.typewriter": () => setTypewriterModeEnabled((value) => !value),
+      "view.fullscreen": toggleFullscreen,
+      "ai.assist": () => window.dispatchEvent(new CustomEvent("mdtxt:ai-assist")),
+      "settings.open": () => setShowSettings(true), "help.shortcuts": () => setShowCheatsheet(true),
+      "help.guide": handleOpenTutorial, "help.tour": () => { if (!hasFile) handleNewFile(); setShowTour(true); },
+      "format.bold": editor("format.bold"), "format.italic": editor("format.italic"), "format.strike": editor("format.strike"),
+      "format.inlineCode": editor("format.inlineCode"), "format.link": editor("format.link"),
+      "format.heading1": editor("format.heading1"), "format.heading2": editor("format.heading2"), "format.heading3": editor("format.heading3"),
+      "format.heading4": editor("format.heading4"), "format.heading5": editor("format.heading5"), "format.heading6": editor("format.heading6"),
+      "format.paragraph": editor("format.paragraph"), "format.bulletList": editor("format.bulletList"),
+      "format.orderedList": editor("format.orderedList"), "format.taskList": editor("format.taskList"), "format.blockquote": editor("format.blockquote"),
+      "insert.codeBlock": editor("insert.codeBlock"), "insert.table": editor("insert.table"), "insert.rule": editor("insert.rule"),
+    };
+  }, [closeTab, filePath, handleNewFile, handleOpenFile, handleOpenTutorial, handleSaveAs, handleSaveFile, handleToggleFileExplorer, handleToggleTOC, hasFile, setMode, showToast, toggleFullscreen, tr]);
+
+  const nativeMenuState = useMemo(() => ({
+    hasDocument: hasFile,
+    canReveal: !!filePath,
+    mode,
+    fileExplorerOpen: showFileExplorer,
+    outlineOpen: showTOC,
+    toolbarOpen: toolbarVisible,
+    typewriterOpen: typewriterModeEnabled,
+    aiEnabled,
+  }), [aiEnabled, filePath, hasFile, mode, showFileExplorer, showTOC, toolbarVisible, typewriterModeEnabled]);
+
+  useNativeMenu({ state: nativeMenuState, commands: nativeMenuCommands, translate: tr });
 
   // Get export HTML from the visible preview on demand (avoids duplicate rendering)
   const getExportHtml = useCallback((): string => {
@@ -2283,8 +2336,7 @@ function AppContent() {
         onExportError={handleExportError}
         onToggleAI={aiEnabled ? handleToggleAI : undefined}
         aiActive={showAIPanel}
-        isFullscreen={isFullscreen}
-        onToggleFullscreen={toggleFullscreen}
+        isNativeFullscreen={isFullscreen}
         mode={mode}
         onSetMode={setMode}
         liveEnabled={liveBetaEnabled}

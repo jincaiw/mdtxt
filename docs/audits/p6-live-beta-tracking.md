@@ -1,5 +1,15 @@
 # P6 Live Beta Requirement Tracking
 
+## v0.2.0 addendum
+
+v0.2.0 advances the approved inactive-line presentation from styling-only
+decorations to source-preserving replacements. Inline delimiters, block markers
+and complex-widget source collapse only while their node is unfocused; a caret,
+selection, composition, search match, malformed parse or uncertain mapping
+restores exact Markdown. This preserves the original P6 boundary: Markdown,
+selection and undo history remain authoritative, Live is explicit Beta, and
+Source is the default and fallback.
+
 Status: **accepted as an explicit, default-off Live Beta on macOS, Windows, and Ubuntu. This does not authorize making Live the default.**
 
 ## Requirement traceability

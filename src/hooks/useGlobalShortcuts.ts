@@ -9,6 +9,8 @@ export interface ShortcutHandlers {
     handleNewFile: () => void;
     handleToggleMode: () => void;
     handleToggleSplit: () => void;
+    handleToggleLive?: () => void;
+    handleToggleTypewriter?: () => void;
     /** Toggle OS fullscreen (F11). Cross-platform via the Tauri window API. */
     toggleFullscreen: () => void;
     handleToggleFileExplorer: () => void;
@@ -56,6 +58,20 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
             if (e.key === "F11") {
                 e.preventDefault();
                 s.toggleFullscreen();
+                return;
+            }
+            // F9 - typewriter mode. This has no browser-reserved behavior and
+            // works in the editor, Reader, and the welcome screen alike.
+            if (e.key === "F9") {
+                e.preventDefault();
+                s.handleToggleTypewriter?.();
+                return;
+            }
+            // Cmd/Ctrl+Shift+L - explicit Live mode. Keep Ctrl+E's historical
+            // Reader/Source toggle intact rather than overloading it again.
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === "l" || e.key === "L")) {
+                e.preventDefault();
+                if (s.hasFile) s.handleToggleLive?.();
                 return;
             }
             // Ctrl+Shift+E - Toggle file explorer (check before Ctrl+E)

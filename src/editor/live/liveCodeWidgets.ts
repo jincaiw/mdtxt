@@ -32,7 +32,7 @@ class LiveCodeWidget extends WidgetType {
     }
 
     ignoreEvent() {
-        return true;
+        return false;
     }
 }
 
@@ -52,8 +52,7 @@ function codeDecorations(view: EditorView, locale: LiveLocale): DecorationSet {
                 const code = text ? view.state.doc.sliceString(text.from, text.to) : "";
                 const source = view.state.doc.sliceString(node.from, node.to);
                 widgets.push(Decoration.widget({
-                    widget: new LiveCodeWidget(source, language, code, locale),
-                    side: 1,
+                    widget: new LiveCodeWidget(source, language, code, locale), side: 1,
                 }).range(view.state.doc.lineAt(node.to).to));
             },
         });

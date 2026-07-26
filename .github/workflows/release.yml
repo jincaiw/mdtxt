@@ -23,6 +23,7 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
       notes: ${{ steps.release.outputs.notes }}
+      release_id: ${{ steps.release.outputs.release_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,13 +44,24 @@ jobs:
             found { print }
           ' CHANGELOG.md)"
           test -n "$(printf '%s' "$notes" | tr -d '[:space:]')"
+          notes_file="$(mktemp)"
+          printf '%s\n' "$notes" > "$notes_file"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --draft --prerelease --title "mdtxt $tag" --notes-file "$notes_file"
+          else
+            gh release create "$tag" --draft --prerelease --title "mdtxt $tag" --notes-file "$notes_file"
+          fi
+          release_id="$(gh release view "$tag" --json databaseId --jq .databaseId)"
           {
             echo "tag=$tag"
             echo "version=$version"
+            echo "release_id=$release_id"
             echo "notes<<MDTXT_RELEASE_NOTES"
             printf '%s\n' "$notes"
             echo "MDTXT_RELEASE_NOTES"
           } >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   build:
     needs: metadata

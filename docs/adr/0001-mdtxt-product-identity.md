@@ -2,10 +2,11 @@
 
 - Status: accepted
 - Date: 2026-07-15
+- Amended: 2026-07-26 (v0.2.0)
 
 ## Decision
 
-The shipped product is named `mdtxt` (always lowercase), versioned as `0.1.0`,
+The shipped product is named `mdtxt` (always lowercase), versioned as `0.2.0`,
 with Tauri identifier `app.mdtxt.desktop`. The npm package, Cargo package,
 library, executable, desktop entry, window title, generated exports, native
 smoke configuration, release artifacts, and visible in-app copy use this
@@ -19,7 +20,7 @@ without sharing its app state, updater configuration, or file associations.
 
 No mdtxt endpoint or signing key exists yet. The updater plugin, its frontend
 dialog, its capability grants, the Paperling public key, and updater-artifact
-generation are removed for 0.1.0 development builds. A later release may add
+generation remain removed for the v0.2.0 unsigned prerelease. A later release may add
 them only in a separate ADR after it proves a mdtxt-owned endpoint, private-key
 handling, signed metadata, rollback behavior, and all target-platform builds.
 

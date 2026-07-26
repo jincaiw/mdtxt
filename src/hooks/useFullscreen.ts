@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Window } from "@tauri-apps/api/window";
 
 // Fullscreen-transition timing. The cover fades IN over FS_FADE_IN_MS (kept in
@@ -18,32 +18,73 @@ export interface FullscreenControls {
 }
 
 /**
- * Toggle OS fullscreen (F11). The custom title bar deliberately stays visible so
- * there's always an obvious way back (its square button turns into "exit
- * fullscreen", plus F11 again); a one-time hint reinforces it.
- *
- * Two Windows-specific footguns, both worked around here. (1) On a frameless
- * (decorations:false) window, entering fullscreen while MAXIMIZED leaves a black
- * bar where the taskbar was / overflows the right edge — a known tao bug. So we
- * drop maximize first and restore it on exit. (2) isFullscreen() returns
- * unreliable values for frameless windows, so F11 "wouldn't exit"; we track the
- * state ourselves instead of querying it. FULLSCREEN-01.
+ * Toggle OS fullscreen (F11). With native window decorations, fullscreen can
+ * also change through the macOS green button and native Window menu. Keep the
+ * React state subscribed to the OS instead of treating F11 as its own source of
+ * truth. FULLSCREEN-01.
  *
  * @param notify shows the "press F11 to exit" hint when entering fullscreen.
  */
 export function useFullscreen(notify: (message: string) => void): FullscreenControls {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const isFullscreenRef = useRef(false);
-  const wasMaximizedRef = useRef(false);
-  // Drops an opaque cover over the webview while the window resizes. The
-  // unmaximize→fullscreen step (and its reverse) physically resizes the window
-  // twice, so the content visibly reflows mid-transition — a jarring "snap".
+  const settleTimerRef = useRef<number | undefined>(undefined);
+  // Drops an opaque cover over the webview while the native window resizes.
+  // Fullscreen transitions can visibly reflow the editor mid-transition — a
+  // jarring "snap" without this cover.
   // We fade the cover IN to full opacity, hold while the OS settles behind it,
   // then fade it OUT, so the change reads as a smooth dip rather than a hard
   // cut. Crucially we wait for the fade-in to finish before touching the window,
   // so the resize is masked from its very first frame (a single rAF wasn't
   // reliably enough — early reflow frames leaked through). FULLSCREEN-01.
   const [fsTransition, setFsTransition] = useState(false);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlistenResize: (() => void) | undefined;
+    let unlistenFocus: (() => void) | undefined;
+
+    const sync = async (windowHandle: Window) => {
+      try {
+        const fullscreen = await windowHandle.isFullscreen();
+        if (!disposed) {
+          isFullscreenRef.current = fullscreen;
+          setIsFullscreen(fullscreen);
+        }
+      } catch {
+        // Browser development and restricted test harnesses have no native
+        // window bridge. The explicit F11 handler remains a harmless no-op.
+      }
+    };
+
+    try {
+      const windowHandle = Window.getCurrent();
+      void sync(windowHandle);
+      void Promise.all([
+        windowHandle.onResized(() => { void sync(windowHandle); }),
+        windowHandle.onFocusChanged(() => { void sync(windowHandle); }),
+      ]).then(([removeResize, removeFocus]) => {
+        if (disposed) {
+          removeResize();
+          removeFocus();
+        } else {
+          unlistenResize = removeResize;
+          unlistenFocus = removeFocus;
+        }
+      }).catch(() => {
+        // Browser development has no Tauri event bridge.
+      });
+    } catch {
+      // Window.getCurrent() can throw in browser development mode.
+    }
+
+    return () => {
+      disposed = true;
+      unlistenResize?.();
+      unlistenFocus?.();
+      if (settleTimerRef.current !== undefined) window.clearTimeout(settleTimerRef.current);
+    };
+  }, []);
 
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -54,22 +95,18 @@ export function useFullscreen(notify: (message: string) => void): FullscreenCont
       // with the cover's fade-in duration class.
       setFsTransition(true);
       await new Promise((r) => window.setTimeout(r, FS_FADE_IN_MS));
-      if (next) {
-        wasMaximizedRef.current = await w.isMaximized();
-        if (wasMaximizedRef.current) await w.unmaximize();
-        await w.setFullscreen(true);
+      await w.setFullscreen(next);
+      const actual = await w.isFullscreen();
+      isFullscreenRef.current = actual;
+      setIsFullscreen(actual);
+      if (actual) {
         notify("Fullscreen on — press F11 to exit");
-      } else {
-        await w.setFullscreen(false);
-        if (wasMaximizedRef.current) await w.maximize();
       }
-      isFullscreenRef.current = next;
-      setIsFullscreen(next);
     } catch {
       /* browser dev mode — no Tauri window */
     } finally {
       // Let the resize settle behind the fully-opaque cover, then fade out.
-      window.setTimeout(() => setFsTransition(false), FS_SETTLE_MS);
+      settleTimerRef.current = window.setTimeout(() => setFsTransition(false), FS_SETTLE_MS);
     }
   }, [notify]);
 

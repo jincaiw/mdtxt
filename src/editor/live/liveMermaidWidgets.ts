@@ -36,7 +36,7 @@ class LiveMermaidWidget extends WidgetType {
     }
 
     ignoreEvent() {
-        return true;
+        return false;
     }
 
     destroy() {
@@ -59,8 +59,7 @@ function mermaidDecorations(view: EditorView, locale: LiveLocale): DecorationSet
                 const source = view.state.doc.sliceString(node.from, node.to);
                 const code = text ? view.state.doc.sliceString(text.from, text.to) : "";
                 widgets.push(Decoration.widget({
-                    widget: new LiveMermaidWidget(source, code, locale),
-                    side: 1,
+                    widget: new LiveMermaidWidget(source, code, locale), side: 1,
                 }).range(view.state.doc.lineAt(node.to).to));
             },
         });

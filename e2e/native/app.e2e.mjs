@@ -153,6 +153,22 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.waitUntil(async () => (await settings.getAttribute("aria-expanded")) !== "true");
     });
 
+    it("delegates window chrome to the native platform outside macOS", async () => {
+        const chrome = await browser.execute(() => ({
+            platform: navigator.platform,
+            title: document.title,
+            hasAppDragRegion: Boolean(document.querySelector("header.drag-region")),
+            simulatedControls: [...document.querySelectorAll("button")]
+                .map((button) => button.getAttribute("aria-label"))
+                .filter((label) => /^(minimize|maximize|restore|close)$/i.test(label ?? "")),
+        }));
+
+        assert.match(chrome.platform, /Linux/i);
+        assert.equal(chrome.title, "mdtxt");
+        assert.equal(chrome.hasAppDragRegion, false);
+        assert.deepEqual(chrome.simulatedControls, []);
+    });
+
     it("exposes the approved workspace modes and keeps Live behind explicit opt-in", async () => {
         const newFile = await $("//button[contains(., '新建文件') or contains(., 'New File')]");
         await newFile.click();

@@ -5,6 +5,7 @@ import { SettingsMenu } from "./SettingsMenu";
 import { ExportMenu } from "./ExportMenu";
 import { ModeToggle, type ViewMode } from "./ModeToggle";
 import { useLocale } from "../context/LocaleContext";
+import { getDesktopPlatform } from "../utils/desktopPlatform";
 
 interface TitleBarProps {
     fileName?: string;
@@ -17,42 +18,25 @@ interface TitleBarProps {
     onExportError?: (format: string) => void;
     onToggleAI?: () => void;
     aiActive?: boolean;
-    isFullscreen?: boolean;
-    onToggleFullscreen?: () => void;
+    /** macOS hides traffic lights while in native fullscreen, so release the
+     * overlay safe area instead of leaving an empty gutter. */
+    isNativeFullscreen?: boolean;
     mode?: ViewMode;
     onSetMode?: (mode: ViewMode) => void;
     liveEnabled?: boolean;
 }
 
-function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getExportHtml, onExportSuccess, onExportError, onToggleAI, aiActive, isFullscreen, onToggleFullscreen, mode, onSetMode, liveEnabled }: TitleBarProps) {
+function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getExportHtml, onExportSuccess, onExportError, onToggleAI, aiActive, isNativeFullscreen, mode, onSetMode, liveEnabled }: TitleBarProps) {
     const { t } = useLocale();
-    const handleMinimize = async () => {
-        try {
-            const appWindow = Window.getCurrent();
-            await appWindow.minimize();
-        } catch (e) {
-            console.error("Minimize failed:", e);
-        }
-    };
-
-    const handleMaximize = async () => {
-        // While fullscreen, this button is the "exit fullscreen" control —
-        // toggling maximize underneath an active fullscreen is what produced
-        // the black-bar / stuck-taskbar state on Windows. Route it through the
-        // same fullscreen toggle (which also restores the prior maximize).
-        if (isFullscreen) {
-            onToggleFullscreen?.();
-            return;
-        }
-        try {
-            const appWindow = Window.getCurrent();
-            await appWindow.toggleMaximize();
-        } catch (e) {
-            console.error("Maximize failed:", e);
-        }
-    };
+    const desktopPlatform = getDesktopPlatform();
+    const isMacOverlay = desktopPlatform === "macos";
+    const showDocumentIdentity = desktopPlatform !== "windows" && desktopPlatform !== "linux";
 
     const handleTitleBarMouseDown = async (event: MouseEvent<HTMLElement>) => {
+        // Windows/Linux now delegate drag and double-click zoom to the native
+        // title bar. macOS Overlay still needs an HTML drag region beneath the
+        // native traffic lights.
+        if (!isMacOverlay) return;
         const target = event.target;
 
         if (
@@ -65,29 +49,15 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
 
         try {
             const appWindow = Window.getCurrent();
-            // Native title bars maximize on double-click; event.detail
-            // counts clicks within the double-click interval. While fullscreen
-            // a double-click exits it (same reason as the maximize button).
+            // Native macOS title bars zoom on double-click; event.detail
+            // counts clicks within the double-click interval.
             if (event.detail === 2) {
-                if (isFullscreen) onToggleFullscreen?.();
-                else await appWindow.toggleMaximize();
+                if (!isNativeFullscreen) await appWindow.toggleMaximize();
             } else {
                 await appWindow.startDragging();
             }
         } catch (e) {
             console.error("Window drag failed:", e);
-        }
-    };
-
-    // close() fires the Tauri close-requested event, which App intercepts when
-    // the buffer is dirty (CLOSE-01) — same code path as Alt+F4 and the
-    // taskbar close, so the unsaved-changes flow lives in exactly one place.
-    const handleCloseClick = async () => {
-        try {
-            const appWindow = Window.getCurrent();
-            await appWindow.close();
-        } catch (e) {
-            console.error("Close failed:", e);
         }
     };
 
@@ -108,14 +78,14 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
         <>
             <header
                 onMouseDown={handleTitleBarMouseDown}
-                className="h-11 shrink-0 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-3 bg-[var(--bg-titlebar)] border-b border-[var(--border)] no-select drag-region transition-colors"
+                className={`h-11 shrink-0 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-3 bg-[var(--bg-titlebar)] border-b border-[var(--border)] no-select transition-colors ${isMacOverlay ? "drag-region" : ""} ${isMacOverlay && !isNativeFullscreen ? "pl-20" : ""}`}
             >
                 {/* Left: Icon & Title */}
                 <div className="flex min-w-0 items-center gap-2 no-drag">
-                    {hasFile && <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                    {hasFile && showDocumentIdentity && <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                         <img src="/icon.png" alt="mdtxt" className="h-full w-full rounded-[5px] object-contain" />
                     </div>}
-                    {hasFile && <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-[var(--text-secondary)]">
+                    {hasFile && showDocumentIdentity && <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-[var(--text-secondary)]">
                         {parentFolder && (
                             <>
                                 <span className="opacity-60 hidden md:inline">{parentFolder} /</span>
@@ -179,38 +149,16 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                 </div>
 
                 <div className="flex items-center justify-center px-3">
-                    {!hasFile && <span className="text-[12px] font-medium tracking-tight text-[var(--text-primary)]">mdtxt</span>}
+                    {!hasFile && showDocumentIdentity && <span className="text-[12px] font-medium tracking-tight text-[var(--text-primary)]">mdtxt</span>}
                     {hasFile && mode && onSetMode && (
                         <ModeToggle mode={mode} onSetMode={onSetMode} liveEnabled={liveEnabled} />
                     )}
                 </div>
 
-                {/* Right: Settings & Window Controls */}
+                {/* Settings is an application command. Window controls belong
+                    to the platform title bar instead of being reimplemented. */}
                 <div className="flex items-center justify-self-end gap-0.5 no-drag">
                     <SettingsMenu />
-                    <div className="w-[1px] h-4 bg-[var(--border)] mx-1"></div>
-                    <button
-                        onClick={handleMinimize}
-                        aria-label={t("Minimize")}
-                        className="flex items-center justify-center w-7 h-7 rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">remove</span>
-                    </button>
-                    <button
-                        onClick={handleMaximize}
-                        aria-label={t(isFullscreen ? "Exit fullscreen" : "Maximize")}
-                        title={isFullscreen ? "Exit fullscreen (F11)" : "Maximize"}
-                        className="flex items-center justify-center w-7 h-7 rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-[16px]">{isFullscreen ? "fullscreen_exit" : "crop_square"}</span>
-                    </button>
-                    <button
-                        onClick={handleCloseClick}
-                        aria-label={t("Close")}
-                        className="flex items-center justify-center w-7 h-7 rounded-[var(--radius-sm)] hover:bg-[var(--danger)] text-[var(--text-secondary)] hover:text-[var(--accent-text)] transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">close</span>
-                    </button>
                 </div>
             </header>
         </>

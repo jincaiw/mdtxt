@@ -36,7 +36,7 @@ class LiveImageWidget extends WidgetType {
     }
 
     ignoreEvent() {
-        return true;
+        return false;
     }
 
     destroy() {
@@ -94,8 +94,7 @@ function imageDecorations(view: EditorView, filePath: string | null, locale: Liv
                 const alt = altEnd >= 2 ? source.slice(2, altEnd) : "";
                 const lineEnd = view.state.doc.lineAt(node.to).to;
                 widgets.push(Decoration.widget({
-                    widget: new LiveImageWidget(source, alt, path, baseDir, locale),
-                    side: 1,
+                    widget: new LiveImageWidget(source, alt, path, baseDir, locale), side: 1,
                 }).range(lineEnd));
             },
         });

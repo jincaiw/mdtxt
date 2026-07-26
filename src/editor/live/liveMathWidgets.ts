@@ -58,7 +58,7 @@ class LiveMathWidget extends WidgetType {
     }
 
     ignoreEvent() {
-        return true;
+        return false;
     }
 
     destroy() {

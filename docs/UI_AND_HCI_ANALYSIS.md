@@ -1,6 +1,6 @@
-# Paperling: Frontend UI & HCI (Human-Computer Interaction) Analysis
+# mdtxt: Frontend UI & HCI (Human-Computer Interaction) Analysis
 
-> Comprehensive analysis of UI design issues, accessibility gaps, interaction design flaws, and HCI improvements.
+> Historical upstream analysis retained for attribution; findings are re-evaluated against the mdtxt interface before action.
 
 ---
 

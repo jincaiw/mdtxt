@@ -41,7 +41,7 @@ class LiveFrontmatterWidget extends WidgetType {
     }
 
     ignoreEvent() {
-        return true;
+        return false;
     }
 }
 
@@ -65,8 +65,7 @@ function frontmatterDecorations(view: EditorView, locale: LiveLocale): Decoratio
     const parsed = parseFrontmatter(`${block.source}\n`);
     const entries = Object.entries(parsed.data);
     const widgets: Range<Decoration>[] = [Decoration.widget({
-        widget: new LiveFrontmatterWidget(block.source, entries, locale),
-        side: 1,
+        widget: new LiveFrontmatterWidget(block.source, entries, locale), side: 1,
     }).range(block.to)];
     return Decoration.set(widgets, true);
 }

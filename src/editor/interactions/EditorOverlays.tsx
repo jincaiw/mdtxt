@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { EditorView } from "@codemirror/view";
 import { applyEditorResult, toEditorActionState } from "../core/editorPresentation";
 import type { EditorResult, EditorState } from "../../utils/editorActions";
@@ -8,6 +8,7 @@ import { FormatToolbar } from "../../components/FormatToolbar";
 import { SlashMenu, type SlashCommand } from "../../components/SlashMenu";
 import { AIBubble } from "../../components/AIBubble";
 import { TableToolbar } from "../../components/TableToolbar";
+import { EDITOR_COMMAND_EVENT, runEditorCommand, type EditorCommandId } from "../commands/editorCommands";
 
 type AIBubbleState = { x: number; y: number; selStart: number; selEnd: number; text: string };
 type SlashState = { from: number; pos: { x: number; y: number } };
@@ -136,13 +137,33 @@ export function useEditorOverlays({
         const view = viewRef.current;
         if (view) { applyEditorResult(view, result); view.focus(); }
     }, [viewRef]);
-    const insertAtCaret = useCallback((text: string) => {
+    const runCommand = useCallback((command: EditorCommandId) => {
         const view = viewRef.current;
         if (!view) return;
-        const selection = view.state.selection.main;
-        view.dispatch({ changes: { from: selection.from, to: selection.to, insert: text }, selection: { anchor: selection.from + text.length } });
+        applyEditorResult(view, runEditorCommand(toEditorActionState(view), command));
         view.focus();
     }, [viewRef]);
+
+    // Native menu actions and browser-mode global shortcuts dispatch through
+    // this one editor boundary. It keeps the CodeMirror document, selection and
+    // undo history authoritative while every UI surface invokes the same command.
+    useEffect(() => {
+        const listener = (event: Event) => {
+            const command = (event as CustomEvent<EditorCommandId>).detail;
+            if (command) runCommand(command);
+        };
+        window.addEventListener(EDITOR_COMMAND_EVENT, listener);
+        return () => window.removeEventListener(EDITOR_COMMAND_EVENT, listener);
+    }, [runCommand]);
+    useEffect(() => {
+        const listener = (event: Event) => {
+            const mode = (event as CustomEvent<"find" | "replace">).detail;
+            const view = viewRef.current;
+            if (view && (mode === "find" || mode === "replace")) openFind(mode, view.state.selection.main.from);
+        };
+        window.addEventListener("mdtxt:editor-find", listener);
+        return () => window.removeEventListener("mdtxt:editor-find", listener);
+    }, [openFind, viewRef]);
     const handleSlashSelect = useCallback((command: SlashCommand) => {
         const view = viewRef.current;
         const current = slashStateRef.current;
@@ -163,7 +184,7 @@ export function useEditorOverlays({
     }, [viewRef]);
 
     const toolbar = showToolbar
-        ? <FormatToolbar getState={getState} apply={applyResult} insert={insertAtCaret} onAIAssist={aiEnabled ? openAIBubble : undefined} />
+        ? <FormatToolbar getState={getState} apply={applyResult} onAIAssist={aiEnabled ? openAIBubble : undefined} />
         : null;
     const floatingOverlays = (
         <>

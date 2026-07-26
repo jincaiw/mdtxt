@@ -10,9 +10,10 @@ This is a **real, editable document**. Nothing here is a screenshot: everything
 you see rendered on the right is produced from the markdown on the left. Poke at
 it, change things, and watch the preview update live.
 
-> Tip: press **Ctrl+E** to flip between Reader, Split and Code views. In Split
-> view you can edit and preview side by side, which is the best way to explore
-> this guide.
+> Tip: press **Ctrl/⌘+E** to flip between Reader, Split and Code views. Enable
+> **Live Beta** in Settings to try the source-preserving live document view; it
+> is optional and Source is always one shortcut away. In Split view you can edit
+> and preview side by side, which is the best way to explore this guide.
 
 Open the outline (the list icon in the bottom bar, **Ctrl+Shift+O**) to see every
 heading below turn into a clickable table of contents.
@@ -24,9 +25,9 @@ heading below turn into a clickable table of contents.
 You can write **bold**, *italic*, ***both***, ~~strikethrough~~ and `inline code`
 without ever touching the mouse. A few handy shortcuts:
 
-- **Ctrl+B**: bold the selection
-- **Ctrl+I**: italic the selection
-- **Ctrl+K**: turn the selection into a link
+- **Ctrl/⌘+B**: bold the selection
+- **Ctrl/⌘+I**: italic the selection
+- **Ctrl/⌘+K**: turn the selection into a link
 
 > Block quotes are great for asides, callouts and citations.
 
@@ -53,6 +54,7 @@ preview:
 | File explorer  | `Ctrl+Shift+E` | Browse the current folder      |
 | Outline        | `Ctrl+Shift+O` | Jump between headings          |
 | Global search  | `Ctrl+Shift+F` | Find text across your folder   |
+| Live Beta      | `Ctrl/⌘+Shift+L` | Toggle the opt-in live view |
 
 ## 4. Code with syntax highlighting
 

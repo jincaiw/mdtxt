@@ -23,7 +23,7 @@ class LiveFootnoteWidget extends WidgetType {
     }
 
     ignoreEvent() {
-        return true;
+        return false;
     }
 }
 
@@ -43,8 +43,7 @@ function footnoteDecorations(view: EditorView): DecorationSet {
                 const label = source.slice(2, labelEnd);
                 const note = source.slice(labelEnd + 2).trim();
                 widgets.push(Decoration.widget({
-                    widget: new LiveFootnoteWidget(source, label, note),
-                    side: 1,
+                    widget: new LiveFootnoteWidget(source, label, note), side: 1,
                 }).range(view.state.doc.lineAt(node.to).to));
             },
         });

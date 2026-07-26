@@ -41,7 +41,7 @@ class LiveTableWidget extends WidgetType {
     }
 
     ignoreEvent() {
-        return true;
+        return false;
     }
 }
 
@@ -57,8 +57,7 @@ function tableDecorations(view: EditorView): DecorationSet {
                 const source = view.state.doc.sliceString(node.from, node.to);
                 const model = parseTable(source.split("\n"));
                 widgets.push(Decoration.widget({
-                    widget: new LiveTableWidget(source, model),
-                    side: 1,
+                    widget: new LiveTableWidget(source, model), side: 1,
                 }).range(view.state.doc.lineAt(node.to).to));
             },
         });

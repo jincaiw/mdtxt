@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { EditorView } from "@codemirror/view";
 import { liveMarkdownDecorations, liveMarkdownPresentation, restrictedLiveMarkdownPresentation } from "./liveMarkdownPresentation";
 
 function decorationCount(state: EditorState): number {
@@ -38,5 +39,22 @@ describe("liveMarkdownPresentation", () => {
 
         expect(state.field(liveMarkdownDecorations, false)).toBeUndefined();
         expect(state.doc.toString()).toBe(source);
+    });
+
+    it("hides inactive common Markdown markers and restores them at the caret", () => {
+        const parent = document.createElement("div");
+        document.body.append(parent);
+        const view = new EditorView({
+            parent,
+            state: EditorState.create({
+                doc: "# heading\n\n**bold** and [link](https://example.com)\n",
+                extensions: [markdown({ base: markdownLanguage }), liveMarkdownPresentation],
+            }),
+        });
+        expect(view.contentDOM.textContent).not.toContain("**");
+        view.dispatch({ selection: { anchor: view.state.doc.toString().indexOf("bold") + 1 } });
+        expect(view.contentDOM.textContent).toContain("**bold**");
+        view.destroy();
+        parent.remove();
     });
 });

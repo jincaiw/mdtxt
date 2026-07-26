@@ -1,8 +1,8 @@
 import { useEffect, type RefObject } from "react";
 import { RangeSetBuilder, StateField, type Compartment, type EditorState, type Extension, type Range, type Transaction } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { resolveEditFocus } from "./editFocusResolver";
+import { rangeIntersectsEditFocus, resolveEditFocus } from "./editFocusResolver";
 import { liveImageWidgets } from "./liveImageWidgets";
 import { liveCodeWidgets } from "./liveCodeWidgets";
 import { liveFrontmatterWidgets } from "./liveFrontmatterWidgets";
@@ -33,6 +33,144 @@ const marks: Record<string, Decoration> = {
     Task: Decoration.mark({ class: "cm-live-task" }),
     TaskMarker: Decoration.mark({ class: "cm-live-task-marker" }),
 };
+
+const hiddenMarker = Decoration.replace({});
+
+class LiveRuleWidget extends WidgetType {
+    toDOM() {
+        const rule = document.createElement("hr");
+        rule.className = "cm-live-rule-widget";
+        rule.setAttribute("aria-label", "Horizontal rule");
+        return rule;
+    }
+    ignoreEvent() { return false; }
+}
+
+class LiveListMarkerWidget extends WidgetType {
+    constructor(private readonly source: string, private readonly task = false) { super(); }
+    eq(other: LiveListMarkerWidget) { return this.source === other.source && this.task === other.task; }
+    toDOM() {
+        const marker = document.createElement("span");
+        marker.className = this.task ? "cm-live-task-checkbox" : "cm-live-list-bullet";
+        marker.setAttribute("aria-hidden", "true");
+        if (this.task) marker.textContent = /x/i.test(this.source) ? "☑" : "☐";
+        else marker.textContent = /^\d+\./.test(this.source) ? this.source : "•";
+        return marker;
+    }
+    ignoreEvent() { return false; }
+}
+
+function addHidden(ranges: Range<Decoration>[], seen: Set<string>, from: number, to: number) {
+    if (to <= from) return;
+    const key = `${from}:${to}`;
+    if (!seen.has(key)) {
+        seen.add(key);
+        ranges.push(hiddenMarker.range(from, to));
+    }
+}
+
+/**
+ * Builds only viewport-local marker replacements. The permanent StateField
+ * retains syntax styling and incremental mapping; this plugin handles the
+ * Typora-like show-source-at-caret contract without rescanning a large file on
+ * every cursor move.
+ */
+function markerHidingDecorations(view: EditorView): DecorationSet {
+    const ranges: Range<Decoration>[] = [];
+    const seen = new Set<string>();
+    const focus = resolveEditFocus({
+        selections: view.state.selection.ranges.map((range) => ({ from: range.from, to: range.to })),
+        compositionStarted: view.compositionStarted,
+    });
+    if (!focus.canCollapseMarkers) return Decoration.none;
+    const source = view.state.doc;
+
+    const hideInlineDelimiters = (from: number, to: number, delimiter: string) => {
+        if (rangeIntersectsEditFocus({ from, to }, focus)) return;
+        const text = source.sliceString(from, to);
+        if (!text.startsWith(delimiter) || !text.endsWith(delimiter) || text.length <= delimiter.length * 2) return;
+        addHidden(ranges, seen, from, from + delimiter.length);
+        addHidden(ranges, seen, to - delimiter.length, to);
+    };
+
+    for (const visible of view.visibleRanges) {
+        syntaxTree(view.state).iterate({
+            from: visible.from,
+            to: visible.to,
+            enter(node) {
+                const focused = rangeIntersectsEditFocus({ from: node.from, to: node.to }, focus);
+                switch (node.name) {
+                    case "StrongEmphasis": hideInlineDelimiters(node.from, node.to, "**"); break;
+                    case "Strikethrough": hideInlineDelimiters(node.from, node.to, "~~"); break;
+                    case "Emphasis": {
+                        const text = source.sliceString(node.from, node.to);
+                        if (text.startsWith("*") || text.startsWith("_")) hideInlineDelimiters(node.from, node.to, text[0]);
+                        break;
+                    }
+                    case "InlineCode": {
+                        if (focused) break;
+                        const text = source.sliceString(node.from, node.to);
+                        const opening = text.match(/^`+/)?.[0];
+                        const closing = text.match(/`+$/)?.[0];
+                        if (opening && closing && opening === closing && text.length > opening.length * 2) {
+                            addHidden(ranges, seen, node.from, node.from + opening.length);
+                            addHidden(ranges, seen, node.to - closing.length, node.to);
+                        }
+                        break;
+                    }
+                    case "Link": {
+                        if (focused) break;
+                        const text = source.sliceString(node.from, node.to);
+                        const boundary = text.indexOf("](");
+                        if (text.startsWith("[") && boundary > 0 && text.endsWith(")")) {
+                            addHidden(ranges, seen, node.from, node.from + 1);
+                            addHidden(ranges, seen, node.from + boundary, node.to);
+                        }
+                        break;
+                    }
+                    case "ATXHeading1": case "ATXHeading2": case "ATXHeading3":
+                    case "ATXHeading4": case "ATXHeading5": case "ATXHeading6": {
+                        if (focused) break;
+                        const prefix = source.sliceString(node.from, node.to).match(/^#{1,6}\s+/)?.[0];
+                        if (prefix) addHidden(ranges, seen, node.from, node.from + prefix.length);
+                        break;
+                    }
+                    case "ListMark":
+                        if (!focused) ranges.push(Decoration.replace({ widget: new LiveListMarkerWidget(source.sliceString(node.from, node.to)) }).range(node.from, node.to));
+                        break;
+                    case "TaskMarker":
+                        if (!focused) ranges.push(Decoration.replace({ widget: new LiveListMarkerWidget(source.sliceString(node.from, node.to), true) }).range(node.from, node.to));
+                        break;
+                    case "Blockquote": {
+                        if (focused) break;
+                        const start = source.lineAt(node.from).number;
+                        const end = source.lineAt(node.to).number;
+                        for (let number = start; number <= end; number += 1) {
+                            const line = source.line(number);
+                            const prefix = line.text.match(/^\s*>\s?/)?.[0];
+                            if (prefix) addHidden(ranges, seen, line.from, line.from + prefix.length);
+                        }
+                        break;
+                    }
+                    case "HorizontalRule":
+                        if (!focused) ranges.push(Decoration.replace({ widget: new LiveRuleWidget() }).range(node.from, node.to));
+                        break;
+                }
+            },
+        });
+    }
+    return Decoration.set(ranges, true);
+}
+
+const liveMarkerHidingPlugin = ViewPlugin.fromClass(class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) { this.decorations = markerHidingDecorations(view); }
+    update(update: ViewUpdate) {
+        if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
+            this.decorations = markerHidingDecorations(update.view);
+        }
+    }
+}, { decorations: (plugin) => plugin.decorations });
 
 function decorationRanges(state: EditorState, from: number, to: number): readonly Range<Decoration>[] {
     const ranges: Range<Decoration>[] = [];
@@ -118,6 +256,9 @@ export const liveMarkdownTheme = EditorView.baseTheme({
     ".cm-live-quote": { color: "var(--text-secondary)" },
     ".cm-live-list-mark, .cm-live-task-marker": { color: "var(--accent)" },
     ".cm-live-rule": { color: "var(--border)", fontWeight: "700" },
+    ".cm-live-rule-widget": { border: "0", borderTop: "1px solid var(--border)", margin: "1.2rem 0", width: "100%" },
+    ".cm-live-list-bullet": { display: "inline-block", width: "1.2em", color: "var(--accent)", fontWeight: "750" },
+    ".cm-live-task-checkbox": { display: "inline-block", width: "1.2em", color: "var(--accent)", fontSize: "1.06em", lineHeight: "1" },
     ".cm-live-block-widget": {
         display: "flex", flexDirection: "column", alignItems: "center", gap: "0.35rem",
         width: "100%", margin: "0.65rem 0 0.25rem", padding: "0.65rem",
@@ -201,7 +342,7 @@ const liveRestrictedAttributes: Extension = [
     EditorView.editorAttributes.of({ "data-mdtxt-live": "restricted" }),
     EditorView.contentAttributes.of({ "data-mdtxt-live": "restricted" }),
 ];
-const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveEditFocusPlugin, liveMarkdownTheme];
+const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveMarkerHidingPlugin, liveEditFocusPlugin, liveMarkdownTheme];
 export function createLiveMarkdownPresentation(filePath: string | null, locale: LiveLocale = "zh-CN"): Extension {
     return [liveMarkdownBase, liveImageWidgets(filePath, locale), liveCodeWidgets(locale), liveFrontmatterWidgets(locale), liveTableWidgets, liveMathWidgets(locale), liveMermaidWidgets(locale), liveFootnoteWidgets, liveCalloutWidgets(locale), liveAttributes];
 }

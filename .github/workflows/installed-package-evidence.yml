@@ -43,7 +43,8 @@ jobs:
           test -n "$package"
           sha256sum "$package"
           sudo apt-get install -y "$package"
-          test "$(dpkg-query -W -f='${Version}' mdtxt)" = "0.1.0"
+          version="$(jq -r '.version' src-tauri/tauri.conf.json)"
+          test "$(dpkg-query -W -f='${Version}' mdtxt)" = "$version"
           test -x /usr/bin/mdtxt
 
       - name: Force-kill and restore two installed-package drafts
@@ -115,9 +116,12 @@ jobs:
           }
           if (-not $binary) { throw 'Installed production mdtxt.exe was not found.' }
           $version = (Get-Item $binary).VersionInfo.ProductVersion
-          if ($version -notlike '0.1.0*') { throw "Installed version is $version, expected 0.1.0." }
+          $expectedVersion = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($version -notlike "$expectedVersion*") { throw "Installed version is $version, expected $expectedVersion." }
+          $signature = Get-AuthenticodeSignature $binary
+          if ($signature.Status -ne 'NotSigned') { throw "Expected unsigned prerelease binary, got Authenticode status $($signature.Status)." }
           "MDTXT_E2E_BINARY=$binary" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Output "MDTXT_INSTALLED_BINARY path=$binary version=$version"
+          Write-Output "MDTXT_INSTALLED_BINARY path=$binary version=$version authenticode=$($signature.Status)"
 
       - name: Force-kill, restore, and validate denied-share UX
         run: bun scripts/windows-installed-recovery.mjs

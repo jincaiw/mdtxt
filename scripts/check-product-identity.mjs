@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 const expected = {
   name: "mdtxt",
-  version: "0.1.0",
   identifier: "app.mdtxt.desktop",
 };
 
@@ -29,14 +28,15 @@ const cargoPackage = /^name = "([^"]+)"/m.exec(cargo)?.[1];
 const cargoVersion = /^version = "([^"]+)"/m.exec(cargo)?.[1];
 const cargoLib = /\[lib\][\s\S]*?^name = "([^"]+)"/m.exec(cargo)?.[1];
 const failures = [];
+const expectedVersion = pkg.version;
 
 if (pkg.name !== expected.name) failures.push(`package name=${pkg.name}`);
-if (pkg.version !== expected.version) failures.push(`package version=${pkg.version}`);
+if (!/^0\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(expectedVersion)) failures.push(`package version=${expectedVersion}`);
 if (tauri.productName !== expected.name) failures.push(`productName=${tauri.productName}`);
-if (tauri.version !== expected.version) failures.push(`tauri version=${tauri.version}`);
+if (tauri.version !== expectedVersion) failures.push(`tauri version=${tauri.version}`);
 if (tauri.identifier !== expected.identifier) failures.push(`identifier=${tauri.identifier}`);
 if (cargoPackage !== expected.name) failures.push(`cargo package=${cargoPackage ?? "missing"}`);
-if (cargoVersion !== expected.version) failures.push(`cargo version=${cargoVersion ?? "missing"}`);
+if (cargoVersion !== expectedVersion) failures.push(`cargo version=${cargoVersion ?? "missing"}`);
 if (cargoLib !== "mdtxt_lib") failures.push(`cargo lib=${cargoLib ?? "missing"}`);
 if (tauri.plugins?.updater) failures.push("updater must be disabled until mdtxt has an owned endpoint");
 if (tauri.bundle?.createUpdaterArtifacts) failures.push("updater artifacts must be disabled without mdtxt signing keys");
@@ -63,4 +63,4 @@ if (failures.length) {
   throw new Error(`Product identity check failed: ${failures.join("; ")}`);
 }
 
-console.log(`Product identity passed: ${expected.name} v${expected.version} (${expected.identifier}).`);
+console.log(`Product identity passed: ${expected.name} v${expectedVersion} (${expected.identifier}).`);
