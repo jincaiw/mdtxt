@@ -118,7 +118,7 @@ function bridgeCall(command, args = {}, timeoutMs = 10_000) {
 // after restarting the app and switching the active TSF input service. This
 // only covers test-bridge transport; product performance assertions retain
 // their explicit 3–5 second limits below.
-const execute = (script, timeoutMs = 20_000) => bridgeCall("execute_js", { script }, timeoutMs);
+const execute = (script, timeoutMs = 45_000) => bridgeCall("execute_js", { script }, timeoutMs);
 
 async function waitForScript(script, description, timeoutMs = 20_000) {
     const deadline = Date.now() + timeoutMs;
