@@ -114,7 +114,11 @@ function bridgeCall(command, args = {}, timeoutMs = 10_000) {
     });
 }
 
-const execute = (script, timeoutMs) => bridgeCall("execute_js", { script }, timeoutMs);
+// WebView2 can take longer than the bridge's ten-second default immediately
+// after restarting the app and switching the active TSF input service. This
+// only covers test-bridge transport; product performance assertions retain
+// their explicit 3–5 second limits below.
+const execute = (script, timeoutMs = 20_000) => bridgeCall("execute_js", { script }, timeoutMs);
 
 async function waitForScript(script, description, timeoutMs = 20_000) {
     const deadline = Date.now() + timeoutMs;
