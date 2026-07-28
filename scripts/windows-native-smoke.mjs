@@ -604,13 +604,20 @@ async function run() {
     );
 
     sendNativeKeys("ControlZ");
-    await wait(200);
-    assert.equal((await execute("return document.querySelector('.cm-content')?.textContent ?? '';")).includes(sourceChinese), false);
+    // TSF composition commits reach CodeMirror's undo history asynchronously
+    // on WebView2. Observe the editor state rather than assuming the history
+    // transaction is visible after one fixed 200 ms delay.
+    await waitForScript(
+        `return !(document.querySelector('.cm-content')?.textContent ?? '').includes(${JSON.stringify(sourceChinese)});`,
+        "Microsoft Pinyin Source undo",
+    );
     // Ctrl+Y is the platform-native redo binding and avoids Microsoft Pinyin
     // treating the shifted character chord as a fresh text-service input.
     sendNativeKeys("ControlY");
-    await wait(200);
-    assert.equal((await execute("return document.querySelector('.cm-content')?.textContent ?? '';")).includes(sourceChinese), true);
+    await waitForScript(
+        `return (document.querySelector('.cm-content')?.textContent ?? '').includes(${JSON.stringify(sourceChinese)});`,
+        "Microsoft Pinyin Source redo",
+    );
 
     await execute(`
         const button = document.querySelector("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
