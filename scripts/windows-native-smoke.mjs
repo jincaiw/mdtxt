@@ -637,16 +637,18 @@ async function run() {
     await wait(500);
     sendNativeKeys("Space");
     await wait(500);
-    const liveText = await execute(`
+    const editorSnapshot = `
         const content = document.querySelector(".cm-content");
-        return content
-            ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
+        const document = content?.cmView?.view?.state.doc.toString();
+        return typeof document === "string"
+            ? {
+                  document,
+                  text: [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n"),
+              }
             : null;
-    `);
-    const liveDocument = await execute(`
-        const content = document.querySelector(".cm-content");
-        return content?.cmView?.view?.state.doc.toString() ?? null;
-    `);
+    `;
+    const liveSnapshot = await waitForScript(editorSnapshot, "Windows Live editor state");
+    const { text: liveText, document: liveDocument } = liveSnapshot;
     const liveChinese = liveText.match(/[\u3400-\u9fff]{2,}/gu) ?? [];
     assert.ok(liveChinese.length >= 2, `Live did not commit a second Chinese phrase: ${liveText}`);
 
@@ -655,16 +657,11 @@ async function run() {
     sendNativeKeys("Enter");
     sendNativeKeys("ControlV");
     await wait(300);
-    const copiedText = await execute(`
-        const content = document.querySelector(".cm-content");
-        return content
-            ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
-            : null;
-    `);
-    const copiedDocument = await execute(`
-        const content = document.querySelector(".cm-content");
-        return content?.cmView?.view?.state.doc.toString() ?? null;
-    `);
+    // Clipboard insertion can remount Live's CodeMirror view while WebView2
+    // reconnects its text-service context. Wait for a coherent source/text
+    // snapshot instead of reading a transient missing .cm-content node.
+    const copiedSnapshot = await waitForScript(editorSnapshot, "Windows Live editor after clipboard insertion");
+    const { text: copiedText, document: copiedDocument } = copiedSnapshot;
     assert.ok(copiedDocument.endsWith(liveDocument), "Microsoft Pinyin clipboard round trip changed the Markdown source");
 
     await execute(`
