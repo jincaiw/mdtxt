@@ -1,6 +1,6 @@
 # mdtxt packaging
 
-mdtxt v0.2.0 is a public unsigned prerelease. GitHub Releases provides the
+mdtxt v0.2.1 is a public unsigned GA release. GitHub Releases provides the
 supported installers and portable artifacts, but no package-manager manifest or
 automatic update channel is published yet.
 

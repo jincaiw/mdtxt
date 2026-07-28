@@ -4,7 +4,7 @@ mdtxt is a local-first Markdown editor. This roadmap is directional rather than
 a promise; the safety of local documents and a reliable native experience take
 priority over feature count.
 
-## Shipped in v0.2.0 preview
+## Shipped in v0.2.1
 
 - A single command model powers native menus, keyboard shortcuts, the command
   palette and editor formatting actions.
@@ -12,12 +12,14 @@ priority over feature count.
   original source, selection, undo history and Source fallback.
 - macOS uses native traffic lights in an Overlay title bar; Windows and Linux
   use their system title bars and window controls.
+- Recovered unsaved drafts keep full tab-keyboard reachability, including
+  direct tab selection and cycling shortcuts.
 
 ## Next
 
 - Gather broader Live Beta feedback before considering it as the default mode.
 - Add Developer ID signing/notarization for macOS and code signing for Windows
-  before any GA release or updater channel.
+  before any trusted installer or updater channel.
 - Improve accessible keyboard navigation and native-package installation
   coverage on supported desktop environments.
 
@@ -29,6 +31,7 @@ priority over feature count.
 
 ## Release policy
 
-Windows x64, Ubuntu LTS x64 and macOS Apple Silicon are the supported preview
-targets. Until mdtxt owns signing credentials and an update endpoint, releases
-remain unsigned prereleases and the in-app updater stays disabled.
+Windows x64, Ubuntu LTS x64 and macOS Apple Silicon are the supported targets.
+v0.2.1 is a GA release by product-owner decision, but it remains unsigned and
+the in-app updater stays disabled until mdtxt owns signing credentials and an
+update endpoint.

@@ -6,6 +6,20 @@ All notable mdtxt changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-28
+
+### Fixed
+
+- Restored unsaved drafts now remain reachable through the documented tab
+  shortcuts (Ctrl+1…9, Ctrl+Tab, Ctrl+PageUp/Down, and Alt+Left/Right) instead
+  of treating a missing file path as the absence of a tab.
+
+### Security
+
+- v0.2.1 is a GA release that remains unsigned: macOS uses ad-hoc
+  bundle-integrity signing, Windows packages are unsigned, and automatic
+  updates remain disabled.
+
 ## [0.2.0] - 2026-07-26
 
 ### Added

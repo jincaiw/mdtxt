@@ -47,9 +47,9 @@ jobs:
           notes_file="$(mktemp)"
           printf '%s\n' "$notes" > "$notes_file"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release edit "$tag" --draft --prerelease --title "mdtxt $tag" --notes-file "$notes_file"
+            gh release edit "$tag" --draft --title "mdtxt $tag" --notes-file "$notes_file"
           else
-            gh release create "$tag" --draft --prerelease --title "mdtxt $tag" --notes-file "$notes_file"
+            gh release create "$tag" --draft --title "mdtxt $tag" --notes-file "$notes_file"
           fi
           release_id="$(gh release view "$tag" --json databaseId --jq .databaseId)"
           {
@@ -110,10 +110,10 @@ jobs:
           releaseName: "mdtxt ${{ needs.metadata.outputs.tag }}"
           releaseBody: ${{ needs.metadata.outputs.notes }}
           args: ${{ matrix.args }}
-          # P11 must explicitly promote a verified release. Until then every
-          # generated package remains a draft beta, never an implied GA.
+          # P11 must explicitly promote a verified release. Generated packages
+          # remain drafts until the release verification step makes them public.
           releaseDraft: true
-          prerelease: true
+          prerelease: false
           # mdtxt owns neither an updater endpoint nor signing keys yet.
           includeUpdaterJson: false
       - name: Upload Windows x64 Portable executable
