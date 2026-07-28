@@ -120,8 +120,10 @@ function TabBarImpl({ tabs, activeId, onSelect, onClose, onNewTab, onReorder, on
                         onMouseDown={(e) => {
                             // Middle-click closes, like a browser.
                             if (e.button === 1) { e.preventDefault(); onClose(tab.id); }
-                            else if (e.button === 0) onSelect(tab.id);
                         }}
+                        // Use the platform activation event so mouse, keyboard and
+                        // assistive technologies all take the same selection path.
+                        onClick={() => onSelect(tab.id)}
                         onContextMenu={(e) => {
                             if (!onContextMenu) return;
                             e.preventDefault();
