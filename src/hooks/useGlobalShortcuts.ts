@@ -214,7 +214,11 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
             }
         };
 
-        window.addEventListener("keydown", handleKeyDown);
+        // Register in capture phase: CodeMirror consumes Alt+Arrow for cursor
+        // navigation during its bubbling handler, but Alt+Left/Right are also
+        // documented app-wide tab commands. Capturing keeps native WebView2
+        // editor focus from making those shortcuts silently unavailable.
+        window.addEventListener("keydown", handleKeyDown, { capture: true });
 
         // Defense-in-depth for Ctrl+J: Edge/Chrome/WebView2 treat Ctrl+J as a
         // "browser accelerator" for Downloads. On WebView2 (Windows) the page
@@ -231,7 +235,7 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
         window.addEventListener("keydown", blockCtrlJ, { capture: true });
 
         return () => {
-            window.removeEventListener("keydown", handleKeyDown);
+            window.removeEventListener("keydown", handleKeyDown, { capture: true } as EventListenerOptions);
             window.removeEventListener("keydown", blockCtrlJ, { capture: true } as EventListenerOptions);
         };
     }, []);
