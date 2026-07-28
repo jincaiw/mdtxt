@@ -17,6 +17,7 @@ const powershell = resolve(process.env.SystemRoot ?? "C:\\Windows", "System32", 
 const inputScript = resolve(root, "scripts", "windows-send-input.ps1");
 const uiaScript = resolve(root, "scripts", "windows-uia-wait.ps1");
 const uiaInvokeScript = resolve(root, "scripts", "windows-uia-invoke.ps1");
+const uiaFocusTabScript = resolve(root, "scripts", "windows-uia-focus-tab.ps1");
 const captureScript = resolve(root, "scripts", "windows-capture-screen.ps1");
 const recoveryScreenshot = resolve(process.env.RUNNER_TEMP ?? tmpdir(), "mdtxt-windows-installed-recovery.png");
 const deniedScreenshot = resolve(process.env.RUNNER_TEMP ?? tmpdir(), "mdtxt-windows-denied-share.png");
@@ -59,6 +60,15 @@ function invokeUi(pattern, timeoutSeconds = 30) {
     const output = runPowerShell(uiaInvokeScript, [
         "-TargetProcessId", String(application.pid),
         "-Pattern", pattern,
+        "-TimeoutSeconds", String(timeoutSeconds),
+    ]);
+    console.log(output);
+}
+
+function focusUiTab(index, timeoutSeconds = 30) {
+    const output = runPowerShell(uiaFocusTabScript, [
+        "-TargetProcessId", String(application.pid),
+        "-Index", String(index),
         "-TimeoutSeconds", String(timeoutSeconds),
     ]);
     console.log(output);
@@ -179,14 +189,15 @@ async function run() {
     await wait(1_000);
     send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
-    // WebView2 reserves browser-history and Ctrl+Tab chords. Ctrl+PageUp is
-    // the documented tab-cycle alias and is also registered by the native
-    // Window menu, so the packaged app receives it before editor handling.
-    send({ keys: ["ControlPageUp"] });
+    // Validate the guaranteed keyboard path: focus the first accessible tab
+    // through UI Automation, then activate it with the same Enter key handled
+    // by TabBar's roving-tabindex implementation.
+    focusUiTab(0);
+    send({ keys: ["Enter"] });
     await wait(500);
     assert.equal(readEditorThroughClipboard(), firstText);
     capture(recoveryScreenshot);
-    console.log(`MDTXT_INSTALLED_RECOVERY platform=windows binary=${binary} signal=taskkill-F drafts=2 order=passed activeTab=second cursorLine=5 content=passed originalOverwrite=impossible deniedShareUx=passed recoveryScreenshot=${recoveryScreenshot} deniedScreenshot=${deniedScreenshot}`);
+    console.log(`MDTXT_INSTALLED_RECOVERY platform=windows binary=${binary} signal=taskkill-F drafts=2 order=passed activeTab=second cursorLine=5 content=passed keyboardTabSelection=passed originalOverwrite=impossible deniedShareUx=passed recoveryScreenshot=${recoveryScreenshot} deniedScreenshot=${deniedScreenshot}`);
 }
 
 try {

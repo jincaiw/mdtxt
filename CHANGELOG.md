@@ -10,9 +10,10 @@ All notable mdtxt changes are documented here. The format follows
 
 ### Fixed
 
-- Windows packaged apps now route the documented `Ctrl+PageUp/PageDown`
-  tab-cycle shortcuts through native menu accelerators, avoiding WebView2's
-  reserved browser-history and `Ctrl+Tab` key paths.
+- Recovered drafts on Windows now have a package-level keyboard regression for
+  the accessible tab bar's focus-and-Enter path; previous/next tab commands are
+  also available from the native Window menu without relying on WebView2's
+  reserved browser shortcut paths.
 
 ## [0.2.2] - 2026-07-28
 

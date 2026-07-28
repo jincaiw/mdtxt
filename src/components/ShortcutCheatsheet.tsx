@@ -44,7 +44,6 @@ const groups: ShortcutGroup[] = [
             { keys: `${cmd}+Shift+T`, description: "Reopen closed tab" },
             { keys: `${cmd}+Tab`, description: "Next tab" },
             { keys: `${cmd}+Shift+Tab`, description: "Previous tab" },
-            { keys: `${cmd}+PageUp/PageDown`, description: "Previous / next tab" },
             { keys: "Alt+←/→", description: "Previous / next tab" },
             { keys: `${cmd}+1-8`, description: "Jump to tab N" },
             { keys: `${cmd}+9`, description: "Jump to last tab" },
