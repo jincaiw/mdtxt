@@ -11,6 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName System.Windows.Forms
 
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 while ([DateTime]::UtcNow -lt $deadline) {
@@ -43,6 +44,14 @@ while ([DateTime]::UtcNow -lt $deadline) {
           Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=selection-item"
           exit 0
         }
+        # WebView2 does not consistently expose an invokable pattern for an
+        # ARIA tab. Keep focus and activation in this process so another
+        # SendInput process cannot move focus back to the top-level window.
+        $tab.SetFocus()
+        Start-Sleep -Milliseconds 100
+        [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+        Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=focus-enter"
+        exit 0
       }
     } catch {
       # React/WebView2 may replace the accessibility node while recovery mounts.
