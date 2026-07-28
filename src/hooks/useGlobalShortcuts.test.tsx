@@ -107,9 +107,10 @@ describe("useGlobalShortcuts gating", () => {
         render(<Harness handlers={h} />);
         press({ key: "1", ctrlKey: true });
         press({ key: "Tab", ctrlKey: true, shiftKey: true });
+        press({ key: "PageUp", ctrlKey: true });
         press({ key: "PageDown", ctrlKey: true });
         expect(h.gotoTab).toHaveBeenCalledWith(0);
-        expect(h.prevTab).toHaveBeenCalledTimes(1);
+        expect(h.prevTab).toHaveBeenCalledTimes(2);
         expect(h.nextTab).toHaveBeenCalledTimes(1);
     });
 

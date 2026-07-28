@@ -10,9 +10,9 @@ All notable mdtxt changes are documented here. The format follows
 
 ### Fixed
 
-- Windows packaged apps now route the documented `Alt+Left/Right` tab-cycle
-  shortcuts through native menu accelerators, before WebView2 can reserve the
-  keys as browser history navigation.
+- Windows packaged apps now route the documented `Ctrl+PageUp/PageDown`
+  tab-cycle shortcuts through native menu accelerators, avoiding WebView2's
+  reserved browser-history and `Ctrl+Tab` key paths.
 
 ## [0.2.2] - 2026-07-28
 

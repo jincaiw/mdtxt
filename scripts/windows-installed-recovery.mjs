@@ -179,10 +179,10 @@ async function run() {
     await wait(1_000);
     send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
-    // WebView2 reserves browser-navigation chords before the renderer can see
-    // them. The native Window menu owns Alt+Left and dispatches the same tab
-    // command before WebView2 can consume it.
-    send({ keys: ["AltLeft"] });
+    // WebView2 reserves browser-history and Ctrl+Tab chords. Ctrl+PageUp is
+    // the documented tab-cycle alias and is also registered by the native
+    // Window menu, so the packaged app receives it before editor handling.
+    send({ keys: ["ControlPageUp"] });
     await wait(500);
     assert.equal(readEditorThroughClipboard(), firstText);
     capture(recoveryScreenshot);
