@@ -179,9 +179,10 @@ async function run() {
     await wait(1_000);
     send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
-    // Ctrl+1 is mdtxt's direct first-tab shortcut and avoids relying on the
-    // embedded WebView's browser-style Ctrl+Shift+Tab routing.
-    send({ keys: ["Control1"] });
+    // Use the documented Ctrl+Shift+Tab cycle. WebView2 reliably forwards
+    // this chord to the app, whereas Ctrl+digit can be retained by the host
+    // accelerator layer before the renderer sees it.
+    send({ keys: ["ControlShiftTab"] });
     await wait(500);
     assert.equal(readEditorThroughClipboard(), firstText);
     capture(recoveryScreenshot);

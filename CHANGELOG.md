@@ -6,6 +6,13 @@ All notable mdtxt changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-07-28
+
+### Fixed
+
+- Windows installed-package recovery evidence now verifies restored draft tab
+  cycling through the WebView2-safe documented `Ctrl+Shift+Tab` shortcut.
+
 ## [0.2.1] - 2026-07-28
 
 ### Fixed
