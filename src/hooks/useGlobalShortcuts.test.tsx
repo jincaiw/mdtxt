@@ -102,6 +102,17 @@ describe("useGlobalShortcuts gating", () => {
         expect(h.handleSaveFile).not.toHaveBeenCalled();
     });
 
+    it("switches recovered unsaved tabs without a file path", () => {
+        const h = makeHandlers({ hasFile: false, content: "", gotoTab: vi.fn(), prevTab: vi.fn(), nextTab: vi.fn() });
+        render(<Harness handlers={h} />);
+        press({ key: "1", ctrlKey: true });
+        press({ key: "Tab", ctrlKey: true, shiftKey: true });
+        press({ key: "PageDown", ctrlKey: true });
+        expect(h.gotoTab).toHaveBeenCalledWith(0);
+        expect(h.prevTab).toHaveBeenCalledTimes(1);
+        expect(h.nextTab).toHaveBeenCalledTimes(1);
+    });
+
     it("Ctrl+F opens preview find only in reader mode", () => {
         const h = makeHandlers({ mode: "preview", openPreviewFind: vi.fn() });
         render(<Harness handlers={h} />);

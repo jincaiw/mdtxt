@@ -146,29 +146,29 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
             // editor. TABS-01.
             if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key === "ArrowLeft") {
                 e.preventDefault();
-                if (s.hasFile) s.prevTab?.();
+                s.prevTab?.();
                 return;
             }
             if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key === "ArrowRight") {
                 e.preventDefault();
-                if (s.hasFile) s.nextTab?.();
+                s.nextTab?.();
                 return;
             }
             // Ctrl+Tab / Ctrl+Shift+Tab - cycle tabs (the browser/VS Code pair),
             // and Ctrl+PageDown / Ctrl+PageUp as the other common alias. TABS-16.
             if (e.ctrlKey && !e.altKey && !e.metaKey && e.key === "Tab") {
                 e.preventDefault();
-                if (s.hasFile) (e.shiftKey ? s.prevTab : s.nextTab)?.();
+                (e.shiftKey ? s.prevTab : s.nextTab)?.();
                 return;
             }
             if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && e.key === "PageDown") {
                 e.preventDefault();
-                if (s.hasFile) s.nextTab?.();
+                s.nextTab?.();
                 return;
             }
             if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && e.key === "PageUp") {
                 e.preventDefault();
-                if (s.hasFile) s.prevTab?.();
+                s.prevTab?.();
                 return;
             }
             // Ctrl+Shift+T - reopen the most recently closed tab. TABS-15.
@@ -180,7 +180,7 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
             // Ctrl+1..9 - jump to tab N (Ctrl+9 = last tab, like browsers). TABS-16.
             if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && e.key >= "1" && e.key <= "9") {
                 e.preventDefault();
-                if (s.hasFile) s.gotoTab?.(e.key === "9" ? -1 : Number(e.key) - 1);
+                s.gotoTab?.(e.key === "9" ? -1 : Number(e.key) - 1);
                 return;
             }
             // ? - Show cheatsheet (only when no input is focused)
