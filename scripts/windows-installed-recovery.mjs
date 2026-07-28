@@ -179,10 +179,10 @@ async function run() {
     await wait(1_000);
     send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
-    // Use the documented Ctrl+Shift+Tab cycle. WebView2 reliably forwards
-    // this chord to the app, whereas Ctrl+digit can be retained by the host
-    // accelerator layer before the renderer sees it.
-    send({ keys: ["ControlShiftTab"] });
+    // WebView2 reserves Ctrl+Tab-family chords before the renderer can see
+    // them. Alt+Left is the documented Windows tab-cycle shortcut and reaches
+    // the app reliably in a packaged WebView2 host.
+    send({ keys: ["AltLeft"] });
     await wait(500);
     assert.equal(readEditorThroughClipboard(), firstText);
     capture(recoveryScreenshot);

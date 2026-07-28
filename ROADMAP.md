@@ -4,7 +4,7 @@ mdtxt is a local-first Markdown editor. This roadmap is directional rather than
 a promise; the safety of local documents and a reliable native experience take
 priority over feature count.
 
-## Shipped in v0.2.2
+## Shipped in v0.2.3
 
 - A single command model powers native menus, keyboard shortcuts, the command
   palette and editor formatting actions.
@@ -32,6 +32,6 @@ priority over feature count.
 ## Release policy
 
 Windows x64, Ubuntu LTS x64 and macOS Apple Silicon are the supported targets.
-v0.2.2 is a GA release by product-owner decision, but it remains unsigned and
+v0.2.3 is a GA release by product-owner decision, but it remains unsigned and
 the in-app updater stays disabled until mdtxt owns signing credentials and an
 update endpoint.

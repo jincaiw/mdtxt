@@ -6,12 +6,20 @@ All notable mdtxt changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-07-28
+
+### Fixed
+
+- Windows packaged-app recovery now proves restored draft navigation through
+  `Alt+Left`, the documented tab-cycle shortcut that WebView2 forwards to the
+  renderer instead of reserving at the host layer.
+
 ## [0.2.2] - 2026-07-28
 
 ### Fixed
 
-- Windows installed-package recovery evidence now verifies restored draft tab
-  cycling through the WebView2-safe documented `Ctrl+Shift+Tab` shortcut.
+- Release candidate retained as an unpublished draft after its Windows
+  installed-package shortcut verification did not pass.
 
 ## [0.2.1] - 2026-07-28
 
