@@ -114,8 +114,12 @@ export function useNativeMenu({ state, commands, translate }: NativeMenuOptions)
                     await item("ai.assist", "AI assist on selection", isMac ? "Cmd+J" : "Alt+J", state.hasDocument && state.aiEnabled),
                 ] });
                 const windowMenu = await Submenu.new({ text: translate("Window"), items: [
-                    await item("tab.previous", "Previous tab", isMac ? undefined : "Ctrl+PageUp", state.hasDocument),
-                    await item("tab.next", "Next tab", isMac ? undefined : "Ctrl+PageDown", state.hasDocument),
+                    // Keep tab-cycle accelerators registered even on the
+                    // welcome screen. Their handlers safely no-op with no tabs,
+                    // and this avoids a disabled-menu race while crash-recovery
+                    // tabs are mounted and the native menu is rebuilt.
+                    await item("tab.previous", "Previous tab", isMac ? undefined : "Ctrl+PageUp"),
+                    await item("tab.next", "Next tab", isMac ? undefined : "Ctrl+PageDown"),
                     await separator(),
                     await PredefinedMenuItem.new({ item: "Minimize" }), await PredefinedMenuItem.new({ item: "Maximize" }),
                     await PredefinedMenuItem.new({ item: "Fullscreen" }), await PredefinedMenuItem.new({ item: "CloseWindow" }),
