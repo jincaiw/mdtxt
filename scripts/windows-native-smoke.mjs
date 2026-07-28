@@ -646,10 +646,10 @@ async function run() {
     await wait(500);
     const editorSnapshot = `
         const content = document.querySelector(".cm-content");
-        const document = content?.cmView?.view?.state.doc.toString();
-        return typeof document === "string"
+        const markdown = content?.cmView?.view?.state.doc.toString();
+        return typeof markdown === "string"
             ? {
-                  document,
+                  document: markdown,
                   text: [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n"),
               }
             : null;
