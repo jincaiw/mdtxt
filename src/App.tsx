@@ -1878,6 +1878,8 @@ function AppContent() {
       "file.copyPath": () => { if (filePath) void navigator.clipboard.writeText(filePath).then(() => showToast(tr("File path copied"), "success"), () => showToast(tr("Could not copy path"), "error")); },
       "file.stats": () => setShowStats(true),
       "tab.close": () => { if (activeTabIdRef.current) closeTab(activeTabIdRef.current); },
+      "tab.previous": () => cycleTab(-1),
+      "tab.next": () => cycleTab(1),
       "export.html": exportDocument("html"), "export.pdf": exportDocument("pdf"), "export.docx": exportDocument("docx"),
       "editor.find": () => window.dispatchEvent(new CustomEvent("mdtxt:editor-find", { detail: "find" })),
       "editor.replace": () => window.dispatchEvent(new CustomEvent("mdtxt:editor-find", { detail: "replace" })),
@@ -1896,7 +1898,7 @@ function AppContent() {
       "format.orderedList": editor("format.orderedList"), "format.taskList": editor("format.taskList"), "format.blockquote": editor("format.blockquote"),
       "insert.codeBlock": editor("insert.codeBlock"), "insert.table": editor("insert.table"), "insert.rule": editor("insert.rule"),
     };
-  }, [closeTab, filePath, handleNewFile, handleOpenFile, handleOpenTutorial, handleSaveAs, handleSaveFile, handleToggleFileExplorer, handleToggleTOC, hasFile, setMode, showToast, toggleFullscreen, tr]);
+  }, [closeTab, cycleTab, filePath, handleNewFile, handleOpenFile, handleOpenTutorial, handleSaveAs, handleSaveFile, handleToggleFileExplorer, handleToggleTOC, hasFile, setMode, showToast, toggleFullscreen, tr]);
 
   const nativeMenuState = useMemo(() => ({
     hasDocument: hasFile,

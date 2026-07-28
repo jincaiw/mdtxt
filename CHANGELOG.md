@@ -10,9 +10,9 @@ All notable mdtxt changes are documented here. The format follows
 
 ### Fixed
 
-- Windows packaged-app recovery now proves restored draft navigation through
-  `Alt+Left`, the documented tab-cycle shortcut that WebView2 forwards to the
-  renderer instead of reserving at the host layer.
+- Windows packaged apps now route the documented `Alt+Left/Right` tab-cycle
+  shortcuts through native menu accelerators, before WebView2 can reserve the
+  keys as browser history navigation.
 
 ## [0.2.2] - 2026-07-28
 

@@ -179,9 +179,9 @@ async function run() {
     await wait(1_000);
     send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
-    // WebView2 reserves Ctrl+Tab-family chords before the renderer can see
-    // them. Alt+Left is the documented Windows tab-cycle shortcut and reaches
-    // the app reliably in a packaged WebView2 host.
+    // WebView2 reserves browser-navigation chords before the renderer can see
+    // them. The native Window menu owns Alt+Left and dispatches the same tab
+    // command before WebView2 can consume it.
     send({ keys: ["AltLeft"] });
     await wait(500);
     assert.equal(readEditorThroughClipboard(), firstText);
