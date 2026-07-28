@@ -172,7 +172,10 @@ async function run() {
 
     await launch();
     waitForUi("Restore all|全部恢复|Restore latest session|恢复最新会话");
-    send({ keys: ["Enter"] });
+    // The default button can be "Restore latest session". Explicitly invoke
+    // Restore all so this installed-package smoke verifies both recovered
+    // drafts instead of depending on platform button focus order.
+    invokeUi("Restore all|全部恢复");
     await wait(1_000);
     send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
