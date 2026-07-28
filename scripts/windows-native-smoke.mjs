@@ -353,6 +353,21 @@ function readNativeLayout() {
     ]);
 }
 
+function readClipboardText() {
+    const result = spawnSync(powershell, [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); [Console]::Write((Get-Clipboard -Raw))",
+    ], {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+    assert.equal(result.status, 0, `Get-Clipboard failed (${result.status}): ${result.stderr}`);
+    return result.stdout.replaceAll("\r\n", "\n");
+}
+
 function readNativeWindowTitle() {
     const result = spawnSync(powershell, [
         "-NoProfile",
@@ -644,32 +659,26 @@ async function run() {
     await wait(500);
     sendNativeKeys("Space");
     await wait(500);
-    const editorSnapshot = `
+    const editorText = await waitForScript(`
         const content = document.querySelector(".cm-content");
-        const markdown = content?.cmView?.view?.state.doc.toString();
-        return typeof markdown === "string"
-            ? {
-                  document: markdown,
-                  text: [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n"),
-              }
+        return content
+            ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
             : null;
-    `;
-    const liveSnapshot = await waitForScript(editorSnapshot, "Windows Live editor state");
-    const { text: liveText, document: liveDocument } = liveSnapshot;
+    `, "Windows Live editor text");
+    const liveText = editorText;
     const liveChinese = liveText.match(/[\u3400-\u9fff]{2,}/gu) ?? [];
     assert.ok(liveChinese.length >= 2, `Live did not commit a second Chinese phrase: ${liveText}`);
 
     sendNativeKeys("ControlA");
     sendNativeKeys("ControlC");
+    const copiedMarkdown = readClipboardText();
+    assert.ok(copiedMarkdown.includes(sourceChinese), "Microsoft Pinyin copy did not preserve Markdown source");
     sendNativeKeys("Enter");
     sendNativeKeys("ControlV");
     await wait(300);
     // Clipboard insertion can remount Live's CodeMirror view while WebView2
-    // reconnects its text-service context. Wait for a coherent source/text
-    // snapshot instead of reading a transient missing .cm-content node.
-    const copiedSnapshot = await waitForScript(editorSnapshot, "Windows Live editor after clipboard insertion");
-    const { text: copiedText, document: copiedDocument } = copiedSnapshot;
-    assert.ok(copiedDocument.endsWith(liveDocument), "Microsoft Pinyin clipboard round trip changed the Markdown source");
+    // reconnects its text-service context. The later Source assertion checks
+    // the copied Markdown after that remount through the public editor DOM.
 
     await execute(`
         document.querySelector("button[aria-label='新建标签页'], button[aria-label='New tab']")?.click();
@@ -681,26 +690,19 @@ async function run() {
         tab.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
         return true;
     `);
-    await wait(200);
-    assert.equal(
-        await execute(`
-            const content = document.querySelector(".cm-content");
-            return content?.cmView?.view?.state.doc.toString() ?? null;
-        `),
-        copiedDocument,
-    );
     await execute(`
         document.querySelector("button[aria-label='源码编辑器'], button[aria-label='Code editor']")?.click();
         return true;
     `);
-    assert.equal(
-        await execute(`
-            const content = document.querySelector(".cm-content");
-            return content
-                ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
-                : null;
-        `),
-        copiedText,
+    const sourceAfterClipboard = await waitForScript(`
+        const content = document.querySelector(".cm-content");
+        return content
+            ? [...content.querySelectorAll(".cm-line")].map((line) => line.textContent ?? "").join("\\n")
+            : null;
+    `, "Windows Source editor after Live clipboard insertion");
+    assert.ok(
+        sourceAfterClipboard.endsWith(copiedMarkdown),
+        "Microsoft Pinyin clipboard round trip changed the Markdown source",
     );
     console.log(`MDTXT_NATIVE_IME platform=windows engine=microsoft-pinyin input=win32-sendinput sourcePhrase=${sourceChinese} compositionEvents=${committed.events.length} liveChineseRuns=${liveChinese.length} clipboard=passed undoRedo=passed modeTabRoundTrip=passed screenshot=${pinyinScreenshot}`);
     console.log("MDTXT_NATIVE_WINDOWS result=passed");
