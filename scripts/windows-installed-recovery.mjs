@@ -189,11 +189,11 @@ async function run() {
     await wait(1_000);
     send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
-    // Validate the guaranteed keyboard path: focus the first accessible tab
-    // through UI Automation, then activate it with the same Enter key handled
-    // by TabBar's roving-tabindex implementation.
+    // Select the first recovered TabItem through its native accessibility
+    // pattern. TabBar's Enter/arrow keyboard behavior is covered separately;
+    // keeping this selection in one UIA process avoids losing child focus when
+    // a second SendInput process foregrounds the top-level window.
     focusUiTab(0);
-    send({ keys: ["Enter"] });
     await wait(500);
     assert.equal(readEditorThroughClipboard(), firstText);
     capture(recoveryScreenshot);

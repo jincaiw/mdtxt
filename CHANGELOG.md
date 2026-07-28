@@ -10,10 +10,10 @@ All notable mdtxt changes are documented here. The format follows
 
 ### Fixed
 
-- Recovered drafts on Windows now have a package-level keyboard regression for
-  the accessible tab bar's focus-and-Enter path; previous/next tab commands are
-  also available from the native Window menu without relying on WebView2's
-  reserved browser shortcut paths.
+- Recovered drafts on Windows now have package-level accessibility selection
+  coverage for every restored tab; keyboard focus/Enter behavior remains
+  covered at the TabBar boundary, and previous/next tab commands are available
+  from the native Window menu without WebView2-reserved shortcut paths.
 
 ## [0.2.2] - 2026-07-28
 

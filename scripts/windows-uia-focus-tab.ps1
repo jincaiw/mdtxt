@@ -25,9 +25,18 @@ while ([DateTime]::UtcNow -lt $deadline) {
       $tabs = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
       if ($tabs.Count -gt $Index) {
         $tab = $tabs.Item($Index)
-        $tab.SetFocus()
-        Write-Output "MDTXT_UIA_FOCUS_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name)"
-        exit 0
+        $selection = $null
+        if ($tab.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) {
+          $selection.Select()
+          Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=selection-item"
+          exit 0
+        }
+        $legacy = $null
+        if ($tab.TryGetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern, [ref]$legacy)) {
+          $legacy.DoDefaultAction()
+          Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=legacy"
+          exit 0
+        }
       }
     } catch {
       # React/WebView2 may replace the accessibility node while recovery mounts.
@@ -36,4 +45,4 @@ while ([DateTime]::UtcNow -lt $deadline) {
   Start-Sleep -Milliseconds 200
 }
 
-throw "Timed out waiting to focus tab index $Index."
+throw "Timed out waiting to select tab index $Index."
