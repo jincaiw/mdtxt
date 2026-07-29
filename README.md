@@ -8,7 +8,7 @@ mdtxt 直接打开 Markdown 文件，提供默认 Live、源码、阅读和分�
 
 ## 当前状态
 
-`0.4.2` 是下一正式版本。mdtxt 使用独立应用标识
+`0.4.3` 是下一正式版本。mdtxt 使用独立应用标识
 `app.mdtxt.desktop`，可与 Paperling 并存。自动更新在 mdtxt 拥有签名密钥和
 更新端点前保持关闭，绝不会访问上游更新通道。
 
@@ -45,7 +45,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 ## 发布
 
-v0.4.2 通过 mdtxt 专属仓库提供 macOS、Windows x64 与 Ubuntu LTS x64 正式包，
+v0.4.3 通过 mdtxt 专属仓库提供 macOS、Windows x64 与 Ubuntu LTS x64 正式包，
 并附统一校验和、SPDX SBOM 与第三方许可证清单。所有文件名均带 `-unsigned`，
 不包含 macOS 签名/公证或 Windows Authenticode 签名；自动更新保持关闭。详见
 [发布流程](docs/RELEASE_PROCESS.md)和[隐私说明](docs/PRIVACY.md)。

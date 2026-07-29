@@ -6,6 +6,11 @@ All notable mdtxt changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-07-30
+
+- Fixed macOS unsigned packaging by omitting the empty signing-identity
+  environment variable, so Tauri does not invoke `codesign`.
+
 ## [0.4.2] - 2026-07-30
 
 - Release every platform package as a plainly named `-unsigned` artifact; the
