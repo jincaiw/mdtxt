@@ -70,7 +70,7 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
-            args: "--target x86_64-pc-windows-msvc"
+            args: "--target x86_64-pc-windows-msvc --bundles msi,nsis"
             portable: true
           - platform: ubuntu-24.04
             # Ship the native Debian installer plus a portable AppImage. RPM is
@@ -79,7 +79,7 @@ jobs:
             args: "--bundles deb,appimage"
             portable: false
           - platform: macos-latest
-            args: ""
+            args: "--bundles dmg"
             portable: false
     runs-on: ${{ matrix.platform }}
     steps:
@@ -100,23 +100,15 @@ jobs:
         with:
           bun-version: 1.3.14
       - run: bun install --frozen-lockfile
-      - name: Build and upload installers
-        uses: tauri-apps/tauri-action@v0
+      # This release lane is deliberately unsigned. Do not add certificate,
+      # notarization, codesign, notarytool, signtool, or signing-service steps
+      # without replacing this policy and obtaining the required credentials.
+      - name: Build unsigned packages
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tauriScript: bun run tauri
-          tagName: ${{ needs.metadata.outputs.tag }}
-          releaseName: "mdtxt ${{ needs.metadata.outputs.tag }}"
-          releaseBody: ${{ needs.metadata.outputs.notes }}
-          args: ${{ matrix.args }}
-          # P11 must explicitly promote a verified release. Generated packages
-          # remain drafts until the release verification step makes them public.
-          releaseDraft: true
-          prerelease: false
-          # mdtxt owns neither an updater endpoint nor signing keys yet.
-          includeUpdaterJson: false
-      - name: Upload Windows x64 Portable executable
+          # Prevent a runner keychain identity from being selected implicitly.
+          APPLE_SIGNING_IDENTITY: ""
+        run: bun run tauri build ${{ matrix.args }}
+      - name: Rename and upload unsigned Windows packages
         if: matrix.portable
         shell: pwsh
         env:
@@ -126,11 +118,56 @@ jobs:
         run: |
           $source = "src-tauri/target/x86_64-pc-windows-msvc/release/mdtxt.exe"
           if (-not (Test-Path $source)) { throw "Portable source executable not found: $source" }
-          $portable = "mdtxt_$env:VERSION`_windows_x64_portable.exe"
+          $portable = "mdtxt_$env:VERSION`_windows_x64_portable-unsigned.exe"
           Copy-Item $source $portable
-          $hash = (Get-FileHash $portable -Algorithm SHA256).Hash.ToLower()
-          "$hash  $portable" | Set-Content "$portable.sha256" -NoNewline
-          gh release upload $env:TAG $portable "$portable.sha256" --clobber
+          $packages = @($portable)
+          $bundles = @(
+            @{ Path = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi"; Name = "mdtxt_$env:VERSION`_windows_x64-unsigned.msi" },
+            @{ Path = "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe"; Name = "mdtxt_$env:VERSION`_windows_x64_setup-unsigned.exe" }
+          )
+          foreach ($bundle in $bundles) {
+            $sourceFile = @(Get-ChildItem $bundle.Path)
+            if ($sourceFile.Count -ne 1) { throw "Expected exactly one package for $($bundle.Path), got $($sourceFile.Count)" }
+            Copy-Item $sourceFile[0] $bundle.Name
+            $packages += $bundle.Name
+          }
+          foreach ($package in $packages) {
+            $hash = (Get-FileHash $package -Algorithm SHA256).Hash.ToLower()
+            "$hash  $package" | Set-Content "$package.sha256" -NoNewline
+          }
+          gh release upload $env:TAG $packages ($packages | ForEach-Object { "$($_).sha256" }) --clobber
+      - name: Rename and upload unsigned macOS package
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          source_file="$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)"
+          test -n "$source_file"
+          package="mdtxt_${VERSION}_macos-unsigned.dmg"
+          cp "$source_file" "$package"
+          shasum -a 256 "$package" | awk '{print $1 "  " $2}' > "$package.sha256"
+          gh release upload "$TAG" "$package" "$package.sha256" --clobber
+      - name: Rename and upload unsigned Linux packages
+        if: matrix.platform == 'ubuntu-24.04'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          deb="$(find src-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)"
+          appimage="$(find src-tauri/target/release/bundle/appimage -maxdepth 1 -name '*.AppImage' -print -quit)"
+          test -n "$deb" && test -n "$appimage"
+          deb_target="mdtxt_${VERSION}_linux_amd64-unsigned.deb"
+          appimage_target="mdtxt_${VERSION}_linux_amd64-unsigned.AppImage"
+          cp "$deb" "$deb_target"
+          cp "$appimage" "$appimage_target"
+          sha256sum "$deb_target" > "$deb_target.sha256"
+          sha256sum "$appimage_target" > "$appimage_target.sha256"
+          gh release upload "$TAG" "$deb_target" "$deb_target.sha256" "$appimage_target" "$appimage_target.sha256" --clobber
 
   supply-chain:
     name: Checksums, SBOM, and third-party licenses

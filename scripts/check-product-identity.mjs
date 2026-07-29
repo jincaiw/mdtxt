@@ -40,8 +40,8 @@ if (cargoVersion !== expectedVersion) failures.push(`cargo version=${cargoVersio
 if (cargoLib !== "mdtxt_lib") failures.push(`cargo lib=${cargoLib ?? "missing"}`);
 if (tauri.plugins?.updater) failures.push("updater must be disabled until mdtxt has an owned endpoint");
 if (tauri.bundle?.createUpdaterArtifacts) failures.push("updater artifacts must be disabled without mdtxt signing keys");
-if (tauri.bundle?.macOS?.signingIdentity !== "-") {
-  failures.push("unsigned macOS releases must carry a complete ad-hoc app signature");
+if (tauri.bundle?.macOS?.signingIdentity) {
+  failures.push("unsigned releases must not configure a macOS signing identity");
 }
 if (/paperling/i.test(releaseWorkflow) || /paperling/i.test(testBuildWorkflow)) {
   failures.push("release workflows retain Paperling identity");
@@ -52,11 +52,14 @@ if (/paperling/i.test(issueConfig) || /paperling/i.test(bugTemplate)) {
 if (/paperling/i.test(docsSurface) || /github\.com\/jincaiw\/paperling/i.test(docsSurface)) {
   failures.push("public documentation retains Paperling identity or upstream links");
 }
-if (!/releaseName:\s*"mdtxt \$\{\{ needs\.metadata\.outputs\.tag \}\}"/.test(releaseWorkflow)) {
+if (!/gh release (?:edit|create) "\$tag" --draft --title "mdtxt \$tag"/.test(releaseWorkflow)) {
   failures.push("release workflow must publish under the mdtxt name");
 }
-if (!/includeUpdaterJson:\s*false/.test(releaseWorkflow)) {
+if (tauri.bundle?.createUpdaterArtifacts !== false) {
   failures.push("release workflow must not publish updater metadata");
+}
+if (!/unsigned/.test(releaseWorkflow) || /uses:\s*tauri-apps\/tauri-action/.test(releaseWorkflow)) {
+  failures.push("release workflow must build and label unsigned artifacts without platform signing tools");
 }
 
 if (failures.length) {
