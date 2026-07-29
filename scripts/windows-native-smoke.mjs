@@ -681,11 +681,20 @@ async function run() {
     // the copied Markdown after that remount through the public editor DOM.
 
     await execute(`
-        document.querySelector("button[aria-label='新建标签页'], button[aria-label='New tab']")?.click();
+        const button = document.querySelector("button[aria-label='新建文件'], button[aria-label='New file']");
+        if (!(button instanceof HTMLButtonElement)) throw new Error("New file action is unavailable");
+        button.click();
         return true;
     `);
+    await waitForScript(`
+        return document.querySelectorAll(
+            "[role='tablist'][aria-label='打开的文件'] [role='tab'], [role='tablist'][aria-label='Open files'] [role='tab']",
+        ).length >= 2;
+    `, "two-document tab strip");
     await execute(`
-        const tab = document.querySelectorAll("[role='tab']")[0];
+        const tab = document.querySelector(
+            "[role='tablist'][aria-label='打开的文件'] [role='tab'], [role='tablist'][aria-label='Open files'] [role='tab']",
+        );
         if (!(tab instanceof HTMLElement)) throw new Error("Original tab is unavailable");
         tab.click();
         return true;
