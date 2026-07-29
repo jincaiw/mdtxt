@@ -115,15 +115,22 @@ async function run() {
     await dismissTour();
     await typeEditorLines(firstText);
     await browser.execute(() => {
-        document.querySelector("button[aria-label='新建标签页'], button[aria-label='New tab']")?.click();
+        const button = document.querySelector("button[aria-label='新建文件'], button[aria-label='New file']");
+        if (!(button instanceof HTMLButtonElement)) throw new Error("New file action is unavailable");
+        button.click();
     });
-    await browser.waitUntil(async () => (await browser.$$("[role='tab']")).length === 2);
+    const fileTabs = "[role='tablist'][aria-label='打开的文件'] [role='tab'], [role='tablist'][aria-label='Open files'] [role='tab']";
+    await browser.waitUntil(async () => (await browser.$$(fileTabs)).length === 2);
     await typeEditorLines(secondText);
     await browser.pause(3_500);
 
     const beforeKill = await browser.execute(() => ({
-        tabs: [...document.querySelectorAll("[role='tab']")].map((tab) => tab.getAttribute("title")),
-        active: document.querySelector("[role='tab'][aria-selected='true']")?.getAttribute("title"),
+        tabs: [...document.querySelectorAll(
+            "[role='tablist'][aria-label='打开的文件'] [role='tab'], [role='tablist'][aria-label='Open files'] [role='tab']",
+        )].map((tab) => tab.getAttribute("title")),
+        active: document.querySelector(
+            "[role='tablist'][aria-label='打开的文件'] [role='tab'][aria-selected='true'], [role='tablist'][aria-label='Open files'] [role='tab'][aria-selected='true']",
+        )?.getAttribute("title"),
         body: document.body.innerText,
     }));
     assert.equal(beforeKill.tabs.length, 2);
@@ -156,8 +163,12 @@ async function run() {
     await dialog.waitForDisplayed({ reverse: true });
 
     const restored = await browser.execute(() => ({
-        tabs: [...document.querySelectorAll("[role='tab']")].map((tab) => tab.getAttribute("title")),
-        active: document.querySelector("[role='tab'][aria-selected='true']")?.getAttribute("title"),
+        tabs: [...document.querySelectorAll(
+            "[role='tablist'][aria-label='打开的文件'] [role='tab'], [role='tablist'][aria-label='Open files'] [role='tab']",
+        )].map((tab) => tab.getAttribute("title")),
+        active: document.querySelector(
+            "[role='tablist'][aria-label='打开的文件'] [role='tab'][aria-selected='true'], [role='tablist'][aria-label='Open files'] [role='tab'][aria-selected='true']",
+        )?.getAttribute("title"),
         body: document.body.innerText,
     }));
     assert.equal(restored.tabs.length, 2);
@@ -168,7 +179,9 @@ async function run() {
     assert.equal((await editorText()).replaceAll("\u00a0", " "), secondText);
 
     await browser.execute(() => {
-        const first = document.querySelectorAll("[role='tab']")[0];
+        const first = document.querySelector(
+            "[role='tablist'][aria-label='打开的文件'] [role='tab'], [role='tablist'][aria-label='Open files'] [role='tab']",
+        );
         if (!(first instanceof HTMLElement)) throw new Error("first restored tab is unavailable");
         first.click();
     });
