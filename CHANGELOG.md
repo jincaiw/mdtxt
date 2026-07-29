@@ -6,6 +6,10 @@ All notable mdtxt changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-29
+
+- Fixed native recovery and performance acceptance probes to explicitly enter Source before exact Markdown input, while preserving Live as the default editor.
+
 ## [0.4.0] - 2026-07-29
 
 - Live is the default stable editor mode; the opt-in Beta gate has been removed while Source, Reader, Split and large-document Source fallback remain available.

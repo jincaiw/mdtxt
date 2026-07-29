@@ -4,7 +4,7 @@ mdtxt is a local-first Markdown editor. This roadmap is directional rather than
 a promise; the safety of local documents and a reliable native experience take
 priority over feature count.
 
-## Shipped in v0.4.0
+## Shipped in v0.4.1
 
 - Graduate Live from Beta to the default source-preserving editor, with a safe
   Source fallback for documents above published Live limits.
