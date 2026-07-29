@@ -222,6 +222,23 @@ const slugify = (text: string): string =>
         .replace(/-+/g, "-")
         .replace(/^-|-$/g, "");
 
+/** Render Typora-compatible standalone [TOC] markers without mutating source. */
+function tocHtml(markdown: string, title: string): string {
+    const seen = new Map<string, number>();
+    const items = markdown.split(/\r?\n/).flatMap((line) => {
+        const match = line.match(/^\s*(#{1,6})\s+(.+?)\s*(?:#+\s*)?$/);
+        if (!match) return [];
+        const text = match[2].replace(/\s*\{#[^}]+\}\s*$/, "").trim();
+        const base = slugify(text) || "section";
+        const count = seen.get(base) ?? 0;
+        seen.set(base, count + 1);
+        return [{ level: match[1].length, text, id: count ? `${base}-${count}` : base }];
+    });
+    if (items.length === 0) return "";
+    const links = items.map((item) => `<li class="mdtxt-toc-level-${item.level}"><a href="#${item.id}">${item.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</a></li>`).join("");
+    return "<nav class=\"mdtxt-toc\" aria-label=\"" + title + "\"><strong>" + title + "</strong><ol>" + links + "</ol></nav>";
+}
+
 /** Extract the plain-text label from a React node tree (for slug + anchor link). */
 function nodeText(node: React.ReactNode): string {
     if (typeof node === "string" || typeof node === "number") return String(node);
@@ -821,12 +838,14 @@ function MarkdownPreviewImpl({
     // and load the target file, while keeping the source markdown portable
     // (the source still has [[Foo]] — only the rendered output uses the scheme).
     const renderBody = useMemo(() => {
-        return parsedBody.replace(/\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]/g, (_m, target: string, alias?: string) => {
+        return parsedBody
+        .replace(/^\s*\[TOC\]\s*$/gim, () => tocHtml(parsedBody, t("Table of contents")))
+        .replace(/\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]/g, (_m, target: string, alias?: string) => {
             const t = target.trim();
             const a = (alias ?? target).trim();
             return `[${a}](wikilink:${encodeURIComponent(t)})`;
         });
-    }, [parsedBody]);
+    }, [parsedBody, t]);
 
     // Lazy-load KaTeX only when the document actually contains math.
     // Heavy (~280kb) — keeping it out of the initial bundle is a real win.

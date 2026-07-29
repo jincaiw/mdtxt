@@ -13,6 +13,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { CodeEditor } from "./components/CodeEditor";
 import { StatusBar } from "./components/StatusBar";
 import { WorkspaceSidebar, type NavigationTab } from "./components/WorkspaceSidebar";
+import type { WorkspaceMutation } from "./components/FileExplorer";
 import type { ViewMode } from "./components/ModeToggle";
 import { ToastStack } from "./components/Toast";
 import { SplitDivider } from "./components/SplitDivider";
@@ -74,9 +75,8 @@ import {
   getAIEnabled,
   initAIKey,
   getLastFile,
-  getLiveBetaEnabled,
+  migrateLiveV4Default,
   getOpenInReader,
-  getSavedViewMode,
   getSession,
   setSession,
   getSpellCheck,
@@ -125,7 +125,6 @@ import { PreviewFindBar } from "./components/PreviewFindBar";
 import { useLocale } from "./context/LocaleContext";
 import {
   acceptsSessionResult,
-  resolveLiveBetaViewMode,
   type DocumentSession,
   type DiskSaveResult,
 } from "./utils/documentSession";
@@ -185,7 +184,7 @@ const THEME_CHOICES: { id: Theme; label: string }[] = [
 ];
 
 function getSafeSavedViewMode(): ViewMode {
-  return resolveLiveBetaViewMode(getSavedViewMode(), getLiveBetaEnabled());
+  return migrateLiveV4Default();
 }
 
 function AppContent() {
@@ -218,7 +217,6 @@ function AppContent() {
   const [toolbarVisible, setToolbarVisible] = usePersistedState<boolean>(getToolbarEnabled, setToolbarEnabled);
   const [wordWrapEnabled, setWordWrapEnabled] = usePersistedState<boolean>(getWordWrap, setWordWrap);
   const [spellCheckEnabled, setSpellCheckEnabled] = usePersistedState<boolean>(getSpellCheck, setSpellCheck);
-  const [liveBetaEnabled, setLiveBetaEnabledState] = useState(getLiveBetaEnabled);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
   // True while the launch-time file resolution (OS-opened CLI file, then
   // last-session restore) is still in flight. Shows a neutral splash instead
@@ -482,10 +480,9 @@ function AppContent() {
     // callback: React may invoke that callback while rendering, and the store
     // subscription would then try to update App during its own render.
     const requested = typeof next === "function" ? next(modeRef.current) : next;
-    const resolved = resolveLiveBetaViewMode(requested, getLiveBetaEnabled());
     const activeId = activeTabIdRef.current;
-    if (activeId) sessionController.setViewMode(activeId, resolved);
-    setModeState(resolved);
+    if (activeId) sessionController.setViewMode(activeId, requested);
+    setModeState(requested);
   }, [setModeState, sessionController]);
 
   // Every close-time save reads the controller's versioned snapshots. React tab
@@ -523,9 +520,7 @@ function AppContent() {
     if (!session) {
       return;
     }
-    const restoredMode = resolveLiveBetaViewMode(session.viewMode, getLiveBetaEnabled());
-    if (restoredMode !== session.viewMode) sessionController.setViewMode(session.id, restoredMode);
-    setModeState(restoredMode);
+    setModeState(session.viewMode);
     if (tab.filePath) setLastFile(tab.filePath);
     // Restore where you were in this tab — jump to the remembered line, or fall
     // back to the top for a never-focused / line-1 tab. TABS-02.
@@ -646,15 +641,6 @@ function AppContent() {
       ["mdtxt:toolbar-toggle", (e) => setToolbarVisible(!!(e as CustomEvent).detail?.enabled)],
       ["mdtxt:wordwrap-toggle", (e) => setWordWrapEnabled(!!(e as CustomEvent).detail?.enabled)],
       ["mdtxt:spellcheck-toggle", (e) => setSpellCheckEnabled(!!(e as CustomEvent).detail?.enabled)],
-      ["mdtxt:live-beta-toggle", (e) => {
-        const enabled = !!(e as CustomEvent).detail?.enabled;
-        setLiveBetaEnabledState(enabled);
-        if (!enabled && modeRef.current === "live") {
-          const activeId = activeTabIdRef.current;
-          if (activeId) sessionController.setViewMode(activeId, "code");
-          setModeState("code");
-        }
-      }],
       ["mdtxt:autosave-toggle", (e) => setAutoSaveEnabled(!!(e as CustomEvent).detail?.enabled)],
       // Opened from the title-bar settings dropdown's "More settings…" entry.
       ["mdtxt:open-settings", () => setShowSettings(true)],
@@ -1432,7 +1418,7 @@ function AppContent() {
     });
     if (reusable) {
       if (reusable.id !== activeTabIdRef.current) activateTab(reusable.id);
-      setMode("code");
+      setMode("live");
       return;
     }
     const id = newTabId();
@@ -1440,7 +1426,7 @@ function AppContent() {
     commitTabs([...tabsRef.current, {
       id, filePath: null, fileName: name, fileSize: 0, knownMtime: 0,
     }]);
-    sessionController.open({ id, path: null, name, content: "", fileSize: 0, viewMode: "code" }, false);
+    sessionController.open({ id, path: null, name, content: "", fileSize: 0, viewMode: "live" }, false);
     setActiveTab(id);
     setProposedDoc(null);
     setFilePath(null);
@@ -1448,7 +1434,7 @@ function AppContent() {
     setFileSize(0);
     knownMtimeRef.current = 0;
     setLastFile(null);
-    setMode("code");
+    setMode("live");
   }, [snapshotActiveTab, commitTabs, setActiveTab, newTabId, activateTab, sessionController]);
 
   useEffect(() => {
@@ -1485,7 +1471,7 @@ function AppContent() {
         content: entry.content,
         savedContent: "",
         fileSize: entry.content.length,
-        viewMode: "code",
+        viewMode: "live",
         cursorLine: entry.cursorLine,
       }, false);
     }
@@ -2355,6 +2341,46 @@ function AppContent() {
     setTabMenu({ id, x, y });
   }, []);
 
+  // Native workspace mutations are authoritative. Remap every open document
+  // that lives at or below the changed path so tabs, session restore and the
+  // active editor never continue saving to an old location. Trashing converts
+  // affected documents to untitled buffers, preserving unsaved edits instead
+  // of silently recreating a file that the user intentionally trashed.
+  const handleWorkspaceMutation = useCallback((mutation: WorkspaceMutation) => {
+    const previous = mutation.previousPath;
+    if (!previous) return;
+    const isAffected = (path: string | null) => path === previous || !!path && (path.startsWith(`${previous}/`) || path.startsWith(`${previous}\\`));
+    const remap = (path: string) => mutation.path + path.slice(previous.length);
+    for (const session of sessionSnapshot.sessions) {
+      if (!isAffected(session.path)) continue;
+      if (mutation.trashed) {
+        sessionController.updateFileMetadata(session.id, { path: null, name: session.name });
+      } else if (session.path) {
+        const nextPath = remap(session.path);
+        const nextName = nextPath.replace(/\\/g, "/").split("/").pop() || session.name;
+        sessionController.updateFileMetadata(session.id, { path: nextPath, name: nextName });
+      }
+    }
+    commitTabs(tabsRef.current.map((tab) => {
+      if (!isAffected(tab.filePath)) return tab;
+      if (mutation.trashed) return { ...tab, filePath: null };
+      const nextPath = remap(tab.filePath!);
+      return { ...tab, filePath: nextPath, fileName: nextPath.replace(/\\/g, "/").split("/").pop() || tab.fileName };
+    }));
+    if (isAffected(filePathRef.current)) {
+      if (mutation.trashed) {
+        setFilePath(null);
+        setLastFile(null);
+        showToast(tr("File moved to Trash; its open tab is now an unsaved buffer"), "info");
+      } else {
+        const nextPath = remap(filePathRef.current!);
+        setFilePath(nextPath);
+        setFileName(nextPath.replace(/\\/g, "/").split("/").pop() || fileName);
+        setLastFile(nextPath);
+      }
+    }
+  }, [commitTabs, fileName, sessionController, sessionSnapshot.sessions, showToast, tr]);
+
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-primary)] overflow-hidden transition-colors">
       <TitleBar
@@ -2371,7 +2397,6 @@ function AppContent() {
         isNativeFullscreen={isFullscreen}
         mode={mode}
         onSetMode={setMode}
-        liveEnabled={liveBetaEnabled}
         onToggleNavigation={handleToggleNavigation}
         navigationActive={navigationOpen}
       />
@@ -2421,6 +2446,7 @@ function AppContent() {
               activeLine={mode === "preview" ? previewLine : cursorPosition.line}
               onTabChange={handleNavigationTabChange}
               onFileSelect={loadFile}
+              onWorkspaceMutation={handleWorkspaceMutation}
               onClose={closeAllPanels}
               onWidthChange={setNavigationWidthState}
             />
@@ -2459,7 +2485,7 @@ function AppContent() {
                 showToolbar={toolbarVisible && !focusModeEnabled}
                 wordWrap={effectiveWordWrap}
                 spellCheck={spellCheckEnabled}
-                liveMode={mode === "live" && liveBetaEnabled}
+                liveMode={mode === "live"}
                 liveRestricted={liveEligibility?.restricted ?? false}
                 liveRestrictionReason={liveRestrictionReason}
                 performanceNotice={editorPerformanceNotice}

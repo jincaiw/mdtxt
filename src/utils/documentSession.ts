@@ -84,7 +84,7 @@ export function createDocumentSession(input: DocumentSessionInput): DocumentSess
         diskHash: input.diskHash ?? "",
         fileSize: input.fileSize ?? input.content.length,
         format: inferDocumentFormat(input.content),
-        viewMode: input.viewMode ?? "code",
+        viewMode: input.viewMode ?? "live",
         cursorLine: input.cursorLine ?? 1,
         recoveryPending: false,
     };
@@ -107,16 +107,6 @@ export function replaceSessionContent(session: DocumentSession, content: string)
 
 export function setSessionViewMode(session: DocumentSession, viewMode: DocumentViewMode): DocumentSession {
     return session.viewMode === viewMode ? session : { ...session, viewMode };
-}
-
-/**
- * Live is persisted per document, but it cannot be restored until the user
- * has explicitly opted into the Beta in this installation. Keep the fallback
- * here, beside the session contract, so startup and tab activation use the
- * same rule instead of briefly exposing an ungated mode.
- */
-export function resolveLiveBetaViewMode(viewMode: DocumentViewMode, liveBetaEnabled: boolean): DocumentViewMode {
-    return viewMode === "live" && !liveBetaEnabled ? "code" : viewMode;
 }
 
 /** Applies a successful save only when the request still describes this exact revision. */

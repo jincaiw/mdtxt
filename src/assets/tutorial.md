@@ -11,7 +11,7 @@ you see rendered on the right is produced from the markdown on the left. Poke at
 it, change things, and watch the preview update live.
 
 > Tip: press **Ctrl/⌘+E** to flip between Reader, Split and Code views. Enable
-> **Live Beta** in Settings to try the source-preserving live document view; it
+> **Live** is the default source-preserving document view; it
 > is optional and Source is always one shortcut away. In Split view you can edit
 > and preview side by side, which is the best way to explore this guide.
 
@@ -54,7 +54,7 @@ preview:
 | File explorer  | `Ctrl+Shift+E` | Browse the current folder      |
 | Outline        | `Ctrl+Shift+O` | Jump between headings          |
 | Global search  | `Ctrl+Shift+F` | Find text across your folder   |
-| Live Beta      | `Ctrl/⌘+Shift+L` | Toggle the opt-in live view |
+| Live           | `Ctrl/⌘+Shift+L` | Toggle the live editor |
 
 ## 4. Code with syntax highlighting
 

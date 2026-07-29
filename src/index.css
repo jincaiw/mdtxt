@@ -1229,6 +1229,22 @@ select:focus-visible,
   opacity: 1;
 }
 
+.markdown-body .mdtxt-toc {
+  margin: 1.25rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.markdown-body .mdtxt-toc ol { margin: 0.55rem 0 0; padding-left: 1.25rem; }
+.markdown-body .mdtxt-toc li { margin: 0.2rem 0; }
+.markdown-body .mdtxt-toc .mdtxt-toc-level-2 { margin-left: 0.8rem; }
+.markdown-body .mdtxt-toc .mdtxt-toc-level-3 { margin-left: 1.6rem; }
+.markdown-body .mdtxt-toc .mdtxt-toc-level-4,
+.markdown-body .mdtxt-toc .mdtxt-toc-level-5,
+.markdown-body .mdtxt-toc .mdtxt-toc-level-6 { margin-left: 2.4rem; }
+
 @media (max-width: 1099px) {
   .workspace-ai-panel {
     position: absolute;

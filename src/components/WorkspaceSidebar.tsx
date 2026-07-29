@@ -1,4 +1,4 @@
-import { FileExplorer } from "./FileExplorer";
+import { FileExplorer, type WorkspaceMutation } from "./FileExplorer";
 import { TableOfContents } from "./TableOfContents";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { useLocale } from "../context/LocaleContext";
@@ -14,13 +14,14 @@ interface WorkspaceSidebarProps {
     activeLine: number;
     onTabChange: (tab: NavigationTab) => void;
     onFileSelect: (path: string) => void;
+    onWorkspaceMutation?: (mutation: WorkspaceMutation) => void;
     onClose: () => void;
     onWidthChange: (width: number) => void;
 }
 
 export function WorkspaceSidebar({
     isOpen, tab, width, currentFilePath, content, activeLine,
-    onTabChange, onFileSelect, onClose, onWidthChange,
+    onTabChange, onFileSelect, onWorkspaceMutation, onClose, onWidthChange,
 }: WorkspaceSidebarProps) {
     const { t } = useLocale();
     if (!isOpen) return null;
@@ -50,7 +51,7 @@ export function WorkspaceSidebar({
             </div>
             <div className="workspace-navigation-content">
                 {tab === "files" ? (
-                    <FileExplorer isOpen currentFilePath={currentFilePath} onFileSelect={onFileSelect} onClose={onClose} embedded />
+                    <FileExplorer isOpen currentFilePath={currentFilePath} onFileSelect={onFileSelect} onWorkspaceMutation={onWorkspaceMutation} onClose={onClose} embedded />
                 ) : (
                     <TableOfContents isOpen content={content} activeLine={activeLine} onClose={onClose} embedded />
                 )}

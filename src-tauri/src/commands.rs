@@ -40,6 +40,10 @@ pub enum CommandError {
     Conflict(String),
     #[error("File too large: {0}")]
     TooLarge(String),
+    #[error("Workspace path is not allowed: {0}")]
+    WorkspacePath(String),
+    #[error("A file or folder already exists: {0}")]
+    AlreadyExists(String),
 }
 
 impl Serialize for CommandError {
@@ -589,6 +593,308 @@ pub struct FileEntry {
     pub is_dir: bool,
 }
 
+/// A safe, lazily-loaded workspace node. `kind` deliberately exposes regular
+/// non-hidden files as well as Markdown so a destructive folder operation is
+/// never performed against content the user cannot see.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceEntry {
+    pub name: String,
+    pub path: String,
+    pub kind: String,
+    pub has_children: bool,
+    pub size: u64,
+    pub modified: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceMutation {
+    pub path: String,
+    pub previous_path: Option<String>,
+}
+
+fn workspace_root(root: &str) -> Result<PathBuf, CommandError> {
+    let root =
+        std::fs::canonicalize(root).map_err(|e| CommandError::WorkspacePath(e.to_string()))?;
+    if !root.is_dir() {
+        return Err(CommandError::WorkspacePath(
+            "Workspace root is not a directory".into(),
+        ));
+    }
+    Ok(root)
+}
+
+fn workspace_existing_path(root: &Path, raw: &str) -> Result<PathBuf, CommandError> {
+    let path =
+        std::fs::canonicalize(raw).map_err(|e| CommandError::WorkspacePath(e.to_string()))?;
+    if !path.starts_with(root) {
+        return Err(CommandError::WorkspacePath(
+            "Path escapes the workspace root".into(),
+        ));
+    }
+    Ok(path)
+}
+
+fn workspace_directory(root: &Path, raw: &str) -> Result<PathBuf, CommandError> {
+    let path = workspace_existing_path(root, raw)?;
+    if !path.is_dir() {
+        return Err(CommandError::WorkspacePath(
+            "Target is not a directory".into(),
+        ));
+    }
+    Ok(path)
+}
+
+fn workspace_name(name: &str) -> Result<&str, CommandError> {
+    let name = name.trim();
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains('\0')
+    {
+        return Err(CommandError::WorkspacePath(
+            "Invalid file or folder name".into(),
+        ));
+    }
+    Ok(name)
+}
+
+fn workspace_entry(path: PathBuf, metadata: std::fs::Metadata) -> WorkspaceEntry {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_string();
+    let kind = if metadata.is_dir() {
+        "directory"
+    } else if path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown"))
+    {
+        "markdown"
+    } else if path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| {
+            ALLOWED_IMAGE_EXTS
+                .iter()
+                .any(|allowed| ext.eq_ignore_ascii_case(allowed))
+        })
+    {
+        "image"
+    } else {
+        "other"
+    };
+    WorkspaceEntry {
+        name,
+        path: path.to_string_lossy().to_string(),
+        kind: kind.into(),
+        has_children: metadata.is_dir()
+            && std::fs::read_dir(&path)
+                .ok()
+                .and_then(|mut entries| entries.next())
+                .is_some(),
+        size: if metadata.is_file() {
+            metadata.len()
+        } else {
+            0
+        },
+        modified: mtime_ms(&metadata),
+    }
+}
+
+/// Lists one workspace directory. Both root and directory are canonicalized,
+/// which rejects `..` and symlink escapes before the UI can act on a node.
+#[tauri::command]
+pub async fn list_workspace_entries(
+    root: String,
+    directory: String,
+) -> Result<Vec<WorkspaceEntry>, CommandError> {
+    let root = workspace_root(&root)?;
+    let directory = workspace_directory(&root, &directory)?;
+    let entries =
+        tokio::task::spawn_blocking(move || -> Result<Vec<WorkspaceEntry>, CommandError> {
+            let mut entries = Vec::new();
+            for entry in std::fs::read_dir(directory)
+                .map_err(|e| CommandError::ReadError(e.to_string()))?
+                .flatten()
+            {
+                let path = entry.path();
+                let name = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or_default();
+                if name.starts_with('.') {
+                    continue;
+                }
+                // Do not resolve a symlink during listing. It is visible but inert;
+                // all mutation commands canonicalize and reject external targets.
+                let metadata = match std::fs::symlink_metadata(&path) {
+                    Ok(value) => value,
+                    Err(_) => continue,
+                };
+                if metadata.file_type().is_symlink() {
+                    entries.push(WorkspaceEntry {
+                        name: name.into(),
+                        path: path.to_string_lossy().to_string(),
+                        kind: "other".into(),
+                        has_children: false,
+                        size: 0,
+                        modified: mtime_ms(&metadata),
+                    });
+                } else {
+                    entries.push(workspace_entry(path, metadata));
+                }
+            }
+            entries.sort_by(|left, right| {
+                let left_dir = left.kind == "directory";
+                let right_dir = right.kind == "directory";
+                right_dir
+                    .cmp(&left_dir)
+                    .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+            });
+            Ok(entries)
+        })
+        .await
+        .map_err(|e| CommandError::ReadError(e.to_string()))??;
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn create_workspace_entry(
+    root: String,
+    parent: String,
+    name: String,
+    kind: String,
+) -> Result<WorkspaceMutation, CommandError> {
+    let root = workspace_root(&root)?;
+    let parent = workspace_directory(&root, &parent)?;
+    let name = workspace_name(&name)?;
+    let name = match kind.as_str() {
+        "markdown"
+            if !name.to_ascii_lowercase().ends_with(".md")
+                && !name.to_ascii_lowercase().ends_with(".markdown") =>
+        {
+            format!("{name}.md")
+        }
+        "markdown" | "directory" => name.to_string(),
+        _ => {
+            return Err(CommandError::WorkspacePath(
+                "Unknown workspace entry kind".into(),
+            ))
+        }
+    };
+    let path = parent.join(&name);
+    if path.exists() {
+        return Err(CommandError::AlreadyExists(
+            path.to_string_lossy().to_string(),
+        ));
+    }
+    if kind == "directory" {
+        tokio::fs::create_dir(&path)
+            .await
+            .map_err(|e| CommandError::WriteError(e.to_string()))?;
+    } else {
+        tokio::fs::write(&path, b"")
+            .await
+            .map_err(|e| CommandError::WriteError(e.to_string()))?;
+    }
+    Ok(WorkspaceMutation {
+        path: path.to_string_lossy().to_string(),
+        previous_path: None,
+    })
+}
+
+#[tauri::command]
+pub async fn rename_workspace_entry(
+    root: String,
+    path: String,
+    name: String,
+) -> Result<WorkspaceMutation, CommandError> {
+    let root = workspace_root(&root)?;
+    let source = workspace_existing_path(&root, &path)?;
+    if source == root {
+        return Err(CommandError::WorkspacePath(
+            "Cannot rename the workspace root".into(),
+        ));
+    }
+    let target = source
+        .parent()
+        .ok_or_else(|| CommandError::WorkspacePath("Missing parent directory".into()))?
+        .join(workspace_name(&name)?);
+    if target.exists() {
+        return Err(CommandError::AlreadyExists(
+            target.to_string_lossy().to_string(),
+        ));
+    }
+    tokio::fs::rename(&source, &target)
+        .await
+        .map_err(|e| CommandError::WriteError(e.to_string()))?;
+    Ok(WorkspaceMutation {
+        path: target.to_string_lossy().to_string(),
+        previous_path: Some(source.to_string_lossy().to_string()),
+    })
+}
+
+#[tauri::command]
+pub async fn move_workspace_entry(
+    root: String,
+    path: String,
+    destination: String,
+) -> Result<WorkspaceMutation, CommandError> {
+    let root = workspace_root(&root)?;
+    let source = workspace_existing_path(&root, &path)?;
+    if source == root {
+        return Err(CommandError::WorkspacePath(
+            "Cannot move the workspace root".into(),
+        ));
+    }
+    let destination = workspace_directory(&root, &destination)?;
+    if source.is_dir() && destination.starts_with(&source) {
+        return Err(CommandError::WorkspacePath(
+            "Cannot move a folder into itself".into(),
+        ));
+    }
+    let target = destination.join(
+        source
+            .file_name()
+            .ok_or_else(|| CommandError::WorkspacePath("Invalid source name".into()))?,
+    );
+    if target.exists() {
+        return Err(CommandError::AlreadyExists(
+            target.to_string_lossy().to_string(),
+        ));
+    }
+    tokio::fs::rename(&source, &target)
+        .await
+        .map_err(|e| CommandError::WriteError(e.to_string()))?;
+    Ok(WorkspaceMutation {
+        path: target.to_string_lossy().to_string(),
+        previous_path: Some(source.to_string_lossy().to_string()),
+    })
+}
+
+#[tauri::command]
+pub async fn trash_workspace_entry(root: String, path: String) -> Result<(), CommandError> {
+    let root = workspace_root(&root)?;
+    let source = workspace_existing_path(&root, &path)?;
+    if source == root {
+        return Err(CommandError::WorkspacePath(
+            "Cannot trash the workspace root".into(),
+        ));
+    }
+    tokio::task::spawn_blocking(move || {
+        trash::delete(source).map_err(|e| CommandError::WriteError(e.to_string()))
+    })
+    .await
+    .map_err(|e| CommandError::WriteError(e.to_string()))??;
+    Ok(())
+}
+
 /// List all markdown files in a directory
 #[tauri::command]
 pub async fn list_directory_files(directory: String) -> Result<Vec<FileEntry>, CommandError> {
@@ -873,6 +1179,7 @@ pub async fn save_image(
     md_file_path: String,
     image_data: Vec<u8>,
     image_name: String,
+    asset_dir: Option<String>,
 ) -> Result<String, CommandError> {
     if image_data.len() > MAX_IMAGE_BYTES {
         return Err(CommandError::TooLarge(format!(
@@ -889,24 +1196,80 @@ pub async fn save_image(
         .parent()
         .ok_or_else(|| CommandError::WriteError("Cannot determine parent directory".to_string()))?;
 
-    // Create images subdirectory
-    let images_dir = parent_dir.join("images");
+    let asset_dir = validate_asset_dir(asset_dir.as_deref().unwrap_or("images"))?;
+    // Create the configured relative assets directory.
+    let images_dir = parent_dir.join(&asset_dir);
     if !images_dir.exists() {
         tokio::fs::create_dir_all(&images_dir).await.map_err(|e| {
             CommandError::WriteError(format!("Failed to create images directory: {}", e))
         })?;
     }
 
-    // Full path for the image (basename only, no traversal possible).
-    let image_path = images_dir.join(&safe_name);
+    // Full path for the image (basename only, no traversal possible). Never
+    // overwrite an existing asset: a repeated paste gets a deterministic suffix.
+    let stem = Path::new(&safe_name)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("image");
+    let extension = Path::new(&safe_name)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("png");
+    let mut candidate = safe_name.clone();
+    let mut suffix = 2usize;
+    while images_dir.join(&candidate).exists() {
+        candidate = format!("{stem}-{suffix}.{extension}");
+        suffix += 1;
+    }
+    let image_path = images_dir.join(&candidate);
 
     // Write the image data
     tokio::fs::write(&image_path, &image_data)
         .await
         .map_err(|e| CommandError::WriteError(format!("Failed to write image: {}", e)))?;
 
-    // Return relative path for markdown (./images/filename.png)
-    Ok(format!("./images/{}", safe_name))
+    // Return portable POSIX markdown paths on every host.
+    Ok(format!("./{}/{}", asset_dir.replace('\\', "/"), candidate))
+}
+
+/// Explicit v0.4 name for clipboard/drag image bytes. Kept alongside the
+/// historical command so older frontends remain compatible during upgrades.
+#[tauri::command]
+pub async fn save_image_bytes(
+    md_file_path: String,
+    image_data: Vec<u8>,
+    image_name: String,
+    asset_dir: Option<String>,
+) -> Result<String, CommandError> {
+    save_image(md_file_path, image_data, image_name, asset_dir).await
+}
+
+fn validate_asset_dir(value: &str) -> Result<String, CommandError> {
+    let value = value.trim().trim_matches('/').trim_matches('\\');
+    if value.is_empty() || value.contains('\0') {
+        return Err(CommandError::WriteError(
+            "Invalid image asset directory".into(),
+        ));
+    }
+    let path = Path::new(value);
+    if path.is_absolute() || value.as_bytes().get(1) == Some(&b':') {
+        return Err(CommandError::WriteError(
+            "Image asset directory must be relative".into(),
+        ));
+    }
+    for component in path.components() {
+        if matches!(
+            component,
+            std::path::Component::ParentDir
+                | std::path::Component::RootDir
+                | std::path::Component::Prefix(_)
+        ) {
+            return Err(CommandError::WriteError(
+                "Image asset directory escapes the document folder".into(),
+            ));
+        }
+    }
+    Ok(path.to_string_lossy().to_string())
 }
 
 /// Reject a relative image path that tries to escape the document folder or name

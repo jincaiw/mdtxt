@@ -101,7 +101,7 @@ export function useNativeMenu({ state, commands, translate }: NativeMenuOptions)
 
                 const view = await Submenu.new({ text: translate("View"), items: [
                     await check("view.code", "Source", state.mode === "code", undefined, state.hasDocument),
-                    await check("view.live", "Live Beta", state.mode === "live", "CmdOrCtrl+Shift+L", state.hasDocument),
+                    await check("view.live", "Live", state.mode === "live", "CmdOrCtrl+Shift+L", state.hasDocument),
                     await check("view.split", "Split", state.mode === "split", "CmdOrCtrl+\\", state.hasDocument),
                     await check("view.preview", "Reader", state.mode === "preview", "CmdOrCtrl+E", state.hasDocument), await separator(),
                     await check("view.explorer", "File explorer", state.fileExplorerOpen, "CmdOrCtrl+Shift+E", state.hasDocument),

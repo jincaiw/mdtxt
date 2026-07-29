@@ -169,7 +169,7 @@ describe("mdtxt native Tauri smoke", () => {
         assert.deepEqual(chrome.simulatedControls, []);
     });
 
-    it("exposes the approved workspace modes and keeps Live behind explicit opt-in", async () => {
+    it("exposes Live as the default workspace mode", async () => {
         const newFile = await $("//button[contains(., '新建文件') or contains(., 'New File')]");
         await newFile.click();
 
@@ -184,37 +184,10 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.execute(() => localStorage.setItem("mdtxt:tourDone", "true"));
 
         await $("[role='group'][aria-label='切换视图模式'], [role='group'][aria-label='View mode toggle']").waitForDisplayed();
-        assert.equal(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']").getAttribute("aria-pressed"), "true");
+        assert.equal(await $("button[aria-label='Live 模式'], button[aria-label='Live mode']").getAttribute("aria-pressed"), "true");
         assert.equal(await $("button[aria-label='分栏视图'], button[aria-label='Split view']").isDisplayed(), true);
         assert.equal(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']").isDisplayed(), true);
-        assert.equal(await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']").isExisting(), false);
-
-        const settings = await $("button[aria-label='Settings'], button[aria-label='设置']");
-        // Linux WebKitWebDriver can report the title-bar drag region as the
-        // click target once a document toolbar is present, even though the
-        // same settings button is user-clickable (covered by the preceding
-        // welcome-screen test). Activate the control through the DOM here so
-        // this test stays focused on the settings-to-Live integration.
-        await activate(settings);
-        const moreSettings = await $("//button[contains(., '更多设置') or contains(., 'More settings')]");
-        await moreSettings.waitForDisplayed();
-        await activate(moreSettings);
-        await $("[role='dialog'][aria-label='设置'], [role='dialog'][aria-label='Settings']").waitForDisplayed();
-        await activate(await $("//button[contains(., '编辑器') or normalize-space(.)='Editor']"));
-
-        const switches = await $$("[role='switch']");
-        let liveSwitch = null;
-        for (const candidate of switches) {
-            if ((await candidate.getText()).includes("Live Beta")) {
-                liveSwitch = candidate;
-                break;
-            }
-        }
-        assert.ok(liveSwitch, "Live Beta settings switch must exist");
-        await activate(liveSwitch);
-        await activate(await $("button[aria-label='关闭设置'], button[aria-label='Close settings']"));
-
-        const liveMode = await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
+        const liveMode = await $("button[aria-label='Live 模式'], button[aria-label='Live mode']");
         await liveMode.waitForDisplayed();
         const editor = await $(".cm-content");
         await editor.setValue("# Native smoke\n\n## Modes\n\n- Source\n- Live\n- Split\n- Reader");
@@ -341,7 +314,7 @@ describe("mdtxt native Tauri smoke", () => {
         await (await $$(".cm-line"))[4].click();
 
         const started = await browser.execute(() => performance.now());
-        await activate(await $("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']"));
+        await activate(await $("button[aria-label='Live 模式'], button[aria-label='Live mode']"));
         const widgetSelectors = [
             ".cm-live-frontmatter-widget",
             ".cm-live-image-widget",
@@ -398,9 +371,9 @@ describe("mdtxt native Tauri smoke", () => {
 
         const sourceOpenMs = await restoreStagedRecovery();
         const restrictedLiveMs = await browser.executeAsync((done) => {
-            const button = document.querySelector("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
+            const button = document.querySelector("button[aria-label='Live 模式'], button[aria-label='Live mode']");
             if (!(button instanceof HTMLButtonElement)) {
-                done({ error: "Live Beta mode is unavailable" });
+                done({ error: "Live mode is unavailable" });
                 return;
             }
             const started = performance.now();

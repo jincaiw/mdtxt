@@ -4,6 +4,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { getImageAssetSettings } from './persistence';
 
 /**
  * Extract image from clipboard event
@@ -63,13 +64,17 @@ export async function saveImageToFile(
     mdFilePath: string
 ): Promise<string> {
     const imageBytes = await fileToBytes(imageFile);
-    const imageName = generateImageName(imageFile.type);
+    const generated = generateImageName(imageFile.type);
+    const imageName = imageFile.name && /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(imageFile.name)
+        ? imageFile.name.replace(/[\\/]/g, "_")
+        : generated;
     
     // Call Rust command to save the image
-    const relativePath = await invoke<string>('save_image', {
+    const relativePath = await invoke<string>('save_image_bytes', {
         mdFilePath,
         imageData: Array.from(imageBytes), // Convert to array for serialization
         imageName,
+        assetDir: getImageAssetSettings().relativeDirectory,
     });
     
     return relativePath;

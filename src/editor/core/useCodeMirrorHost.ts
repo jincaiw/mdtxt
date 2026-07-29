@@ -90,6 +90,16 @@ export function useCodeMirrorHost({
             { key: "Mod-Shift-8", run: (view) => applyCommand(view, "format.bulletList") },
             { key: "Mod-Shift-9", run: (view) => applyCommand(view, "format.taskList") },
             { key: "Mod-Shift-c", run: (view) => applyCommand(view, "insert.codeBlock") },
+            // Browser rich-paste handlers vary by WebView. This explicit
+            // shortcut always inserts clipboard plain text and keeps the
+            // resulting transaction in CodeMirror's undo history.
+            { key: "Mod-Shift-v", run: (view) => {
+                void navigator.clipboard.readText().then((text) => {
+                    const selection = view.state.selection.main;
+                    view.dispatch({ changes: { from: selection.from, to: selection.to, insert: text }, selection: { anchor: selection.from + text.length } });
+                });
+                return true;
+            } },
             { key: "Mod-f", run: (view) => { openFind("find", view.state.selection.main.from); return true; } },
             { key: "Mod-h", run: (view) => { openFind("replace", view.state.selection.main.from); return true; } },
         ]));

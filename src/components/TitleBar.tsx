@@ -23,12 +23,11 @@ interface TitleBarProps {
     isNativeFullscreen?: boolean;
     mode?: ViewMode;
     onSetMode?: (mode: ViewMode) => void;
-    liveEnabled?: boolean;
     onToggleNavigation?: () => void;
     navigationActive?: boolean;
 }
 
-function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getExportHtml, onExportSuccess, onExportError, onToggleAI, aiActive, isNativeFullscreen, mode, onSetMode, liveEnabled, onToggleNavigation, navigationActive }: TitleBarProps) {
+function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getExportHtml, onExportSuccess, onExportError, onToggleAI, aiActive, isNativeFullscreen, mode, onSetMode, onToggleNavigation, navigationActive }: TitleBarProps) {
     const { t } = useLocale();
     const desktopPlatform = getDesktopPlatform();
     const isMacOverlay = desktopPlatform === "macos";
@@ -158,7 +157,7 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
 
                 <div className="flex items-center justify-center px-3">
                     {hasFile && mode && onSetMode && (
-                        <ModeToggle mode={mode} onSetMode={onSetMode} liveEnabled={liveEnabled} />
+                        <ModeToggle mode={mode} onSetMode={onSetMode} />
                     )}
                 </div>
 

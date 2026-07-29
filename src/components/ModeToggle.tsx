@@ -4,13 +4,12 @@ import { useLocale } from "../context/LocaleContext";
 interface ModeToggleProps {
     mode: ViewMode;
     onSetMode: (mode: ViewMode) => void;
-    liveEnabled?: boolean;
 }
 
 const buttonBase =
     "btn-press flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-2 text-[11px] font-medium transition-colors";
 
-export function ModeToggle({ mode, onSetMode, liveEnabled = false }: ModeToggleProps) {
+export function ModeToggle({ mode, onSetMode }: ModeToggleProps) {
     const { t } = useLocale();
     const modeClass = (active: boolean) => active
         ? "bg-[var(--bg-primary)] text-[var(--accent)] shadow-[var(--shadow-control)]"
@@ -32,16 +31,16 @@ export function ModeToggle({ mode, onSetMode, liveEnabled = false }: ModeToggleP
                     <span className="hidden lg:inline">{t("Source")}</span>
                 </button>
 
-                {liveEnabled && <button
+                <button
                     onClick={() => onSetMode("live")}
-                    aria-label={t("Live Beta mode")}
+                    aria-label={t("Live mode")}
                     aria-pressed={mode === "live"}
-                    title={t("Live Beta (Source-compatible)")}
+                    title={t("Live Markdown editor")}
                     className={`${buttonBase} ${modeClass(mode === "live")}`}
                 >
                     <span className="material-symbols-outlined text-[15px]">auto_fix_high</span>
-                    <span className="hidden lg:inline">{t("Live Beta")}</span>
-                </button>}
+                    <span className="hidden lg:inline">{t("Live")}</span>
+                </button>
 
                 <button
                     onClick={() => onSetMode("split")}

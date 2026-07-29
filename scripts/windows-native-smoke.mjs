@@ -512,9 +512,9 @@ async function run() {
     console.log("MDTXT_NATIVE_WINDOWS phase=activate-restricted-live");
     const restrictedLiveMs = await execute(`
         return await new Promise((resolveLive, rejectLive) => {
-            const button = document.querySelector("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
+            const button = document.querySelector("button[aria-label='Live 模式'], button[aria-label='Live mode']");
             if (!(button instanceof HTMLButtonElement)) {
-                rejectLive(new Error("Live Beta mode is unavailable"));
+                rejectLive(new Error("Live mode is unavailable"));
                 return;
             }
             const started = performance.now();
@@ -635,14 +635,14 @@ async function run() {
     );
 
     await execute(`
-        const button = document.querySelector("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
-        if (!(button instanceof HTMLButtonElement)) throw new Error("Live Beta mode is unavailable");
+        const button = document.querySelector("button[aria-label='Live 模式'], button[aria-label='Live mode']");
+        if (!(button instanceof HTMLButtonElement)) throw new Error("Live mode is unavailable");
         button.click();
         return true;
     `);
     await waitForScript(
         "return Boolean(document.querySelector(\".cm-editor[data-mdtxt-live='true']\"));",
-        "Windows Live Beta mode",
+        "Windows Live mode",
     );
     await execute("document.querySelector('.cm-content')?.focus(); return true;");
     // Live remounts CodeMirror and therefore creates a fresh TSF input

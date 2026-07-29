@@ -104,9 +104,32 @@ export const getSession = (): SessionState | null => {
 export const setSession = (s: SessionState | null): void => safeSet(KEY_SESSION, s);
 
 export type PersistedViewMode = "preview" | "code" | "split" | "live";
-export const getSavedViewMode = (): PersistedViewMode =>
-    safeGet<PersistedViewMode>(KEY_VIEW_MODE, "preview");
+// Live is the primary authoring surface in v0.4.  A one-time migration keeps
+// explicit user choices intact while moving historical default-only installs
+// away from Reader/Source and removing the old opt-in beta gate.
+const KEY_LIVE_V4_MIGRATED = "mdtxt:liveV4Migrated";
+export const getSavedViewMode = (): PersistedViewMode => {
+    const stored = safeGet<PersistedViewMode | null>(KEY_VIEW_MODE, null);
+    if (stored) return stored;
+    return "live";
+};
 export const setSavedViewMode = (m: PersistedViewMode): void => safeSet(KEY_VIEW_MODE, m);
+
+export function migrateLiveV4Default(): PersistedViewMode {
+    const migrated = safeGet<boolean>(KEY_LIVE_V4_MIGRATED, false);
+    const stored = safeGet<PersistedViewMode | null>(KEY_VIEW_MODE, null);
+    if (!migrated) {
+        // The previous app default was Reader, so existing `preview` values
+        // cannot be distinguished from an untouched default. Move those to
+        // Live; deliberate Source/Split choices remain respected.
+        const next = !stored || stored === "preview" ? "live" : stored;
+        safeSet(KEY_VIEW_MODE, next);
+        safeSet(KEY_LIVE_V4_MIGRATED, true);
+        try { localStorage.removeItem("mdtxt:liveBeta"); } catch { /* unavailable */ }
+        return next;
+    }
+    return stored ?? "live";
+}
 
 export const getSplitRatio = (): number => {
     const r = safeGet<number>(KEY_SPLIT_RATIO, 0.5);
@@ -141,11 +164,48 @@ export const setNavigationWidth = (v: number): void => safeSet(KEY_NAVIGATION_WI
 export const getAIPanelWidth = (): number => safeGet<number>(KEY_AI_PANEL_WIDTH, 360);
 export const setAIPanelWidth = (v: number): void => safeSet(KEY_AI_PANEL_WIDTH, Math.min(480, Math.max(320, Math.round(v))));
 
-// Live remains opt-in throughout P6. Its presentation is Source-compatible,
-// but native IME/platform validation is still required before any default flip.
-const KEY_LIVE_BETA = "mdtxt:liveBeta";
-export const getLiveBetaEnabled = (): boolean => safeGet<boolean>(KEY_LIVE_BETA, false);
-export const setLiveBetaEnabled = (v: boolean): void => safeSet(KEY_LIVE_BETA, v);
+const KEY_WORKSPACE_STATE = "mdtxt:workspace";
+export interface WorkspaceState {
+    root: string | null;
+    expandedPaths: string[];
+    recentRoots: string[];
+}
+const DEFAULT_WORKSPACE_STATE: WorkspaceState = { root: null, expandedPaths: [], recentRoots: [] };
+export const getWorkspaceState = (): WorkspaceState => {
+    const state = safeGet<WorkspaceState>(KEY_WORKSPACE_STATE, DEFAULT_WORKSPACE_STATE);
+    return {
+        root: typeof state?.root === "string" ? state.root : null,
+        expandedPaths: Array.isArray(state?.expandedPaths) ? state.expandedPaths.filter((path): path is string => typeof path === "string").slice(0, 300) : [],
+        recentRoots: Array.isArray(state?.recentRoots) ? state.recentRoots.filter((path): path is string => typeof path === "string").slice(0, 12) : [],
+    };
+};
+export const setWorkspaceState = (state: WorkspaceState): void => safeSet(KEY_WORKSPACE_STATE, {
+    root: state.root,
+    expandedPaths: state.expandedPaths.slice(0, 300),
+    recentRoots: state.recentRoots.slice(0, 12),
+});
+export const rememberWorkspaceRoot = (root: string): WorkspaceState => {
+    const current = getWorkspaceState();
+    const recentRoots = [root, ...current.recentRoots.filter((path) => path !== root)].slice(0, 12);
+    const next = { ...current, root, recentRoots };
+    setWorkspaceState(next);
+    return next;
+};
+
+const KEY_IMAGE_ASSETS = "mdtxt:imageAssets";
+export interface ImageAssetSettings { relativeDirectory: string; }
+export const getImageAssetSettings = (): ImageAssetSettings => {
+    const settings = safeGet<Partial<ImageAssetSettings>>(KEY_IMAGE_ASSETS, {});
+    const relativeDirectory = typeof settings.relativeDirectory === "string" && settings.relativeDirectory.trim() && !settings.relativeDirectory.includes("..") && !/^(?:[A-Za-z]:)?[\\/]/.test(settings.relativeDirectory)
+        ? settings.relativeDirectory.replace(/^\.\//, "").replace(/[\\/]+$/, "")
+        : "images";
+    return { relativeDirectory };
+};
+export const setImageAssetSettings = (settings: ImageAssetSettings): void => safeSet(KEY_IMAGE_ASSETS, getImageAssetSettingsFrom(settings));
+function getImageAssetSettingsFrom(settings: ImageAssetSettings): ImageAssetSettings {
+    const relativeDirectory = settings.relativeDirectory.trim().replace(/^\.\//, "").replace(/[\\/]+$/, "");
+    return !relativeDirectory || relativeDirectory.includes("..") || /^(?:[A-Za-z]:)?[\\/]/.test(relativeDirectory) ? { relativeDirectory: "images" } : { relativeDirectory };
+}
 
 const KEY_AUTO_SAVE = "mdtxt:autoSave";
 export const getAutoSave = (): boolean => safeGet<boolean>(KEY_AUTO_SAVE, false);

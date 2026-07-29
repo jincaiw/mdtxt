@@ -6,7 +6,6 @@ import {
     isSessionDirty,
     markSessionSaved,
     replaceSessionContent,
-    resolveLiveBetaViewMode,
     setSessionViewMode,
 } from "./documentSession";
 
@@ -47,10 +46,9 @@ describe("DocumentSession", () => {
         expect(live).toMatchObject({ viewMode: "live", version: session.version, savedVersion: session.savedVersion });
     });
 
-    it("restores a persisted Live mode only after explicit Beta consent", () => {
-        expect(resolveLiveBetaViewMode("live", false)).toBe("code");
-        expect(resolveLiveBetaViewMode("live", true)).toBe("live");
-        expect(resolveLiveBetaViewMode("split", false)).toBe("split");
+    it("defaults a new session to the stable Live editor", () => {
+        const session = createDocumentSession({ id: "live", path: null, name: "Untitled.md", content: "" });
+        expect(session.viewMode).toBe("live");
     });
 
     it("does not let an old save mark a newer edit clean", () => {

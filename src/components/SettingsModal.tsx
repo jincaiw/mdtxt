@@ -10,7 +10,7 @@ import {
     getSpellCheck, setSpellCheck,
     getAutoSave, setAutoSave,
     getOpenInReader, setOpenInReader,
-    getLiveBetaEnabled, setLiveBetaEnabled,
+    getImageAssetSettings, setImageAssetSettings,
 } from "../utils/persistence";
 import { AI_PROVIDERS, matchProvider, type AIProvider } from "../utils/aiProviders";
 import { attachFocusTrap } from "../utils/focusTrap";
@@ -106,7 +106,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const [spellCheck, setSpellCheckLocal] = useState(getSpellCheck);
     const [autoSave, setAutoSaveLocal] = useState(getAutoSave);
     const [openInReader, setOpenInReaderLocal] = useState(getOpenInReader);
-    const [liveBeta, setLiveBetaLocal] = useState(getLiveBetaEnabled);
+    const [imageAssetDirectory, setImageAssetDirectory] = useState(() => getImageAssetSettings().relativeDirectory);
 
     const [ai, setAi] = useState(getAIConfig);
     const [aiEnabled, setAiEnabledLocal] = useState(getAIEnabled);
@@ -370,10 +370,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     <ToggleRow label={t("Spell check")} description={t("Underline misspelled words while you type")} checked={spellCheck}
                                         onChange={(v) => { setSpellCheckLocal(v); setSpellCheck(v); fire("mdtxt:spellcheck-toggle", v); }} />
                                 )}
-                                {matches("live beta") && (
-                                    <ToggleRow label={t("Enable Live Beta")} description={t("Source-compatible Markdown styling; keep disabled for stable Source editing")} checked={liveBeta}
-                                        onChange={(v) => { setLiveBetaLocal(v); setLiveBetaEnabled(v); fire("mdtxt:live-beta-toggle", v); }} />
-                                )}
                                 {matches("autosave") && (
                                     <ToggleRow label={t("Autosave")} description={t("Save automatically a moment after you stop typing")} checked={autoSave}
                                         onChange={(v) => { setAutoSaveLocal(v); setAutoSave(v); fire("mdtxt:autosave-toggle", v); }} />
@@ -383,6 +379,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     // file open (same pattern as toggle-ai-panel).
                                     <ToggleRow label={t("Open files in reader mode")} description={t("Every file opens read-first; editing stays one click away")} checked={openInReader}
                                         onChange={(v) => { setOpenInReaderLocal(v); setOpenInReader(v); }} />
+                                )}
+                                {matches("image asset directory") && (
+                                    <label className="block px-3.5 py-3 text-left">
+                                        <span className="block text-sm font-medium text-[var(--text-primary)]">{t("Image asset directory")}</span>
+                                        <span className="mt-0.5 block text-[11px] text-[var(--text-muted)]">{t("Relative to each Markdown document; default: images")}</span>
+                                        <input value={imageAssetDirectory} onChange={(event) => setImageAssetDirectory(event.target.value)} onBlur={() => { const relativeDirectory = imageAssetDirectory.trim(); setImageAssetSettings({ relativeDirectory }); setImageAssetDirectory(getImageAssetSettings().relativeDirectory); }} className="mt-2 w-full rounded border border-[var(--border)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]" aria-label={t("Image asset directory")} />
+                                    </label>
                                 )}
                             </div>
                         )}

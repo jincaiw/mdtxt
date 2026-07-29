@@ -28,7 +28,7 @@ function measureLocalEdits(state: EditorState): { p50: number; p95: number } {
     return { p50: percentile(samples, 0.5), p95: percentile(samples, 0.95) };
 }
 
-console.log("mdtxt Live Beta CodeMirror state baseline (no DOM/WebView input latency)");
+console.log("mdtxt Live CodeMirror state baseline (no DOM/WebView input latency)");
 console.log("Run on a release candidate and record machine, OS, WebView and output in the P6 tracking record.");
 for (const sample of samples) {
     const document = createLargeMarkdown(sample.bytes);

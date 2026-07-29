@@ -73,8 +73,8 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
                 if (s.hasFile) s.handleToggleFocus?.();
                 return;
             }
-            // Cmd/Ctrl+Shift+L - explicit Live mode. Keep Ctrl+E's historical
-            // Reader/Source toggle intact rather than overloading it again.
+            // Cmd/Ctrl+Shift+L - switch to/from the primary Live editor. Keep
+            // Ctrl+E's Reader/Source toggle intact rather than overloading it.
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === "l" || e.key === "L")) {
                 e.preventDefault();
                 if (s.hasFile) s.handleToggleLive?.();

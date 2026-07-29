@@ -11,6 +11,7 @@ import { liveMathWidgets } from "./liveMathWidgets";
 import { liveMermaidWidgets } from "./liveMermaidWidgets";
 import { liveFootnoteWidgets } from "./liveFootnoteWidgets";
 import { liveCalloutWidgets } from "./liveCalloutWidgets";
+import { liveTocWidgets } from "./liveTocWidgets";
 import type { LiveLocale } from "./liveLocale";
 
 const marks: Record<string, Decoration> = {
@@ -47,13 +48,28 @@ class LiveRuleWidget extends WidgetType {
 }
 
 class LiveListMarkerWidget extends WidgetType {
-    constructor(private readonly source: string, private readonly task = false) { super(); }
-    eq(other: LiveListMarkerWidget) { return this.source === other.source && this.task === other.task; }
-    toDOM() {
+    constructor(private readonly source: string, private readonly task = false, private readonly from = 0) { super(); }
+    eq(other: LiveListMarkerWidget) { return this.source === other.source && this.task === other.task && this.from === other.from; }
+    toDOM(view: EditorView) {
         const marker = document.createElement("span");
         marker.className = this.task ? "cm-live-task-checkbox" : "cm-live-list-bullet";
         marker.setAttribute("aria-hidden", "true");
-        if (this.task) marker.textContent = /x/i.test(this.source) ? "☑" : "☐";
+        if (this.task) {
+            const checked = /x/i.test(this.source);
+            marker.textContent = checked ? "☑" : "☐";
+            marker.setAttribute("role", "checkbox");
+            marker.setAttribute("aria-checked", String(checked));
+            marker.tabIndex = 0;
+            const toggle = (event: Event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const offset = this.source.search(/[ xX]/);
+                if (offset < 0) return;
+                view.dispatch({ changes: { from: this.from + offset, to: this.from + offset + 1, insert: checked ? " " : "x" } });
+            };
+            marker.addEventListener("mousedown", toggle);
+            marker.addEventListener("keydown", (event) => { if (event.key === " " || event.key === "Enter") toggle(event); });
+        }
         else marker.textContent = /^\d+\./.test(this.source) ? this.source : "•";
         return marker;
     }
@@ -136,10 +152,10 @@ function markerHidingDecorations(view: EditorView): DecorationSet {
                         break;
                     }
                     case "ListMark":
-                        if (!focused) ranges.push(Decoration.replace({ widget: new LiveListMarkerWidget(source.sliceString(node.from, node.to)) }).range(node.from, node.to));
+                        if (!focused) ranges.push(Decoration.replace({ widget: new LiveListMarkerWidget(source.sliceString(node.from, node.to), false, node.from) }).range(node.from, node.to));
                         break;
                     case "TaskMarker":
-                        if (!focused) ranges.push(Decoration.replace({ widget: new LiveListMarkerWidget(source.sliceString(node.from, node.to), true) }).range(node.from, node.to));
+                        if (!focused) ranges.push(Decoration.replace({ widget: new LiveListMarkerWidget(source.sliceString(node.from, node.to), true, node.from) }).range(node.from, node.to));
                         break;
                     case "Blockquote": {
                         if (focused) break;
@@ -261,9 +277,8 @@ export const liveMarkdownTheme = EditorView.baseTheme({
     ".cm-live-task-checkbox": { display: "inline-block", width: "1.2em", color: "var(--accent)", fontSize: "1.06em", lineHeight: "1" },
     ".cm-live-block-widget": {
         display: "flex", flexDirection: "column", alignItems: "center", gap: "0.35rem",
-        width: "100%", margin: "0.65rem 0 0.25rem", padding: "0.65rem",
-        border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
-        backgroundColor: "var(--bg-secondary)", boxSizing: "border-box",
+        width: "100%", margin: "0.65rem 0 0.25rem", padding: "0.15rem 0",
+        boxSizing: "border-box",
         cursor: "text",
     },
     ".cm-live-block-widget:focus-visible": { outline: "2px solid var(--accent)", outlineOffset: "2px" },
@@ -271,6 +286,7 @@ export const liveMarkdownTheme = EditorView.baseTheme({
     ".cm-live-image-widget .cm-live-image-caption": { color: "var(--text-secondary)", fontSize: "0.78rem" },
     ".cm-live-widget-label": { alignSelf: "flex-end", color: "var(--text-muted)", fontSize: "0.7rem" },
     ".cm-live-code-widget": { alignItems: "stretch" },
+    ".cm-live-code-widget, .cm-live-table-widget, .cm-live-frontmatter-widget": { padding: "0.65rem", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", backgroundColor: "var(--bg-secondary)" },
     ".cm-live-code-widget pre": {
         margin: "0", padding: "0.75rem", overflowX: "auto", borderRadius: "var(--radius-sm)",
         backgroundColor: "var(--code-bg)", color: "var(--code-text)", fontFamily: "var(--font-mono)",
@@ -346,7 +362,7 @@ const liveRestrictedAttributes: Extension = [
 ];
 const liveMarkdownBase: Extension = [liveMarkdownDecorations, liveMarkerHidingPlugin, liveEditFocusPlugin, liveMarkdownTheme];
 export function createLiveMarkdownPresentation(filePath: string | null, locale: LiveLocale = "zh-CN"): Extension {
-    return [liveMarkdownBase, liveImageWidgets(filePath, locale), liveCodeWidgets(locale), liveFrontmatterWidgets(locale), liveTableWidgets, liveMathWidgets(locale), liveMermaidWidgets(locale), liveFootnoteWidgets, liveCalloutWidgets(locale), liveAttributes];
+    return [liveMarkdownBase, liveImageWidgets(filePath, locale), liveCodeWidgets(locale), liveFrontmatterWidgets(locale), liveTableWidgets, liveMathWidgets(locale), liveMermaidWidgets(locale), liveFootnoteWidgets, liveCalloutWidgets(locale), liveTocWidgets, liveAttributes];
 }
 export const liveMarkdownPresentation: Extension = createLiveMarkdownPresentation(null);
 /**

@@ -7,7 +7,7 @@ import {
     getWordWrap,
     migrateLegacyKeys, getLastFile,
     getOpenInReader, setOpenInReader,
-    getLiveBetaEnabled, setLiveBetaEnabled,
+    getSavedViewMode, migrateLiveV4Default,
     getSession, setSession,
     getFocusMode, setFocusMode,
     getNavigationWidth, setNavigationWidth,
@@ -71,11 +71,17 @@ describe("open in reader", () => {
     });
 });
 
-describe("Live Beta", () => {
-    it("defaults off and only changes after explicit opt-in", () => {
-        expect(getLiveBetaEnabled()).toBe(false);
-        setLiveBetaEnabled(true);
-        expect(getLiveBetaEnabled()).toBe(true);
+describe("Live v0.4 migration", () => {
+    it("defaults clean installs to Live and migrates the historical Reader default", () => {
+        expect(getSavedViewMode()).toBe("live");
+        expect(migrateLiveV4Default()).toBe("live");
+        localStorage.clear();
+        localStorage.setItem("mdtxt:viewMode", JSON.stringify("preview"));
+        expect(migrateLiveV4Default()).toBe("live");
+    });
+    it("preserves explicit Source and Split choices", () => {
+        localStorage.setItem("mdtxt:viewMode", JSON.stringify("code"));
+        expect(migrateLiveV4Default()).toBe("code");
     });
 });
 

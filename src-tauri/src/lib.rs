@@ -4,8 +4,10 @@ mod pdf;
 mod recovery;
 
 use commands::{
-    get_ai_key, get_file_info, list_directory_files, read_file, read_image_file, save_file,
-    save_image, search_files, set_ai_key, write_export_binary, write_export_text,
+    create_workspace_entry, get_ai_key, get_file_info, list_directory_files,
+    list_workspace_entries, move_workspace_entry, read_file, read_image_file,
+    rename_workspace_entry, save_file, save_image, save_image_bytes, search_files, set_ai_key,
+    trash_workspace_entry, write_export_binary, write_export_text,
 };
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
@@ -77,8 +79,14 @@ pub fn run() {
             save_file,
             get_file_info,
             list_directory_files,
+            list_workspace_entries,
+            create_workspace_entry,
+            rename_workspace_entry,
+            move_workspace_entry,
+            trash_workspace_entry,
             search_files,
             save_image,
+            save_image_bytes,
             read_image_file,
             get_ai_key,
             set_ai_key,

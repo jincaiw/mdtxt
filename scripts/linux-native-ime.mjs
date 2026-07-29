@@ -435,14 +435,14 @@ async function run() {
     assert.equal((await execute(editorTextScript)).includes(sourceChinese), true);
 
     await execute(`
-        const button = document.querySelector("button[aria-label='Live Beta 模式'], button[aria-label='Live Beta mode']");
-        if (!(button instanceof HTMLButtonElement)) throw new Error("Live Beta mode is unavailable");
+        const button = document.querySelector("button[aria-label='Live 模式'], button[aria-label='Live mode']");
+        if (!(button instanceof HTMLButtonElement)) throw new Error("Live mode is unavailable");
         button.click();
         return true;
     `);
     await waitForScript(
         "return Boolean(document.querySelector(\".cm-editor[data-mdtxt-live='true']\"));",
-        "Live Beta mode",
+        "Live mode",
     );
     await execute("document.querySelector('.cm-content')?.focus(); return true;");
     // Keep the Source and Live commits on separate lines so two successful

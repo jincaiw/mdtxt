@@ -6,6 +6,12 @@ All notable mdtxt changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-29
+
+- Live is the default stable editor mode; the opt-in Beta gate has been removed while Source, Reader, Split and large-document Source fallback remain available.
+- Added rooted workspace tree operations with containment checks, no-overwrite moves, system Trash and open-tab path remapping.
+- Added standalone `[TOC]` rendering in Live and preview/export HTML, safe relative image asset directories and plain-text paste shortcut.
+
 ## [0.3.0] - 2026-07-29
 
 ### Added
