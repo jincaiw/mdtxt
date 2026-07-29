@@ -88,6 +88,7 @@ import {
   getNavigationWidth,
   getAIPanelWidth,
   getWordWrap,
+  getWorkspaceState,
   setAIEnabled,
   setLastFile,
   setSavedViewMode,
@@ -177,6 +178,7 @@ let bootResolved = false;
 
 // Theme options for the command palette, in the same order as Settings.
 const THEME_CHOICES: { id: Theme; label: string }[] = [
+  { id: "system", label: "System" },
   { id: "dark", label: "Dark" },
   { id: "light", label: "Light" },
   { id: "paper", label: "Paper" },
@@ -1397,7 +1399,8 @@ function AppContent() {
     );
   }, [loadFile]);
 
-  // Folder the cross-file search runs in: the open file's directory.
+  // A selected workspace is the search boundary; only fall back to the open
+  // file's directory when the user has not opened a workspace yet.
   const currentDirectory = useMemo(() => {
     if (!filePath) return null;
     const lastSep = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
@@ -2677,7 +2680,7 @@ function AppContent() {
         <Suspense fallback={null}>
           <GlobalSearch
             isOpen={showSearch}
-            directory={currentDirectory}
+            directory={getWorkspaceState().root ?? currentDirectory}
             onClose={() => setShowSearch(false)}
             onOpenResult={handleOpenSearchResult}
           />

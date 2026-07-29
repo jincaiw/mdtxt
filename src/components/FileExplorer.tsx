@@ -54,6 +54,8 @@ export function FileExplorer({ isOpen, currentFilePath, onFileSelect, onClose, o
     const [loading, setLoading] = useState<Set<string>>(() => new Set());
     const [error, setError] = useState<string | null>(null);
     const [menuPath, setMenuPath] = useState<string | null>(null);
+    const [filter, setFilter] = useState("");
+    const [sortBy, setSortBy] = useState<"name" | "modified">("name");
     const panelRef = useRef<HTMLElement>(null);
 
     const loadDirectory = useCallback(async (root: string, directory: string, force = false) => {
@@ -175,10 +177,40 @@ export function FileExplorer({ isOpen, currentFilePath, onFileSelect, onClose, o
     }, [onWorkspaceMutation, refresh, workspaceRoot]);
 
     const rootName = useMemo(() => workspaceRoot?.replace(/\\/g, "/").split("/").pop() || "Files", [workspaceRoot]);
+    const normalizedFilter = filter.trim().toLocaleLowerCase();
+    const visibleEntries = useCallback((directory: string) => {
+        const entries = children[directory] ?? [];
+        return entries
+            .filter((entry) => !normalizedFilter || entry.name.toLocaleLowerCase().includes(normalizedFilter) || entry.kind === "directory")
+            .slice().sort((left, right) => {
+                if (left.kind === "directory" && right.kind !== "directory") return -1;
+                if (left.kind !== "directory" && right.kind === "directory") return 1;
+                return sortBy === "modified"
+                    ? right.modified - left.modified || left.name.localeCompare(right.name)
+                    : left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
+            });
+    }, [children, normalizedFilter, sortBy]);
+    const visiblePaths = useMemo(() => {
+        if (!workspaceRoot) return [] as string[];
+        const paths: string[] = [];
+        const visit = (directory: string) => {
+            for (const entry of visibleEntries(directory)) {
+                paths.push(entry.path);
+                if (entry.kind === "directory" && expanded.has(entry.path)) visit(entry.path);
+            }
+        };
+        visit(workspaceRoot);
+        return paths;
+    }, [expanded, visibleEntries, workspaceRoot]);
+    const focusRelativeRow = (path: string, delta: number) => {
+        const index = visiblePaths.indexOf(path);
+        const next = visiblePaths[Math.max(0, Math.min(visiblePaths.length - 1, index + delta))];
+        if (next) panelRef.current?.querySelector<HTMLElement>(`[data-workspace-row="${CSS.escape(next)}"]`)?.focus();
+    };
     const renderNode = (entry: WorkspaceEntry, depth: number): React.ReactNode => {
         const open = expanded.has(entry.path);
         const isActive = entry.kind === "markdown" && entry.path === currentFilePath;
-        const nodeChildren = children[entry.path] ?? [];
+        const nodeChildren = visibleEntries(entry.path);
         return (
             <li key={entry.path} role="treeitem" aria-level={depth + 1} aria-expanded={entry.kind === "directory" ? open : undefined} aria-selected={isActive}>
                 <div
@@ -205,9 +237,17 @@ export function FileExplorer({ isOpen, currentFilePath, onFileSelect, onClose, o
                     </button>
                     <button
                         type="button"
+                        data-workspace-row={entry.path}
                         className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left text-sm"
                         onDoubleClick={() => entry.kind === "markdown" && onFileSelect(entry.path)}
                         onClick={() => entry.kind === "directory" ? toggleDirectory(entry) : entry.kind === "markdown" ? onFileSelect(entry.path) : undefined}
+                        onKeyDown={(event) => {
+                            if (event.key === "ArrowDown") { event.preventDefault(); focusRelativeRow(entry.path, 1); }
+                            else if (event.key === "ArrowUp") { event.preventDefault(); focusRelativeRow(entry.path, -1); }
+                            else if (event.key === "ArrowRight" && entry.kind === "directory") { event.preventDefault(); if (!open) toggleDirectory(entry); }
+                            else if (event.key === "ArrowLeft" && entry.kind === "directory") { event.preventDefault(); if (open) toggleDirectory(entry); }
+                            else if ((event.key === "Enter" || event.key === " ") && entry.kind === "markdown") { event.preventDefault(); onFileSelect(entry.path); }
+                        }}
                         title={entry.path}
                     >
                         <span className="material-symbols-outlined text-[16px] shrink-0">{nodeIcon(entry.kind)}</span>
@@ -241,10 +281,14 @@ export function FileExplorer({ isOpen, currentFilePath, onFileSelect, onClose, o
                 <button onClick={() => refresh()} title={t("Refresh")} aria-label={t("Refresh file list")} className="btn-press h-7 w-7 rounded hover:bg-[var(--bg-hover)]"><span className="material-symbols-outlined text-[17px]">refresh</span></button>
                 {!embedded && <button onClick={onClose} aria-label={t("Close file explorer")} className="btn-press h-7 w-7 rounded hover:bg-[var(--bg-hover)]"><span className="material-symbols-outlined text-[17px]">close</span></button>}
             </div>
+            {workspaceRoot && <div className="flex gap-1 border-b border-[var(--border)] p-2">
+                <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder={t("Filter files…")} aria-label={t("Filter files")} className="min-w-0 flex-1 rounded border border-[var(--border)] bg-[var(--bg-input)] px-2 py-1 text-xs outline-none focus:border-[var(--accent)]" />
+                <button type="button" onClick={() => setSortBy((current) => current === "name" ? "modified" : "name")} aria-label={t("Sort files")} title={t(sortBy === "name" ? "Sort by modified" : "Sort by name")} className="btn-press h-7 w-7 rounded hover:bg-[var(--bg-hover)]"><span className="material-symbols-outlined text-[16px]">{sortBy === "name" ? "sort_by_alpha" : "schedule"}</span></button>
+            </div>}
             <div className="min-h-0 flex-1 overflow-auto">
                 {error && <div role="alert" className="m-2 rounded border border-[var(--danger)]/30 p-2 text-xs text-[var(--danger)]">{error}</div>}
                 {!workspaceRoot ? <div className="p-4 text-sm text-[var(--text-secondary)]">{t("Open a folder to manage a Markdown workspace.")}</div> : <ul role="tree" aria-label={t("Files and folders")} className="py-1">
-                    {loading.has(workspaceRoot) ? <li className="p-3 text-sm text-[var(--text-secondary)]">{t("Loading...")}</li> : (children[workspaceRoot] ?? []).map((entry) => renderNode(entry, 0))}
+                    {loading.has(workspaceRoot) ? <li className="p-3 text-sm text-[var(--text-secondary)]">{t("Loading...")}</li> : visibleEntries(workspaceRoot).map((entry) => renderNode(entry, 0))}
                 </ul>}
             </div>
         </aside>

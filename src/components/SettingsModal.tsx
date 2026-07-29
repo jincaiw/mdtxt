@@ -39,6 +39,7 @@ const sections: Array<{ id: Section; label: string; icon: string }> = [
 ];
 
 const themes: Array<{ id: Theme; name: string; colors: [string, string]; textColor: string; icon?: string }> = [
+    { id: 'system', name: 'System', colors: ['#f5f5f5', '#242424'], textColor: '#444', icon: 'brightness_auto' },
     { id: "dark", name: "Dark", colors: ["#0a0a0a", "#141414"], textColor: "#ffffff" },
     { id: "light", name: "Light", colors: ["#ffffff", "#f4f2ee"], textColor: "#171717" },
     { id: "paper", name: "Paper", colors: ["#f5f0e6", "#ebe5d8"], textColor: "#3d3d3d" },

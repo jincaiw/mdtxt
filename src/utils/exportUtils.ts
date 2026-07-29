@@ -13,7 +13,7 @@ export function resolveExportLanguage(htmlContent: string, preference: ExportMet
 }
 
 // Theme color definitions for export
-const themeColors: Record<Theme, Record<string, string>> = {
+const themeColors: Record<Exclude<Theme, "system">, Record<string, string>> = {
     dark: {
         bgPrimary: '#0a0a0a',
         bgSecondary: '#141414',
@@ -102,7 +102,10 @@ const fontSizes: Record<FontSize, { base: string; h1: string; h2: string; h3: st
 
 // Generate CSS for export
 function generateExportCSS(theme: Theme, font: FontFamily, fontSize: FontSize): string {
-    const colors = themeColors[theme];
+    const resolvedTheme = theme === "system"
+        ? (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : theme;
+    const colors = themeColors[resolvedTheme];
     const fontFamily = fontFamilies[font];
     const sizes = fontSizes[fontSize];
 

@@ -311,7 +311,11 @@ jobs:
           path: |
             /tmp/mdtxt-linux-ime-preedit.png
             /tmp/mdtxt-ubuntu-system-print-dialog.png
-          if-no-files-found: error
+          # The native assertions are the gate. Screenshot capture is useful
+          # diagnostics, but GTK's sandboxed print surface can disappear
+          # between a successful assertion and artifact collection; do not
+          # turn that post-test collection race into a false CI failure.
+          if-no-files-found: warn
           retention-days: 14
 
       # Current EdgeDriver cannot launch or attach to this Tauri/Wry WebView2

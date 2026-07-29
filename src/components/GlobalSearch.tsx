@@ -15,7 +15,7 @@ interface FileResult {
 
 interface GlobalSearchProps {
     isOpen: boolean;
-    /** Folder to search (the current file's directory), or null when no file is open. */
+    /** Workspace root, falling back to the current file's directory when absent. */
     directory: string | null;
     onClose: () => void;
     onOpenResult: (path: string, line: number) => void;
@@ -148,7 +148,7 @@ export function GlobalSearch({ isOpen, directory, onClose, onOpenResult }: Globa
                     {error ? (
                         <div className="p-6 text-sm text-[var(--danger)]" role="alert">{error}</div>
                     ) : !query.trim() ? (
-                        <div className="p-6 text-sm text-[var(--text-muted)]">{t("Type to search every markdown file in the current folder.")}</div>
+                        <div className="p-6 text-sm text-[var(--text-muted)]">{t("Type to search every markdown file in the current workspace.")}</div>
                     ) : loading && results.length === 0 ? (
                         <div className="p-6 text-sm text-[var(--text-secondary)]">{t("Searching…")}</div>
                     ) : totalMatches === 0 ? (
