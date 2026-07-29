@@ -132,6 +132,12 @@ describe("mdtxt native Tauri smoke", () => {
         });
         console.log(`MDTXT_NATIVE_TRACE ${JSON.stringify(result.metrics ?? [])}`);
         assert.equal(result.error, undefined, result.error);
+        // Live is the product default. Recovery/performance probes that type
+        // exact Markdown must opt into Source instead of treating the rendered
+        // Live projection as a contenteditable source surface.
+        const source = await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']");
+        await activate(source);
+        await browser.waitUntil(async () => (await source.getAttribute("aria-pressed")) === "true");
         return result.duration;
     };
 

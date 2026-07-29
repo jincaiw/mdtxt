@@ -83,6 +83,13 @@ async function editorText() {
     });
 }
 
+async function selectSource() {
+    const source = await browser.$("button[aria-label='源码编辑器'], button[aria-label='Code editor']");
+    await source.waitForDisplayed();
+    await browser.execute((button) => button.click(), source);
+    await browser.waitUntil(async () => (await source.getAttribute("aria-pressed")) === "true");
+}
+
 async function typeEditorLines(text) {
     const editor = await browser.$(".cm-content");
     for (const delayMs of [50, 100, 200]) {
@@ -113,6 +120,7 @@ async function run() {
     await browser.$("//button[contains(., '新建文件') or contains(., 'New File')]").click();
     await browser.$(".cm-content").waitForDisplayed();
     await dismissTour();
+    await selectSource();
     await typeEditorLines(firstText);
     await browser.execute(() => {
         const button = document.querySelector("button[aria-label='新建文件'], button[aria-label='New file']");
