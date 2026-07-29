@@ -104,9 +104,6 @@ jobs:
       # notarization, codesign, notarytool, signtool, or signing-service steps
       # without replacing this policy and obtaining the required credentials.
       - name: Build unsigned packages
-        env:
-          # Prevent a runner keychain identity from being selected implicitly.
-          APPLE_SIGNING_IDENTITY: ""
         run: bun run tauri build ${{ matrix.args }}
       - name: Rename and upload unsigned Windows packages
         if: matrix.portable
