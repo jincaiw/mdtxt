@@ -195,8 +195,8 @@ async function run() {
     // a second SendInput process foregrounds the top-level window.
     focusUiTab(0);
     await wait(500);
-    assert.equal(readEditorThroughClipboard(), firstText);
     capture(recoveryScreenshot);
+    assert.equal(readEditorThroughClipboard(), firstText);
     console.log(`MDTXT_INSTALLED_RECOVERY platform=windows binary=${binary} signal=taskkill-F drafts=2 order=passed activeTab=second cursorLine=5 content=passed accessibleTabSelection=passed originalOverwrite=impossible deniedShareUx=passed recoveryScreenshot=${recoveryScreenshot} deniedScreenshot=${deniedScreenshot}`);
 }
 

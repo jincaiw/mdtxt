@@ -52,8 +52,9 @@ while ([DateTime]::UtcNow -lt $deadline) {
         # Use the accessible element's native screen rectangle for a real
         # pointer activation of the same standard click path users exercise.
         $rect = $tab.Current.BoundingRectangle
-        $x = [int]($rect.Left + ($rect.Width / 2))
-        $y = [int]($rect.Top + ($rect.Height / 2))
+        $point = $tab.GetClickablePoint()
+        $x = [int]$point.X
+        $y = [int]$point.Y
         [void][MdtxtNativePointer]::ShowWindow($process.MainWindowHandle, [MdtxtNativePointer]::Restore)
         if (-not [MdtxtNativePointer]::SetForegroundWindow($process.MainWindowHandle)) {
           throw "Could not foreground mdtxt before selecting tab index $Index."
@@ -64,7 +65,7 @@ while ([DateTime]::UtcNow -lt $deadline) {
         }
         [MdtxtNativePointer]::mouse_event([MdtxtNativePointer]::LeftDown, 0, 0, 0, [UIntPtr]::Zero)
         [MdtxtNativePointer]::mouse_event([MdtxtNativePointer]::LeftUp, 0, 0, 0, [UIntPtr]::Zero)
-        Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=native-pointer x=$x y=$y"
+        Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=native-pointer x=$x y=$y bounds=$($rect.Left),$($rect.Top),$($rect.Width),$($rect.Height)"
         exit 0
       }
     } catch {
