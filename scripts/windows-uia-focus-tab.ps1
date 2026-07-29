@@ -26,27 +26,10 @@ while ([DateTime]::UtcNow -lt $deadline) {
       $tabs = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
       if ($tabs.Count -gt $Index) {
         $tab = $tabs.Item($Index)
-        $invoke = $null
-        if ($tab.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$invoke)) {
-          $invoke.Invoke()
-          Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=invoke"
-          exit 0
-        }
-        $legacy = $null
-        if ($tab.TryGetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern, [ref]$legacy)) {
-          $legacy.DoDefaultAction()
-          Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=legacy"
-          exit 0
-        }
-        $selection = $null
-        if ($tab.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) {
-          $selection.Select()
-          Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=selection-item"
-          exit 0
-        }
         # WebView2 does not consistently expose an invokable pattern for an
-        # ARIA tab. Keep focus and activation in this process so another
-        # SendInput process cannot move focus back to the top-level window.
+        # ARIA tab, and probing unsupported patterns can itself throw. Keep
+        # discovery, focus and activation in one process so no helper can move
+        # focus back to the top-level window between SetFocus and Enter.
         $tab.SetFocus()
         Start-Sleep -Milliseconds 100
         [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
