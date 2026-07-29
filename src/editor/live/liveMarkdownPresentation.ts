@@ -264,9 +264,11 @@ export const liveMarkdownTheme = EditorView.baseTheme({
         width: "100%", margin: "0.65rem 0 0.25rem", padding: "0.65rem",
         border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
         backgroundColor: "var(--bg-secondary)", boxSizing: "border-box",
+        cursor: "text",
     },
+    ".cm-live-block-widget:focus-visible": { outline: "2px solid var(--accent)", outlineOffset: "2px" },
     ".cm-live-image-widget img": { maxWidth: "100%", maxHeight: "28rem", borderRadius: "var(--radius-sm)" },
-    ".cm-live-image-widget figcaption": { color: "var(--text-secondary)", fontSize: "0.78rem" },
+    ".cm-live-image-widget .cm-live-image-caption": { color: "var(--text-secondary)", fontSize: "0.78rem" },
     ".cm-live-widget-label": { alignSelf: "flex-end", color: "var(--text-muted)", fontSize: "0.7rem" },
     ".cm-live-code-widget": { alignItems: "stretch" },
     ".cm-live-code-widget pre": {
@@ -300,10 +302,10 @@ export const liveMarkdownTheme = EditorView.baseTheme({
 });
 
 /**
- * Tracks the focus contract at the view boundary. It deliberately does not
- * mutate source or decorations: P6 uses styled source only. The data classes
- * make composition/multi-selection state explicit for a future renderer that
- * wants to collapse markers and must first consult `resolveEditFocus`.
+ * Tracks the edit-focus contract at the view boundary. Projection extensions
+ * keep selection-touched source visible; these data classes additionally let
+ * marker styling and Focus mode suspend visual collapsing during composition
+ * or multi-selection without mutating the document.
  */
 const liveEditFocusPlugin = ViewPlugin.fromClass(class {
     constructor(private readonly view: EditorView) {

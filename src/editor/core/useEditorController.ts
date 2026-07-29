@@ -31,6 +31,7 @@ export interface EditorControllerOptions {
     onScrollFraction?: (fraction: number) => void;
     registerScroller?: (scroller: Scroller | null) => void;
     typewriterMode?: boolean;
+    focusMode?: boolean;
     showToolbar?: boolean;
     wordWrap?: boolean;
     spellCheck?: boolean;
@@ -54,7 +55,7 @@ export interface EditorControllerOptions {
 export function useEditorController({
     documentId, sessionState, onStateChange, content, onChange, onTextChanges, onCursorChange,
     onSelectionChange, onImagePaste, onError, onNotice, filePath,
-    onScrollFraction, registerScroller, typewriterMode, showToolbar,
+    onScrollFraction, registerScroller, typewriterMode, focusMode = false, showToolbar,
     wordWrap = true, spellCheck = false, liveMode = false, liveRestricted = false, liveLocale = "zh-CN", aiConfig, reviewDoc, onReviewResolve,
 }: EditorControllerOptions) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -108,7 +109,7 @@ export function useEditorController({
         viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef, contentRef,
         onStateChangeRef, documentId, sessionState, content,
     });
-    useEditorPreferences({ viewRef, wrapCompRef, spellCompRef, wordWrap, spellCheck });
+    useEditorPreferences({ viewRef, wrapCompRef, spellCompRef, wordWrap, spellCheck, focusMode });
     const sourceSyntaxRestricted = content.length > LARGE_SOURCE_SYNTAX_LIMIT;
     useEffect(() => {
         viewRef.current?.dispatch({

@@ -17,12 +17,14 @@ export function useEditorPreferences({
     spellCompRef,
     wordWrap,
     spellCheck,
+    focusMode,
 }: {
     viewRef: RefObject<EditorView | null>;
     wrapCompRef: RefObject<Compartment>;
     spellCompRef: RefObject<Compartment>;
     wordWrap: boolean;
     spellCheck: boolean;
+    focusMode: boolean;
 }) {
     useEffect(() => {
         viewRef.current?.dispatch({ effects: wrapCompRef.current.reconfigure(wordWrap ? EditorView.lineWrapping : []) });
@@ -31,4 +33,11 @@ export function useEditorPreferences({
     useEffect(() => {
         viewRef.current?.dispatch({ effects: spellCompRef.current.reconfigure(EditorView.contentAttributes.of(spellcheckAttributes(spellCheck))) });
     }, [spellCheck, spellCompRef, viewRef]);
+
+    useEffect(() => {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dom.classList.toggle("mdtxt-editor-focus", focusMode);
+        return () => view.dom.classList.remove("mdtxt-editor-focus");
+    }, [focusMode, viewRef]);
 }

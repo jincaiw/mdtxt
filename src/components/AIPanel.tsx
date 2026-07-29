@@ -5,6 +5,7 @@ import { streamChat, buildAskMessages, buildAgentMessages, parseEdits, AI_MAX_DO
 import type { AIConfig } from "../utils/aiAssist";
 import { useLocale } from "../context/LocaleContext";
 import { localizeAIError } from "../utils/aiErrors";
+import { PanelResizeHandle } from "./PanelResizeHandle";
 
 interface AIPanelProps {
     isOpen: boolean;
@@ -20,6 +21,9 @@ interface AIPanelProps {
     aiConfig: AIConfig;
     /** Called (Agent mode) with the proposed document to review in the editor. */
     onProposeEdit?: (proposedDoc: string, source: { documentId: string; version: number; content: string }) => void;
+    embedded?: boolean;
+    width?: number;
+    onWidthChange?: (width: number) => void;
 }
 
 interface UIMessage {
@@ -31,7 +35,7 @@ interface UIMessage {
 // itself is attached only to the latest turn inside buildAskMessages).
 const MAX_HISTORY_TURNS = 8;
 
-export function AIPanel({ isOpen, onClose, note, documentId, documentVersion, fileName, selectionText, aiConfig, onProposeEdit }: AIPanelProps) {
+export function AIPanel({ isOpen, onClose, note, documentId, documentVersion, fileName, selectionText, aiConfig, onProposeEdit, embedded = false, width = 360, onWidthChange }: AIPanelProps) {
     const { t } = useLocale();
     const [messages, setMessages] = useState<UIMessage[]>([]);
     const [input, setInput] = useState("");
@@ -147,8 +151,12 @@ export function AIPanel({ isOpen, onClose, note, documentId, documentVersion, fi
         <aside
             role="complementary"
             aria-label={t("AI assistant")}
-            className="fixed right-0 top-12 bottom-7 w-[400px] max-w-[90vw] z-50 flex flex-col bg-[var(--bg-secondary)] border-l border-[var(--border)] shadow-2xl"
+            style={embedded ? ({ "--workspace-ai-width": `${width}px` } as React.CSSProperties) : undefined}
+            className={embedded
+                ? "workspace-ai-panel flex flex-col bg-[var(--bg-secondary)] border-l border-[var(--border)]"
+                : "fixed right-0 top-12 bottom-7 w-[400px] max-w-[90vw] z-50 flex flex-col bg-[var(--bg-secondary)] border-l border-[var(--border)] shadow-2xl"}
         >
+            {embedded && onWidthChange && <PanelResizeHandle side="right" value={width} min={320} max={480} onChange={onWidthChange} />}
             {/* Header */}
             <div className="h-10 shrink-0 px-3 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-titlebar)]">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)] no-select tracking-tight">

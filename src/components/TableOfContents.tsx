@@ -15,6 +15,7 @@ interface TableOfContentsProps {
     onClose: () => void;
     /** Current cursor line in code mode, or top-of-viewport line in preview. */
     activeLine?: number;
+    embedded?: boolean;
 }
 
 export function TableOfContents({
@@ -22,10 +23,12 @@ export function TableOfContents({
     content,
     onClose,
     activeLine = 1,
+    embedded = false,
 }: TableOfContentsProps) {
     const { t } = useLocale();
     const panelRef = useRef<HTMLElement>(null);
     const [filter, setFilter] = useState("");
+    const [collapsedLines, setCollapsedLines] = useState<Set<number>>(() => new Set());
 
     const headings = useMemo((): TocItem[] => {
         // Skip the parse entirely when the panel isn't open. Saves walking
@@ -62,23 +65,46 @@ export function TableOfContents({
         return idx;
     }, [headings, activeLine]);
 
-    // Filtered list (filter by text only — keeps stable indexes)
+    useEffect(() => {
+        const currentLines = new Set(headings.map((heading) => heading.line));
+        setCollapsedLines((previous) => {
+            const next = new Set([...previous].filter((line) => currentLines.has(line)));
+            return next.size === previous.size ? previous : next;
+        });
+    }, [headings]);
+
+    const itemMetadata = useMemo(() => {
+        const collapsedLevels: number[] = [];
+        return headings.map((heading, index) => {
+            while (collapsedLevels.length > 0 && collapsedLevels[collapsedLevels.length - 1] >= heading.level) {
+                collapsedLevels.pop();
+            }
+            const hidden = collapsedLevels.length > 0;
+            if (collapsedLines.has(heading.line)) collapsedLevels.push(heading.level);
+            return {
+                hasChildren: index + 1 < headings.length && headings[index + 1].level > heading.level,
+                hidden,
+            };
+        });
+    }, [collapsedLines, headings]);
+
+    // Filtering searches the complete outline; otherwise collapsed descendants stay hidden.
     const visible = useMemo(() => {
-        if (!filter.trim()) return headings.map((h, i) => ({ h, i }));
+        if (!filter.trim()) return headings.map((h, i) => ({ h, i })).filter(({ i }) => !itemMetadata[i].hidden);
         const q = filter.toLowerCase();
         return headings.map((h, i) => ({ h, i })).filter(({ h }) => h.text.toLowerCase().includes(q));
-    }, [headings, filter]);
+    }, [filter, headings, itemMetadata]);
 
     // Keep the active row in view when activeHeadingIdx changes
     useEffect(() => {
         if (activeHeadingIdx === -1) return;
         const el = panelRef.current?.querySelector<HTMLElement>(`[data-toc-idx="${activeHeadingIdx}"]`);
-        el?.scrollIntoView({ block: "nearest" });
+        el?.scrollIntoView?.({ block: "nearest" });
     }, [activeHeadingIdx]);
 
     // Escape key to close and focus management
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || embedded) return;
 
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
@@ -95,7 +121,7 @@ export function TableOfContents({
             document.removeEventListener("keydown", handleKeyDown);
             detachTrap();
         };
-    }, [isOpen, onClose]);
+    }, [embedded, isOpen, onClose]);
 
     // Jump by SOURCE LINE, not heading text (NAV-01). The editor and the
     // preview both listen for this event and scroll themselves, so the click
@@ -104,6 +130,16 @@ export function TableOfContents({
     // approach always hit the first occurrence, and only in preview mode).
     const handleHeadingClick = (line: number) => {
         window.dispatchEvent(new CustomEvent("mdtxt:goto-line", { detail: { line } }));
+    };
+
+    const toggleCollapsed = (line: number, force?: boolean) => {
+        setCollapsedLines((previous) => {
+            const next = new Set(previous);
+            const collapse = force ?? !next.has(line);
+            if (collapse) next.add(line);
+            else next.delete(line);
+            return next;
+        });
     };
 
     const getIndent = (level: number): string => {
@@ -123,11 +159,12 @@ export function TableOfContents({
             role="navigation"
             aria-label={t("Table of contents")}
             tabIndex={-1}
-            className={`fixed left-0 top-12 bottom-7 w-72 bg-[var(--bg-secondary)] border-r border-[var(--border)] z-50 shadow-2xl flex flex-col overflow-hidden transition-transform duration-200 ease-out ${isOpen ? "translate-x-0" : "-translate-x-full"
-                }`}
+            className={embedded
+                ? "relative h-full w-full bg-[var(--bg-secondary)] flex flex-col overflow-hidden"
+                : `fixed left-0 top-12 bottom-7 w-72 bg-[var(--bg-secondary)] border-r border-[var(--border)] z-50 shadow-2xl flex flex-col overflow-hidden transition-transform duration-200 ease-out ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
         >
             {/* Header */}
-            <div className="h-10 shrink-0 px-4 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-titlebar)]">
+            {!embedded && <div className="h-10 shrink-0 px-4 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-titlebar)]">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)] no-select">
                     <span className="material-symbols-outlined text-[18px]">format_list_bulleted</span>
                     <span>{t("Outline")}</span>
@@ -139,7 +176,7 @@ export function TableOfContents({
                 >
                     <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
-            </div>
+            </div>}
 
             {/* Filter (only shown when there are >5 headings to keep it clean) */}
             {headings.length > 5 && (
@@ -176,20 +213,45 @@ export function TableOfContents({
                     <ul className="py-2">
                         {visible.map(({ h: heading, i: index }) => {
                             const isActive = index === activeHeadingIdx;
+                            const { hasChildren } = itemMetadata[index];
+                            const isCollapsed = collapsedLines.has(heading.line);
                             return (
                             <li key={`${heading.id}-${index}`} data-toc-idx={index}>
                                 <button
                                     onClick={() => handleHeadingClick(heading.line)}
+                                    onKeyDown={(event) => {
+                                        if (!hasChildren) return;
+                                        if (event.key === "ArrowRight" && isCollapsed) {
+                                            event.preventDefault();
+                                            toggleCollapsed(heading.line, false);
+                                        } else if (event.key === "ArrowLeft" && !isCollapsed) {
+                                            event.preventDefault();
+                                            toggleCollapsed(heading.line, true);
+                                        }
+                                    }}
                                     aria-label={t("Go to heading: {heading}", { heading: heading.text })}
                                     aria-current={isActive ? "location" : undefined}
+                                    aria-expanded={hasChildren ? !isCollapsed : undefined}
                                     className={`btn-press w-full px-4 py-1.5 text-left text-sm flex items-center gap-2 transition-colors ${getIndent(heading.level)} ${isActive
                                         ? "bg-[var(--bg-hover)] text-[var(--text-primary)] border-l-2 border-[var(--accent)] -ml-px"
                                         : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                                         }`}
                                 >
-                                    <span className={`material-symbols-outlined text-[14px] ${heading.level === 1 ? "text-[var(--text-primary)]" : "opacity-60"}`}>
-                                        {getIcon(heading.level)}
-                                    </span>
+                                    {hasChildren ? (
+                                        <span
+                                            aria-hidden="true"
+                                            title={t(isCollapsed ? "Expand section" : "Collapse section")}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                toggleCollapsed(heading.line);
+                                            }}
+                                            className="material-symbols-outlined text-[15px] opacity-70 hover:opacity-100"
+                                        >{isCollapsed ? "chevron_right" : "expand_more"}</span>
+                                    ) : (
+                                        <span className={`material-symbols-outlined text-[14px] ${heading.level === 1 ? "text-[var(--text-primary)]" : "opacity-60"}`}>
+                                            {getIcon(heading.level)}
+                                        </span>
+                                    )}
                                     <span className={`truncate ${heading.level === 1 ? "font-semibold" : heading.level === 2 ? "font-medium" : ""}`}>
                                         {heading.text}
                                     </span>

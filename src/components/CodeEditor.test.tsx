@@ -6,7 +6,7 @@
 // light/paper text. The theme must mirror that selector shape for
 // --selection-bg to win.
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { render, waitFor, cleanup } from "@testing-library/react";
+import { render, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { CodeEditor } from "./CodeEditor";
 import { installCodeMirrorDomPolyfills } from "../test/codemirrorDom";
 import { EditorView } from "@codemirror/view";
@@ -73,7 +73,13 @@ describe("editor selection theming", () => {
         const { container } = render(<CodeEditor documentId="code" content={source} onChange={() => {}} liveMode />);
         await waitFor(() => expect(container.querySelector(".cm-live-code-widget code")).toHaveTextContent("const answer = 42;"));
         const editor = container.querySelector<HTMLElement>(".cm-editor");
-        expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
+        const view = EditorView.findFromDOM(editor!);
+        expect(view.state.doc.toString()).toBe(source);
+        expect(container.querySelector(".cm-content")?.textContent).not.toContain("```");
+
+        fireEvent.mouseDown(container.querySelector(".cm-live-code-widget")!);
+        await waitFor(() => expect(container.querySelector(".cm-content")?.textContent).toContain("```ts"));
+        expect(view.state.selection.main.from).toBe(source.indexOf("```ts") + 1);
     });
 
     it("mounts bounded frontmatter metadata without replacing the YAML source", async () => {

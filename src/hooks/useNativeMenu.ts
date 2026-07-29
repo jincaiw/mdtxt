@@ -11,6 +11,7 @@ export interface NativeMenuState {
     outlineOpen: boolean;
     toolbarOpen: boolean;
     typewriterOpen: boolean;
+    focusModeOpen: boolean;
     aiEnabled: boolean;
 }
 
@@ -107,6 +108,7 @@ export function useNativeMenu({ state, commands, translate }: NativeMenuOptions)
                     await check("view.outline", "Outline", state.outlineOpen, "CmdOrCtrl+Shift+O", state.hasDocument),
                     await check("view.toolbar", "Formatting toolbar", state.toolbarOpen, undefined, state.hasDocument),
                     await check("view.typewriter", "Typewriter mode", state.typewriterOpen, "F9", state.hasDocument),
+                    await check("view.focus", "Focus mode", state.focusModeOpen, "F8", state.hasDocument),
                     await separator(), await item("view.fullscreen", "Toggle fullscreen", "F11"),
                 ] });
 

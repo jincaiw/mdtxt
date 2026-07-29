@@ -119,17 +119,27 @@ export const getTourDone = (): boolean => safeGet<boolean>(KEY_TOUR_DONE, false)
 export const setTourDone = (v: boolean): void => safeSet(KEY_TOUR_DONE, v);
 
 const KEY_TYPEWRITER_MODE = "mdtxt:typewriterMode";
+const KEY_FOCUS_MODE = "mdtxt:focusMode";
 const KEY_TOOLBAR = "mdtxt:toolbar";
 const KEY_WORD_WRAP = "mdtxt:wordWrap";
 const KEY_SPELL_CHECK = "mdtxt:spellCheck";
 export const getTypewriterMode = (): boolean => safeGet<boolean>(KEY_TYPEWRITER_MODE, false);
 export const setTypewriterMode = (v: boolean): void => safeSet(KEY_TYPEWRITER_MODE, v);
+export const getFocusMode = (): boolean => safeGet<boolean>(KEY_FOCUS_MODE, false);
+export const setFocusMode = (v: boolean): void => safeSet(KEY_FOCUS_MODE, v);
 export const getToolbarEnabled = (): boolean => safeGet<boolean>(KEY_TOOLBAR, false);
 export const setToolbarEnabled = (v: boolean): void => safeSet(KEY_TOOLBAR, v);
 export const getWordWrap = (): boolean => safeGet<boolean>(KEY_WORD_WRAP, true);
 export const setWordWrap = (v: boolean): void => safeSet(KEY_WORD_WRAP, v);
 export const getSpellCheck = (): boolean => safeGet<boolean>(KEY_SPELL_CHECK, false);
 export const setSpellCheck = (v: boolean): void => safeSet(KEY_SPELL_CHECK, v);
+
+const KEY_NAVIGATION_WIDTH = "mdtxt:navigationWidth";
+const KEY_AI_PANEL_WIDTH = "mdtxt:aiPanelWidth";
+export const getNavigationWidth = (): number => safeGet<number>(KEY_NAVIGATION_WIDTH, 260);
+export const setNavigationWidth = (v: number): void => safeSet(KEY_NAVIGATION_WIDTH, Math.min(360, Math.max(220, Math.round(v))));
+export const getAIPanelWidth = (): number => safeGet<number>(KEY_AI_PANEL_WIDTH, 360);
+export const setAIPanelWidth = (v: number): void => safeSet(KEY_AI_PANEL_WIDTH, Math.min(480, Math.max(320, Math.round(v))));
 
 // Live remains opt-in throughout P6. Its presentation is Source-compatible,
 // but native IME/platform validation is still required before any default flip.

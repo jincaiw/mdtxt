@@ -12,6 +12,7 @@ import { TitleBar } from "./components/TitleBar";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { CodeEditor } from "./components/CodeEditor";
 import { StatusBar } from "./components/StatusBar";
+import { WorkspaceSidebar, type NavigationTab } from "./components/WorkspaceSidebar";
 import type { ViewMode } from "./components/ModeToggle";
 import { ToastStack } from "./components/Toast";
 import { SplitDivider } from "./components/SplitDivider";
@@ -38,12 +39,6 @@ import { useExternalChangeWatcher } from "./hooks/useExternalChangeWatcher";
 // we adapt with the `.then(m => ({ default: m.X }))` shim.
 const MarkdownPreview = lazy(() =>
     import("./components/MarkdownPreview").then((m) => ({ default: m.MarkdownPreview }))
-);
-const FileExplorer = lazy(() =>
-    import("./components/FileExplorer").then((m) => ({ default: m.FileExplorer }))
-);
-const TableOfContents = lazy(() =>
-    import("./components/TableOfContents").then((m) => ({ default: m.TableOfContents }))
 );
 const SettingsModal = lazy(() =>
     import("./components/SettingsModal").then((m) => ({ default: m.SettingsModal }))
@@ -89,6 +84,9 @@ import {
   getToolbarEnabled,
   getTourDone,
   getTypewriterMode,
+  getFocusMode,
+  getNavigationWidth,
+  getAIPanelWidth,
   getWordWrap,
   setAIEnabled,
   setLastFile,
@@ -98,6 +96,9 @@ import {
   setToolbarEnabled,
   setTourDone,
   setTypewriterMode,
+  setFocusMode,
+  setNavigationWidth,
+  setAIPanelWidth,
   setWordWrap,
 } from "./utils/persistence";
 import { getAutoSave } from "./utils/persistence";
@@ -163,7 +164,6 @@ const AI_SHORTCUT = IS_MAC ? "⌘J" : "Alt+J";
 
 // Width of the right-side AI panel; the editor/preview area reserves this much
 // padding-right when it's open so content reflows beside it (not under it).
-const AI_PANEL_WIDTH = 400;
 
 function isDiskConflictMessage(message: string): boolean {
   return message.startsWith("File changed on disk:");
@@ -212,6 +212,9 @@ function AppContent() {
   const [aiConfig, setAiConfigState] = useState(() => getAIConfig());
   const [aiEnabled, setAiEnabledState] = usePersistedState<boolean>(getAIEnabled, setAIEnabled);
   const [typewriterModeEnabled, setTypewriterModeEnabled] = usePersistedState<boolean>(getTypewriterMode, setTypewriterMode);
+  const [focusModeEnabled, setFocusModeEnabled] = usePersistedState<boolean>(getFocusMode, setFocusMode);
+  const [navigationWidth, setNavigationWidthState] = usePersistedState<number>(getNavigationWidth, setNavigationWidth);
+  const [aiPanelWidth, setAIPanelWidthState] = usePersistedState<number>(getAIPanelWidth, setAIPanelWidth);
   const [toolbarVisible, setToolbarVisible] = usePersistedState<boolean>(getToolbarEnabled, setToolbarEnabled);
   const [wordWrapEnabled, setWordWrapEnabled] = usePersistedState<boolean>(getWordWrap, setWordWrap);
   const [spellCheckEnabled, setSpellCheckEnabled] = usePersistedState<boolean>(getSpellCheck, setSpellCheck);
@@ -247,6 +250,9 @@ function AppContent() {
   const [showFileExplorer, setShowFileExplorer] = useState(false);
   const [showTOC, setShowTOC] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
+  const navigationTab: NavigationTab = showTOC ? "outline" : "files";
+  const navigationOpen = (showFileExplorer || showTOC) && !focusModeEnabled;
+  const aiPanelOpen = showAIPanel && !focusModeEnabled;
   // Proposed document from Agent mode, shown as an inline diff for accept/reject.
   const [proposedDoc, setProposedDoc] = useState<ProposedDocument | null>(null);
 
@@ -636,6 +642,7 @@ function AppContent() {
   useEffect(() => {
     const handlers: Array<[string, (e: Event) => void]> = [
       ["mdtxt:typewriter-toggle", (e) => setTypewriterModeEnabled(!!(e as CustomEvent).detail?.enabled)],
+      ["mdtxt:focus-toggle", (e) => setFocusModeEnabled(!!(e as CustomEvent).detail?.enabled)],
       ["mdtxt:toolbar-toggle", (e) => setToolbarVisible(!!(e as CustomEvent).detail?.enabled)],
       ["mdtxt:wordwrap-toggle", (e) => setWordWrapEnabled(!!(e as CustomEvent).detail?.enabled)],
       ["mdtxt:spellcheck-toggle", (e) => setSpellCheckEnabled(!!(e as CustomEvent).detail?.enabled)],
@@ -1738,6 +1745,12 @@ function AppContent() {
 
   // Toggle the right-side AI assistant panel.
   const handleToggleAI = useCallback(() => setShowAIPanel((v) => !v), []);
+  const handleToggleFocus = useCallback(() => setFocusModeEnabled((value) => !value), [setFocusModeEnabled]);
+
+  const handleNavigationTabChange = useCallback((tab: NavigationTab) => {
+    setShowFileExplorer(tab === "files");
+    setShowTOC(tab === "outline");
+  }, []);
 
   // Agent proposed an edited document → show it as a diff to accept/reject.
   // Ensure the editor (where the diff renders) is visible.
@@ -1766,6 +1779,11 @@ function AppContent() {
     setShowFileExplorer(false);
     setShowTOC(false);
   }, []);
+
+  const handleToggleNavigation = useCallback(() => {
+    if (showFileExplorer || showTOC) closeAllPanels();
+    else setShowFileExplorer(true);
+  }, [closeAllPanels, showFileExplorer, showTOC]);
 
   // Handle file drop
   const handleFileDrop = useCallback(
@@ -1850,6 +1868,7 @@ function AppContent() {
     handleOpenFile, handleSaveFile, handleSaveAs, handleNewFile,
     handleToggleMode, handleToggleSplit, handleToggleLive, handleToggleFileExplorer, handleToggleTOC,
     handleToggleTypewriter: () => setTypewriterModeEnabled((value) => !value),
+    handleToggleFocus,
     toggleFullscreen,
     openCheatsheet: () => setShowCheatsheet(true),
     openPalette: () => setShowPalette(true),
@@ -1886,6 +1905,7 @@ function AppContent() {
       "view.code": () => setMode("code"), "view.live": () => setMode("live"), "view.split": () => setMode("split"), "view.preview": () => setMode("preview"),
       "view.explorer": handleToggleFileExplorer, "view.outline": handleToggleTOC,
       "view.toolbar": () => setToolbarVisible((value) => !value), "view.typewriter": () => setTypewriterModeEnabled((value) => !value),
+      "view.focus": handleToggleFocus,
       "view.fullscreen": toggleFullscreen,
       "ai.assist": () => window.dispatchEvent(new CustomEvent("mdtxt:ai-assist")),
       "settings.open": () => setShowSettings(true), "help.shortcuts": () => setShowCheatsheet(true),
@@ -1898,7 +1918,7 @@ function AppContent() {
       "format.orderedList": editor("format.orderedList"), "format.taskList": editor("format.taskList"), "format.blockquote": editor("format.blockquote"),
       "insert.codeBlock": editor("insert.codeBlock"), "insert.table": editor("insert.table"), "insert.rule": editor("insert.rule"),
     };
-  }, [closeTab, cycleTab, filePath, handleNewFile, handleOpenFile, handleOpenTutorial, handleSaveAs, handleSaveFile, handleToggleFileExplorer, handleToggleTOC, hasFile, setMode, showToast, toggleFullscreen, tr]);
+  }, [closeTab, cycleTab, filePath, handleNewFile, handleOpenFile, handleOpenTutorial, handleSaveAs, handleSaveFile, handleToggleFileExplorer, handleToggleFocus, handleToggleTOC, hasFile, setMode, showToast, toggleFullscreen, tr]);
 
   const nativeMenuState = useMemo(() => ({
     hasDocument: hasFile,
@@ -1908,8 +1928,9 @@ function AppContent() {
     outlineOpen: showTOC,
     toolbarOpen: toolbarVisible,
     typewriterOpen: typewriterModeEnabled,
+    focusModeOpen: focusModeEnabled,
     aiEnabled,
-  }), [aiEnabled, filePath, hasFile, mode, showFileExplorer, showTOC, toolbarVisible, typewriterModeEnabled]);
+  }), [aiEnabled, filePath, focusModeEnabled, hasFile, mode, showFileExplorer, showTOC, toolbarVisible, typewriterModeEnabled]);
 
   useNativeMenu({ state: nativeMenuState, commands: nativeMenuCommands, translate: tr });
 
@@ -2101,6 +2122,15 @@ function AppContent() {
       run: () => setTypewriterModeEnabled((v) => !v),
     });
     items.push({
+      id: "toggle.focus",
+      label: focusModeEnabled ? "Disable Focus mode" : "Enable Focus mode",
+      hint: "F8",
+      section: "Toggles",
+      icon: "center_focus_strong",
+      keywords: "focus distraction free dim paragraph zen",
+      run: handleToggleFocus,
+    });
+    items.push({
       id: "toggle.toolbar",
       label: toolbarVisible ? "Hide formatting toolbar" : "Show formatting toolbar",
       section: "Toggles",
@@ -2186,9 +2216,9 @@ function AppContent() {
     // (post-debounce) for no reason. Headings are computed below in a
     // separate hook that's gated on the palette actually being open.
     handleNewFile, handleOpenFile, handleSaveFile, handleSaveAs, handleOpenTutorial,
-    handleToggleSplit, handleToggleFileExplorer, handleToggleTOC, toggleFullscreen,
+    handleToggleSplit, handleToggleFileExplorer, handleToggleFocus, handleToggleTOC, toggleFullscreen,
     loadFile, filePath, hasFile, showToast, closeTab,
-    typewriterModeEnabled, toolbarVisible, aiEnabled,
+    typewriterModeEnabled, focusModeEnabled, toolbarVisible, aiEnabled,
     theme, setTheme, tr,
   ]);
 
@@ -2342,11 +2372,13 @@ function AppContent() {
         mode={mode}
         onSetMode={setMode}
         liveEnabled={liveBetaEnabled}
+        onToggleNavigation={handleToggleNavigation}
+        navigationActive={navigationOpen}
       />
 
-      {/* Tab bar — always shown once a file is open (even with one tab), with a
-          + button, so it's clear more files can be opened in tabs. TABS-01. */}
-      {hasFile && tabBarItems.length >= 1 && (
+      {/* Keep single-document chrome quiet; tabs appear once there is something
+          to switch between, and Focus mode hides them temporarily. */}
+      {hasFile && tabBarItems.length >= 2 && !focusModeEnabled && (
         <TabBar
           tabs={tabBarItems}
           activeId={activeTabId}
@@ -2379,16 +2411,23 @@ function AppContent() {
           {/* Split-aware layout. Both views always mounted; CSS toggles their display
               and width so editor/preview state (scroll, selection) is preserved across
               mode switches. */}
-          <div
-            ref={splitContainerRef}
-            className="flex-1 overflow-hidden flex flex-row"
-            // Reserve space on the right for the AI panel so editor/preview reflow
-            // beside it instead of being covered. The panel itself is fixed at
-            // right-0 (above the status bar), which keeps window controls at the edge.
-            // min() mirrors the panel's own w-[400px] max-w-[90vw] so a narrow
-            // window reserves only as much space as the panel actually takes.
-            style={{ paddingRight: showAIPanel ? `min(${AI_PANEL_WIDTH}px, 90vw)` : 0, transition: "padding-right 0.15s ease" }}
-          >
+          <div className={`workspace-shell ${focusModeEnabled ? "workspace-focus-mode" : ""}`}>
+            <WorkspaceSidebar
+              isOpen={navigationOpen}
+              tab={navigationTab}
+              width={navigationWidth}
+              currentFilePath={filePath}
+              content={presentationContent}
+              activeLine={mode === "preview" ? previewLine : cursorPosition.line}
+              onTabChange={handleNavigationTabChange}
+              onFileSelect={loadFile}
+              onClose={closeAllPanels}
+              onWidthChange={setNavigationWidthState}
+            />
+            <div
+              ref={splitContainerRef}
+              className="workspace-document overflow-hidden flex flex-row"
+            >
             <div
               data-split-left
               className="overflow-hidden flex flex-col"
@@ -2416,7 +2455,8 @@ function AppContent() {
                 onScrollFraction={onCodeScrollFraction}
                 registerScroller={registerCodeScroller}
                 typewriterMode={typewriterModeEnabled}
-                showToolbar={toolbarVisible}
+                focusMode={focusModeEnabled}
+                showToolbar={toolbarVisible && !focusModeEnabled}
                 wordWrap={effectiveWordWrap}
                 spellCheck={spellCheckEnabled}
                 liveMode={mode === "live" && liveBetaEnabled}
@@ -2477,35 +2517,12 @@ function AppContent() {
             </div>
           </div>
 
-          {/* Sidebar Panels — only mount when actually open so they don't
-              load their module until first use. */}
-          {showFileExplorer && (
-            <Suspense fallback={null}>
-              <FileExplorer
-                isOpen={showFileExplorer}
-                currentFilePath={filePath}
-                onFileSelect={loadFile}
-                onClose={closeAllPanels}
-              />
-            </Suspense>
-          )}
-          {showTOC && (
-            <Suspense fallback={null}>
-              <TableOfContents
-                isOpen={showTOC}
-                content={presentationContent}
-                onClose={closeAllPanels}
-                activeLine={mode === "preview" ? previewLine : cursorPosition.line}
-              />
-            </Suspense>
-          )}
-
           {/* AI receives the versioned presentation snapshot rather than the
               editor bridge; proposals are checked against that revision. */}
-          {aiEnabled && showAIPanel && (
+          {aiEnabled && aiPanelOpen && (
             <Suspense fallback={null}>
               <AIPanel
-                isOpen={showAIPanel}
+                isOpen={aiPanelOpen}
                 onClose={() => setShowAIPanel(false)}
                 note={presentationContent}
                 documentId={presentationSnapshot?.documentId ?? null}
@@ -2514,17 +2531,21 @@ function AppContent() {
                 selectionText={presentationContent.slice(selectionRange.start, selectionRange.end)}
                 aiConfig={aiConfig}
                 onProposeEdit={handleProposeEdit}
+                embedded
+                width={aiPanelWidth}
+                onWidthChange={setAIPanelWidthState}
               />
             </Suspense>
           )}
+          </div>
 
 <StatusBar
             isSaved={!isDirty}
             lineNumber={mode === "preview" ? previewLine : cursorPosition.line}
             columnNumber={cursorPosition.col}
             mode={mode}
-            showFileExplorer={showFileExplorer}
-            showTOC={showTOC}
+            showFileExplorer={navigationOpen && navigationTab === "files"}
+            showTOC={navigationOpen && navigationTab === "outline"}
             onToggleFileExplorer={handleToggleFileExplorer}
             onToggleTOC={handleToggleTOC}
             wordCount={wordCount}

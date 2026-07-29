@@ -1,7 +1,8 @@
 import { syntaxTree } from "@codemirror/language";
-import type { Range } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import type { EditorState, Range } from "@codemirror/state";
+import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
 import { liveCalloutTitle, type LiveLocale } from "./liveLocale";
+import { makeLiveProjectionEditable } from "./liveBlockProjection";
 
 const CALLOUT_TYPES = new Set(["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"]);
 
@@ -17,7 +18,7 @@ function parseCallout(source: string): Callout | null {
 }
 
 class LiveCalloutWidget extends WidgetType {
-    constructor(private readonly source: string, private readonly callout: Callout, private readonly locale: LiveLocale) {
+    constructor(private readonly source: string, private readonly callout: Callout, private readonly locale: LiveLocale, private readonly from: number) {
         super();
     }
 
@@ -25,7 +26,7 @@ class LiveCalloutWidget extends WidgetType {
         return this.source === other.source;
     }
 
-    toDOM() {
+    toDOM(view: EditorView) {
         const aside = document.createElement("aside");
         aside.className = "cm-live-block-widget cm-live-callout-widget";
         aside.dataset.callout = this.callout.type.toLowerCase();
@@ -34,6 +35,7 @@ class LiveCalloutWidget extends WidgetType {
         const body = document.createElement("div");
         body.textContent = this.callout.body;
         aside.append(title, body);
+        makeLiveProjectionEditable(aside, view, this.from);
         return aside;
     }
 
@@ -42,39 +44,23 @@ class LiveCalloutWidget extends WidgetType {
     }
 }
 
-function calloutDecorations(view: EditorView, locale: LiveLocale): DecorationSet {
+function calloutDecorations(state: EditorState, locale: LiveLocale): DecorationSet {
     const widgets: Range<Decoration>[] = [];
-    for (const visible of view.visibleRanges) {
-        syntaxTree(view.state).iterate({
-            from: visible.from,
-            to: visible.to,
+        syntaxTree(state).iterate({
             enter(node) {
                 if (node.name !== "Blockquote") return;
-                const source = view.state.doc.sliceString(node.from, node.to);
+                const source = state.doc.sliceString(node.from, node.to);
                 const callout = parseCallout(source);
                 if (!callout) return;
-                if (view.compositionStarted || view.state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from)) return;
-                widgets.push(Decoration.widget({
-                    widget: new LiveCalloutWidget(source, callout, locale), side: 1,
-                }).range(view.state.doc.lineAt(node.to).to));
+                if (state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from)) return;
+                widgets.push(Decoration.replace({
+                    widget: new LiveCalloutWidget(source, callout, locale, node.from),
+                }).range(node.from, node.to));
             },
         });
-    }
     return Decoration.set(widgets, true);
 }
 
 export function liveCalloutWidgets(locale: LiveLocale) {
-    return ViewPlugin.fromClass(class {
-        decorations: DecorationSet;
-
-        constructor(view: EditorView) {
-            this.decorations = calloutDecorations(view, locale);
-        }
-
-        update(update: ViewUpdate) {
-            if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
-                this.decorations = calloutDecorations(update.view, locale);
-            }
-        }
-    }, { decorations: (plugin) => plugin.decorations });
+    return EditorView.decorations.compute(["doc", "selection"], (state) => calloutDecorations(state, locale));
 }
