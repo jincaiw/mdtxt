@@ -11,7 +11,24 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
-Add-Type -AssemblyName System.Windows.Forms
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class MdtxtNativePointer {
+  [DllImport("user32.dll")]
+  public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+  [DllImport("user32.dll")]
+  public static extern bool SetCursorPos(int x, int y);
+
+  [DllImport("user32.dll")]
+  public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
+
+  public const uint LeftDown = 0x0002;
+  public const uint LeftUp = 0x0004;
+}
+'@
 
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 while ([DateTime]::UtcNow -lt $deadline) {
@@ -26,14 +43,21 @@ while ([DateTime]::UtcNow -lt $deadline) {
       $tabs = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
       if ($tabs.Count -gt $Index) {
         $tab = $tabs.Item($Index)
-        # WebView2 does not consistently expose an invokable pattern for an
-        # ARIA tab, and probing unsupported patterns can itself throw. Keep
-        # discovery, focus and activation in one process so no helper can move
-        # focus back to the top-level window between SetFocus and Enter.
-        $tab.SetFocus()
+        # WebView2 exposes the ARIA tab to UI Automation but does not reliably
+        # bridge SelectionItem or keyboard focus activation back to the DOM.
+        # Use the accessible element's native screen rectangle for a real
+        # pointer activation of the same standard click path users exercise.
+        $rect = $tab.Current.BoundingRectangle
+        $x = [int]($rect.Left + ($rect.Width / 2))
+        $y = [int]($rect.Top + ($rect.Height / 2))
+        [void][MdtxtNativePointer]::SetForegroundWindow($process.MainWindowHandle)
         Start-Sleep -Milliseconds 100
-        [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
-        Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=focus-enter"
+        if (-not [MdtxtNativePointer]::SetCursorPos($x, $y)) {
+          throw "Could not move the native pointer to tab index $Index."
+        }
+        [MdtxtNativePointer]::mouse_event([MdtxtNativePointer]::LeftDown, 0, 0, 0, [UIntPtr]::Zero)
+        [MdtxtNativePointer]::mouse_event([MdtxtNativePointer]::LeftUp, 0, 0, 0, [UIntPtr]::Zero)
+        Write-Output "MDTXT_UIA_SELECT_TAB index=$Index count=$($tabs.Count) name=$($tab.Current.Name) method=native-pointer x=$x y=$y"
         exit 0
       }
     } catch {
