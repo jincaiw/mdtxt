@@ -6,6 +6,12 @@ All notable mdtxt changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-30
+
+- Release every platform package as a plainly named `-unsigned` artifact; the
+  workflow does not run macOS code signing or notarization, nor Windows
+  Authenticode signing.
+
 ## [0.4.1] - 2026-07-29
 
 - Fixed native recovery and performance acceptance probes to explicitly enter Source before exact Markdown input, while preserving Live as the default editor.

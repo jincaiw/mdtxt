@@ -2255,7 +2255,7 @@ dependencies = [
 
 [[package]]
 name = "mdtxt"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "futures-util",
  "keyring",

@@ -6,16 +6,17 @@
 项目的发布仓库、签名密钥、安装包 URL、域名或更新清单。由于当前没有
 mdtxt 专属代码签名、公证和更新签名材料，GitHub Release 必须保持
 `prerelease=false`，应用内 updater 继续关闭。
-macOS 包使用 `signingIdentity="-"` 对整个 `.app` 做临时签名，使 Apple
-Silicon 可执行文件和资源封套保持完整；这不等同 Developer ID 签名或公证。
+所有安装包均为纯未签名产物，文件名带 `-unsigned`：不运行 macOS
+`codesign`/`notarytool`，也不运行 Windows `signtool`。macOS 用户可能需要在
+系统安全设置中手动放行，Windows 用户可能会看到 SmartScreen 警告。
 
 ## 发布前检查
 
 1. 固定工具链：Bun 1.3.14、Node 24.18 与 Rust 1.96。
 2. 执行 `bun run release:check`，确认产品标识、中文文案与配置均通过。
 3. 执行 `bun run test`、`bun run build`、`cargo test --manifest-path src-tauri/Cargo.toml`。
-4. 执行 `bun run tauri build --debug --no-bundle`，确认桌面程序可构建。
-   macOS 生产候选还必须通过 `codesign --verify --deep --strict mdtxt.app`。
+4. 执行 `bun run tauri build --debug --no-bundle`，确认桌面程序可构建；此版本
+   不执行签名或公证验证。
 5. 执行 `bun run --cwd docs build`，检查静态站点不含旧品牌、旧域名或上游下载链接。
 6. 等待三平台 CI 原生冒烟通过；确认恢复、产品标识、版本和包清单一致。
 7. 推送与三份版本清单匹配的带注释 `vX.Y.Z` 标签；metadata job 只创建一个 draft Release，
