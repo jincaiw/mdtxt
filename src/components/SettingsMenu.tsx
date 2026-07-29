@@ -4,6 +4,7 @@ import { useDropdownKeyboard } from '../hooks/useDropdownKeyboard';
 import { useLocale } from '../context/LocaleContext';
 
 const themes: { id: Theme; name: string; colors: [string, string] }[] = [
+    { id: 'system', name: 'System', colors: ['#f5f5f5', '#242424'] },
     { id: 'dark', name: 'Dark', colors: ['#0a0a0a', '#141414'] },
     { id: 'light', name: 'Light', colors: ['#ffffff', '#f4f2ee'] },
     { id: 'paper', name: 'Paper', colors: ['#f5f0e6', '#ebe5d8'] },

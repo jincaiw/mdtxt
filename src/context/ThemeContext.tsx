@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ensureFontLoaded } from '../fonts';
 
-export type Theme = 'dark' | 'light' | 'paper' | 'dracula';
+export type Theme = 'dark' | 'light' | 'paper' | 'dracula' | 'system';
 export type FontFamily = 'inter' | 'merriweather' | 'lora' | 'source-serif' | 'fira-sans';
 export type FontSize = 'small' | 'medium' | 'large';
 
@@ -39,9 +39,15 @@ function migrateLegacyThemeKeys(): void {
 migrateLegacyThemeKeys();
 
 // Valid values for validation against corrupted localStorage
-const VALID_THEMES: Theme[] = ['dark', 'light', 'paper', 'dracula'];
+const VALID_THEMES: Theme[] = ['dark', 'light', 'paper', 'dracula', 'system'];
 const VALID_FONTS: FontFamily[] = ['inter', 'merriweather', 'lora', 'source-serif', 'fira-sans'];
 const VALID_FONT_SIZES: FontSize[] = ['small', 'medium', 'large'];
+
+function prefersDarkScheme(): boolean {
+    return typeof window !== "undefined"
+        && typeof window.matchMedia === "function"
+        && window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
 
 function getValidated<T extends string>(key: string, validValues: T[], fallback: T): T {
     const stored = localStorage.getItem(key);
@@ -87,16 +93,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(FONT_SIZE_STORAGE_KEY, newSize);
     };
 
+    const [systemPrefersDark, setSystemPrefersDark] = useState(prefersDarkScheme);
+
+    useEffect(() => {
+        if (typeof window.matchMedia !== "function") return;
+        const media = window.matchMedia("(prefers-color-scheme: dark)");
+        const update = () => setSystemPrefersDark(media.matches);
+        media.addEventListener("change", update);
+        return () => media.removeEventListener("change", update);
+    }, []);
+
     // Apply theme, font, and font size to document in a single effect. Also
     // lazy-load the chosen body font's CSS (no-op for the eager Inter default).
     // Runs on mount too, so a persisted non-default font is fetched on launch.
     useEffect(() => {
         ensureFontLoaded(font);
         const el = document.documentElement;
-        el.setAttribute('data-theme', theme);
+        el.setAttribute('data-theme', theme === 'system' ? (systemPrefersDark ? 'dark' : 'light') : theme);
         el.setAttribute('data-font', font);
         el.setAttribute('data-font-size', fontSize);
-    }, [theme, font, fontSize]);
+    }, [theme, font, fontSize, systemPrefersDark]);
 
     return (
         <ThemeContext.Provider value={{ theme, setTheme, font, setFont, fontSize, setFontSize }}>

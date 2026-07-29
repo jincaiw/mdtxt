@@ -29,4 +29,12 @@ describe("ThemeProvider", () => {
         expect(screen.getByLabelText("active theme")).toHaveTextContent("dracula");
         await waitFor(() => expect(document.documentElement).toHaveAttribute("data-theme", "dracula"));
     });
+
+    it("maps the system choice to the active OS color preference", async () => {
+        localStorage.setItem("mdtxt-theme", "system");
+        render(<ThemeProvider><ThemeProbe /></ThemeProvider>);
+
+        expect(screen.getByLabelText("active theme")).toHaveTextContent("system");
+        await waitFor(() => expect(document.documentElement.getAttribute("data-theme")).toMatch(/^(dark|light)$/));
+    });
 });
