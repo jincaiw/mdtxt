@@ -1061,3 +1061,216 @@ select:focus-visible,
 .cm-editor .cm-deletedLineGutter {
   background-color: var(--diff-del-border);
 }
+
+/* ===== Content-first desktop workspace ===== */
+.workspace-shell {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.workspace-document {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.workspace-navigation {
+  position: relative;
+  display: flex;
+  flex: 0 0 var(--workspace-navigation-width, 260px);
+  width: var(--workspace-navigation-width, 260px);
+  min-width: 220px;
+  max-width: 360px;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+  z-index: 30;
+}
+
+.workspace-navigation-tabs {
+  height: 42px;
+  flex: 0 0 42px;
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-titlebar);
+  padding-left: 6px;
+}
+
+.workspace-navigation-tabs > button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 76px;
+  padding: 0 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.workspace-navigation-tabs > button:hover,
+.workspace-navigation-tabs > button.active {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.workspace-navigation-tabs > button.active::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+.workspace-navigation-tabs .material-symbols-outlined,
+.workspace-title-button .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.workspace-navigation-tabs > .workspace-navigation-close {
+  min-width: 34px;
+  width: 34px;
+  margin-left: auto;
+  padding: 0;
+}
+
+.workspace-navigation-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-ai-panel {
+  position: relative;
+  flex: 0 0 var(--workspace-ai-width, 360px);
+  width: var(--workspace-ai-width, 360px);
+  min-width: 320px;
+  max-width: 480px;
+  min-height: 0;
+  z-index: 30;
+}
+
+.workspace-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 45;
+  width: 7px;
+  cursor: col-resize;
+  outline: none;
+}
+
+.workspace-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.workspace-resize-handle:hover::after,
+.workspace-resize-handle:focus-visible::after {
+  background: var(--accent);
+}
+
+.workspace-resize-handle-left { right: -4px; }
+.workspace-resize-handle-right { left: -4px; }
+
+.workspace-title-button {
+  display: flex;
+  width: 30px;
+  height: 28px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.workspace-title-button:hover,
+.workspace-title-button.active {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* Focus mode keeps the active CodeMirror line legible and lowers surrounding
+   source without changing editor state or rebuilding the retained view. */
+.cm-editor.mdtxt-editor-focus .cm-line {
+  opacity: 0.28;
+  transition: opacity 120ms ease;
+}
+
+.cm-editor.mdtxt-editor-focus .cm-activeLine,
+.cm-editor.mdtxt-editor-focus .cm-selectionMatch,
+.cm-editor.mdtxt-editor-focus.cm-focused .cm-line:has(.cm-selectionBackground) {
+  opacity: 1;
+}
+
+.cm-editor.mdtxt-editor-focus.cm-live-composing .cm-line {
+  opacity: 1;
+}
+
+@media (max-width: 1099px) {
+  .workspace-ai-panel {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(var(--workspace-ai-width, 360px), 90vw);
+    max-width: 90vw;
+    box-shadow: -18px 0 38px rgba(0, 0, 0, 0.16);
+    z-index: 60;
+  }
+}
+
+@media (max-width: 899px) {
+  .workspace-document {
+    flex-direction: column !important;
+  }
+
+  .workspace-document > [data-split-left],
+  .workspace-document > .relative {
+    width: 100%;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 799px) {
+  .workspace-navigation {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(var(--workspace-navigation-width, 260px), 88vw);
+    max-width: 88vw;
+    box-shadow: 18px 0 38px rgba(0, 0, 0, 0.16);
+    z-index: 60;
+  }
+
+  .workspace-title-button.hidden.lg\:flex {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-navigation-tabs > button,
+  .workspace-title-button,
+  .cm-editor.mdtxt-editor-focus .cm-line {
+    transition: none;
+  }
+}

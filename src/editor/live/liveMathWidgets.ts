@@ -1,6 +1,7 @@
-import type { Range } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import type { EditorState, Range } from "@codemirror/state";
+import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
 import { liveText, type LiveLocale } from "./liveLocale";
+import { makeLiveProjectionEditable, revealLiveSource } from "./liveBlockProjection";
 
 const MAX_MATH_LINES = 100;
 const mathCache = new Map<string, string>();
@@ -31,7 +32,7 @@ async function renderMath(source: string): Promise<string> {
 class LiveMathWidget extends WidgetType {
     private destroyed = false;
 
-    constructor(private readonly source: string, private readonly locale: LiveLocale) {
+    constructor(private readonly source: string, private readonly locale: LiveLocale, private readonly from: number) {
         super();
     }
 
@@ -39,20 +40,17 @@ class LiveMathWidget extends WidgetType {
         return this.source === other.source;
     }
 
-    toDOM() {
+    toDOM(view: EditorView) {
         const section = document.createElement("section");
         section.className = "cm-live-block-widget cm-live-math-widget";
         section.textContent = liveText(this.locale, "正在渲染公式…", "Rendering math…");
+        makeLiveProjectionEditable(section, view, this.from);
         void renderMath(this.source)
             .then((html) => {
                 if (!this.destroyed && section.isConnected) section.innerHTML = html;
             })
             .catch(() => {
-                if (!this.destroyed) section.textContent = liveText(
-                    this.locale,
-                    "公式预览不可用，请编辑上方源文本。",
-                    "Math preview unavailable; edit the source above.",
-                );
+                if (!this.destroyed) revealLiveSource(view, this.from);
             });
         return section;
     }
@@ -68,55 +66,38 @@ class LiveMathWidget extends WidgetType {
 
 interface MathBlock { from: number; to: number; expression: string }
 
-function visibleMathBlocks(view: EditorView): MathBlock[] {
+function mathBlocks(state: EditorState): MathBlock[] {
     const blocks: MathBlock[] = [];
     const seen = new Set<number>();
-    for (const visible of view.visibleRanges) {
-        const first = view.state.doc.lineAt(visible.from).number;
-        const last = view.state.doc.lineAt(visible.to).number;
-        for (let lineNumber = first; lineNumber <= last; lineNumber += 1) {
-            const opening = view.state.doc.line(lineNumber);
+        for (let lineNumber = 1; lineNumber <= state.doc.lines; lineNumber += 1) {
+            const opening = state.doc.line(lineNumber);
             if (seen.has(opening.from) || opening.text.trim() !== "$$") continue;
-            const limit = Math.min(view.state.doc.lines, lineNumber + MAX_MATH_LINES);
+            const limit = Math.min(state.doc.lines, lineNumber + MAX_MATH_LINES);
             for (let closingNumber = lineNumber + 1; closingNumber <= limit; closingNumber += 1) {
-                const closing = view.state.doc.line(closingNumber);
+                const closing = state.doc.line(closingNumber);
                 if (closing.text.trim() !== "$$") continue;
                 seen.add(opening.from);
                 blocks.push({
                     from: opening.from,
                     to: closing.to,
-                    expression: view.state.doc.sliceString(opening.to + 1, closing.from).trim(),
+                    expression: state.doc.sliceString(opening.to + 1, closing.from).trim(),
                 });
                 lineNumber = closingNumber;
                 break;
             }
         }
-    }
     return blocks;
 }
 
-function mathDecorations(view: EditorView, locale: LiveLocale): DecorationSet {
-    if (view.compositionStarted) return Decoration.none;
+function mathDecorations(state: EditorState, locale: LiveLocale): DecorationSet {
     const widgets: Range<Decoration>[] = [];
-    for (const block of visibleMathBlocks(view)) {
-        if (view.state.selection.ranges.some((range) => range.from <= block.to && range.to >= block.from)) continue;
-        widgets.push(Decoration.widget({ widget: new LiveMathWidget(block.expression, locale), side: 1 }).range(block.to));
+    for (const block of mathBlocks(state)) {
+        if (state.selection.ranges.some((range) => range.from <= block.to && range.to >= block.from)) continue;
+        widgets.push(Decoration.replace({ widget: new LiveMathWidget(block.expression, locale, block.from) }).range(block.from, block.to));
     }
     return Decoration.set(widgets, true);
 }
 
 export function liveMathWidgets(locale: LiveLocale) {
-    return ViewPlugin.fromClass(class {
-        decorations: DecorationSet;
-
-        constructor(view: EditorView) {
-            this.decorations = mathDecorations(view, locale);
-        }
-
-        update(update: ViewUpdate) {
-            if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
-                this.decorations = mathDecorations(update.view, locale);
-            }
-        }
-    }, { decorations: (plugin) => plugin.decorations });
+    return EditorView.decorations.compute(["doc", "selection"], (state) => mathDecorations(state, locale));
 }

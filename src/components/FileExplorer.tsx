@@ -14,6 +14,7 @@ interface FileExplorerProps {
     currentFilePath: string | null;
     onFileSelect: (path: string) => void;
     onClose: () => void;
+    embedded?: boolean;
 }
 
 export function FileExplorer({
@@ -21,6 +22,7 @@ export function FileExplorer({
     currentFilePath,
     onFileSelect,
     onClose,
+    embedded = false,
 }: FileExplorerProps) {
     const { t } = useLocale();
     const [files, setFiles] = useState<FileEntry[]>([]);
@@ -67,7 +69,7 @@ export function FileExplorer({
 
     // Escape key to close and focus management + focus trap
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || embedded) return;
 
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
@@ -84,7 +86,7 @@ export function FileExplorer({
             document.removeEventListener("keydown", handleKeyDown);
             detachTrap();
         };
-    }, [isOpen, onClose]);
+    }, [embedded, isOpen, onClose]);
 
     const loadFiles = async (directory: string) => {
         setIsLoading(true);
@@ -129,12 +131,12 @@ export function FileExplorer({
             role="navigation"
             aria-label={t("File explorer")}
             tabIndex={-1}
-            className={`fixed left-0 top-12 bottom-7 w-72 bg-[var(--bg-secondary)] border-r border-[var(--border)] z-50 shadow-2xl flex flex-col overflow-hidden transition-transform duration-200 ease-out ${
-                isOpen ? "translate-x-0" : "-translate-x-full"
-            }`}
+            className={embedded
+                ? "relative h-full w-full bg-[var(--bg-secondary)] flex flex-col overflow-hidden"
+                : `fixed left-0 top-12 bottom-7 w-72 bg-[var(--bg-secondary)] border-r border-[var(--border)] z-50 shadow-2xl flex flex-col overflow-hidden transition-transform duration-200 ease-out ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
         >
             {/* Header */}
-            <div className="h-10 shrink-0 px-4 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-titlebar)]">
+            {!embedded && <div className="h-10 shrink-0 px-4 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-titlebar)]">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)] no-select">
                     <button
                         onClick={handleGoUp}
@@ -173,7 +175,7 @@ export function FileExplorer({
                         </span>
                     </button>
                 </div>
-            </div>
+            </div>}
 
             {/* Content */}
             <div className="flex-1 min-h-0 overflow-y-auto">

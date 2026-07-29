@@ -34,4 +34,28 @@ The accepted desktop direction is the final A3 concept set:
 
 ## Live safety boundary
 
-The accepted concept shows collapsed Markdown delimiters in inactive Live lines. The 0.1.0 implementation deliberately retains source delimiters until P6c native Chinese IME, selection, clipboard and undo/redo gates pass. This is the only approved visual deferral: it preserves the PRD's source-safety contract and does not remove or hide the Live Beta page. After P6c passes, delimiter collapsing may proceed as a separate reversible P7 change.
+The accepted concept shows collapsed Markdown delimiters in inactive Live lines.
+The original 0.1.0 implementation retained complex-block source beside its
+Widget while P6c native Chinese IME, selection, clipboard and undo/redo gates
+were still open. Those gates later passed on all three supported platforms.
+
+The current unreleased implementation completes that visual contract with
+source-backed `Decoration.replace` projections. A projection is removed when
+its source range receives the selection, and click, Enter or F2 moves the
+selection back into that exact range. The CodeMirror document remains unchanged
+and Source mode remains the default and immediate rollback path. Local component
+tests and the production build cover this implementation; fresh native-package
+acceptance is still required before release assignment.
+
+## 2026-07-29 workspace implementation update
+
+- `src/components/WorkspaceSidebar.tsx` unifies Files and Outline in one
+  persisted, resizable navigation surface.
+- `src/components/AIPanel.tsx` is a docked third column on wide windows and an
+  overlay on narrower windows; editor content remains the flexible center.
+- `src/components/TableOfContents.tsx` supports collapsible hierarchy,
+  active-heading follow and keyboard expansion.
+- `src/components/SplitDivider.tsx` switches Split mode to a vertical document
+  flow on narrow windows.
+- `src/App.tsx` and the native View menu expose Focus mode with `F8`, temporarily
+  hiding navigation, tabs, toolbar and AI without discarding their state.

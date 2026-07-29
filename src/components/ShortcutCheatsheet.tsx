@@ -56,6 +56,7 @@ const groups: ShortcutGroup[] = [
             { keys: `${cmd}+\\`, description: "Toggle split view" },
             { keys: `${cmd}+Shift+L`, description: "Toggle Live Beta" },
             { keys: "F9", description: "Toggle Typewriter mode" },
+            { keys: "F8", description: "Toggle Focus mode" },
             { keys: "F11", description: "Toggle fullscreen" },
             { keys: `${cmd}+Shift+E`, description: "Toggle file explorer" },
             { keys: `${cmd}+Shift+F`, description: "Search across files" },

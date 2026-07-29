@@ -1,14 +1,15 @@
 import { syntaxTree } from "@codemirror/language";
-import type { Range } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import type { EditorState, Range } from "@codemirror/state";
+import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
 import { nextMermaidRenderId, renderMermaidSvg } from "../../utils/mermaidRenderer";
 import { liveText, type LiveLocale } from "./liveLocale";
+import { makeLiveProjectionEditable, revealLiveSource } from "./liveBlockProjection";
 
 class LiveMermaidWidget extends WidgetType {
     private destroyed = false;
     private readonly id = nextMermaidRenderId("mdtxt-live-mermaid");
 
-    constructor(private readonly source: string, private readonly code: string, private readonly locale: LiveLocale) {
+    constructor(private readonly source: string, private readonly code: string, private readonly locale: LiveLocale, private readonly from: number) {
         super();
     }
 
@@ -16,21 +17,18 @@ class LiveMermaidWidget extends WidgetType {
         return this.source === other.source;
     }
 
-    toDOM() {
+    toDOM(view: EditorView) {
         const section = document.createElement("section");
         section.className = "cm-live-block-widget cm-live-mermaid-widget mermaid-rendered";
         section.textContent = liveText(this.locale, "正在渲染图表…", "Rendering diagram…");
+        makeLiveProjectionEditable(section, view, this.from);
         const theme = document.documentElement.getAttribute("data-theme") ?? "paper";
         void renderMermaidSvg(this.code, theme, this.id)
             .then((svg) => {
                 if (!this.destroyed && section.isConnected) section.innerHTML = svg;
             })
             .catch(() => {
-                if (!this.destroyed) section.textContent = liveText(
-                    this.locale,
-                    "图表预览不可用，请编辑上方源文本。",
-                    "Diagram preview unavailable; edit the source above.",
-                );
+                if (!this.destroyed) revealLiveSource(view, this.from);
             });
         return section;
     }
@@ -44,41 +42,25 @@ class LiveMermaidWidget extends WidgetType {
     }
 }
 
-function mermaidDecorations(view: EditorView, locale: LiveLocale): DecorationSet {
+function mermaidDecorations(state: EditorState, locale: LiveLocale): DecorationSet {
     const widgets: Range<Decoration>[] = [];
-    for (const visible of view.visibleRanges) {
-        syntaxTree(view.state).iterate({
-            from: visible.from,
-            to: visible.to,
+        syntaxTree(state).iterate({
             enter(node) {
                 if (node.name !== "FencedCode") return;
                 const info = node.node.getChild("CodeInfo");
-                if (!info || view.state.doc.sliceString(info.from, info.to).trim().toLowerCase() !== "mermaid") return;
-                if (view.compositionStarted || view.state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from)) return;
+                if (!info || state.doc.sliceString(info.from, info.to).trim().toLowerCase() !== "mermaid") return;
+                if (state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from)) return;
                 const text = node.node.getChild("CodeText");
-                const source = view.state.doc.sliceString(node.from, node.to);
-                const code = text ? view.state.doc.sliceString(text.from, text.to) : "";
-                widgets.push(Decoration.widget({
-                    widget: new LiveMermaidWidget(source, code, locale), side: 1,
-                }).range(view.state.doc.lineAt(node.to).to));
+                const source = state.doc.sliceString(node.from, node.to);
+                const code = text ? state.doc.sliceString(text.from, text.to) : "";
+                widgets.push(Decoration.replace({
+                    widget: new LiveMermaidWidget(source, code, locale, node.from),
+                }).range(node.from, node.to));
             },
         });
-    }
     return Decoration.set(widgets, true);
 }
 
 export function liveMermaidWidgets(locale: LiveLocale) {
-    return ViewPlugin.fromClass(class {
-        decorations: DecorationSet;
-
-        constructor(view: EditorView) {
-            this.decorations = mermaidDecorations(view, locale);
-        }
-
-        update(update: ViewUpdate) {
-            if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
-                this.decorations = mermaidDecorations(update.view, locale);
-            }
-        }
-    }, { decorations: (plugin) => plugin.decorations });
+    return EditorView.decorations.compute(["doc", "selection"], (state) => mermaidDecorations(state, locale));
 }

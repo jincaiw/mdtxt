@@ -9,6 +9,9 @@ import {
     getOpenInReader, setOpenInReader,
     getLiveBetaEnabled, setLiveBetaEnabled,
     getSession, setSession,
+    getFocusMode, setFocusMode,
+    getNavigationWidth, setNavigationWidth,
+    getAIPanelWidth, setAIPanelWidth,
 } from "./persistence";
 
 beforeEach(() => localStorage.clear());
@@ -141,5 +144,15 @@ describe("defaults", () => {
     });
     it("keeps every AI surface disabled until explicit opt-in", () => {
         expect(getAIEnabled()).toBe(false);
+    });
+    it("persists focus mode and clamps workspace panel widths", () => {
+        expect(getFocusMode()).toBe(false);
+        setFocusMode(true);
+        expect(getFocusMode()).toBe(true);
+
+        setNavigationWidth(999);
+        setAIPanelWidth(1);
+        expect(getNavigationWidth()).toBe(360);
+        expect(getAIPanelWidth()).toBe(320);
     });
 });

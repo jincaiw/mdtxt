@@ -3,6 +3,7 @@ import type { Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { getCachedLocalImageUrl, isUnsafeRelativeImagePath, markdownBaseDir } from "../../utils/localImage";
 import { liveText, type LiveLocale } from "./liveLocale";
+import { makeLiveProjectionEditable } from "./liveBlockProjection";
 
 class LiveImageWidget extends WidgetType {
     private destroyed = false;
@@ -13,6 +14,7 @@ class LiveImageWidget extends WidgetType {
         private readonly path: string,
         private readonly baseDir: string | null,
         private readonly locale: LiveLocale,
+        private readonly from: number,
     ) {
         super();
     }
@@ -21,16 +23,18 @@ class LiveImageWidget extends WidgetType {
         return this.source === other.source && this.baseDir === other.baseDir;
     }
 
-    toDOM() {
-        const figure = document.createElement("figure");
+    toDOM(view: EditorView) {
+        const figure = document.createElement("span");
         figure.className = "cm-live-block-widget cm-live-image-widget";
         figure.dataset.source = this.source;
         const image = document.createElement("img");
         image.alt = this.alt;
         image.loading = "lazy";
-        const status = document.createElement("figcaption");
+        const status = document.createElement("span");
+        status.className = "cm-live-image-caption";
         status.textContent = this.alt || this.path;
         figure.append(image, status);
+        makeLiveProjectionEditable(figure, view, this.from);
         void this.load(image, status);
         return figure;
     }
@@ -92,10 +96,9 @@ function imageDecorations(view: EditorView, filePath: string | null, locale: Liv
                 const path = view.state.doc.sliceString(url.from, url.to);
                 const altEnd = source.indexOf("]");
                 const alt = altEnd >= 2 ? source.slice(2, altEnd) : "";
-                const lineEnd = view.state.doc.lineAt(node.to).to;
-                widgets.push(Decoration.widget({
-                    widget: new LiveImageWidget(source, alt, path, baseDir, locale), side: 1,
-                }).range(lineEnd));
+                widgets.push(Decoration.replace({
+                    widget: new LiveImageWidget(source, alt, path, baseDir, locale, node.from),
+                }).range(node.from, node.to));
             },
         });
     }

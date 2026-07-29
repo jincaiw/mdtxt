@@ -24,9 +24,11 @@ interface TitleBarProps {
     mode?: ViewMode;
     onSetMode?: (mode: ViewMode) => void;
     liveEnabled?: boolean;
+    onToggleNavigation?: () => void;
+    navigationActive?: boolean;
 }
 
-function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getExportHtml, onExportSuccess, onExportError, onToggleAI, aiActive, isNativeFullscreen, mode, onSetMode, liveEnabled }: TitleBarProps) {
+function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getExportHtml, onExportSuccess, onExportError, onToggleAI, aiActive, isNativeFullscreen, mode, onSetMode, liveEnabled, onToggleNavigation, navigationActive }: TitleBarProps) {
     const { t } = useLocale();
     const desktopPlatform = getDesktopPlatform();
     const isMacOverlay = desktopPlatform === "macos";
@@ -82,9 +84,17 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
             >
                 {/* Left: Icon & Title */}
                 <div className="flex min-w-0 items-center gap-2 no-drag">
-                    {hasFile && showDocumentIdentity && <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                        <img src="/icon.png" alt="mdtxt" className="h-full w-full rounded-[5px] object-contain" />
-                    </div>}
+                    {hasFile && onToggleNavigation && (
+                        <button
+                            onClick={onToggleNavigation}
+                            aria-label={t(navigationActive ? "Close navigation sidebar" : "Open navigation sidebar")}
+                            aria-pressed={navigationActive}
+                            title={t("Navigation sidebar")}
+                            className={`workspace-title-button ${navigationActive ? "active" : ""}`}
+                        >
+                            <span className="material-symbols-outlined" aria-hidden="true">folder_open</span>
+                        </button>
+                    )}
                     {hasFile && showDocumentIdentity && <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-[var(--text-secondary)]">
                         {parentFolder && (
                             <>
@@ -99,7 +109,8 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                         )}
                     </div>}
 
-                    {/* Open File / New Button - shown when a file is already open */}
+                    {/* Compact file actions. Their full labels remain in the
+                        native menu and command palette, keeping document chrome quiet. */}
                     {hasFile && onOpenFile && (
                         <div className="flex shrink-0 items-center gap-0.5">
                             <div className="ml-1 h-4 w-px shrink-0 bg-[var(--border)]"></div>
@@ -107,21 +118,19 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                                 <button
                                     onClick={onNewFile}
                                     aria-label={t("New file")}
-                                    className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-md)] px-1.5 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] xl:px-2"
+                                    className="workspace-title-button hidden lg:flex"
                                     title={t("New File (Ctrl+N)")}
                                 >
                                     <span className="material-symbols-outlined text-[16px]">edit_note</span>
-                                    <span className="hidden xl:inline">{t("New")}</span>
                                 </button>
                             )}
                             <button
                                 onClick={onOpenFile}
                                 aria-label={t("Open file")}
-                                className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-md)] px-1.5 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] xl:px-2"
+                                className="workspace-title-button hidden lg:flex"
                                 title={t("Open File (Ctrl+O)")}
                             >
                                 <span className="material-symbols-outlined text-[16px]">folder_open</span>
-                                <span className="hidden xl:inline">{t("Open")}</span>
                             </button>
                             <ExportMenu
                                 fileName={fileName || 'document.md'}
@@ -135,13 +144,12 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                                     aria-label={t("AI assistant")}
                                     aria-pressed={aiActive}
                                     title={t("AI assistant")}
-                                    className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-[var(--radius-md)] px-1.5 py-1 text-xs font-semibold tracking-wide transition-colors xl:px-2.5 ${aiActive
+                                    className={`workspace-title-button ${aiActive
                                         ? "bg-[var(--bg-hover)] text-[var(--accent)]"
                                         : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                                     }`}
                                 >
                                     <span className="material-symbols-outlined text-[15px] ai-shimmer" aria-hidden="true">auto_awesome</span>
-                                    <span className="hidden xl:inline">AI</span>
                                 </button>
                             )}
                         </div>

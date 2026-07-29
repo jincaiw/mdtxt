@@ -18,16 +18,24 @@ Ubuntu WebKit viewport gate and exact Source round trip.**
 
 ## Shared safety and performance contract
 
-- Widgets are CodeMirror viewport plugins and never become React document state.
-- Every Widget is appended after its source block. `Decoration.replace` is not used, so Source remains visible and selectable.
-- A Widget is omitted when composition is active or a selection touches its source range.
-- Document changes, selection/focus changes, and viewport changes rebuild only the current visible decoration set.
+- Widgets are CodeMirror decorations and never become React document state.
+- Since the unreleased 2026-07-29 workspace update, an inactive complex block
+  uses a state-backed `Decoration.replace` projection. This changes only the
+  presentation: the exact Markdown remains in `EditorState.doc` and undo history.
+- A Widget is omitted when a selection touches its source range. Click, Enter,
+  or F2 restores the source range immediately; active composition retains the
+  CodeMirror source-editing path.
+- Document and selection changes recompute the projection set. Large documents
+  continue to use restricted Live and omit complex projections.
 - Image, KaTeX, and Mermaid work is lazy; caches are bounded; destroyed Widgets reject late DOM writes.
-- The eight behavior changes are separate commits and can be reverted independently.
+- The projection layer remains isolated from persistence and can be reverted
+  without document migration.
 
 ## Verification
 
 - `src/components/CodeEditor.test.tsx` covers all eight Widget types, exact `EditorState.doc` preservation, explicit Live enablement, and Source fallback.
+- The unreleased tests additionally verify that fenced source is absent from the
+  inactive visual projection and returns when the projection is activated.
 - `src/utils/localImage.test.ts` covers traversal/absolute-path rejection, Windows/POSIX base directories, and bounded MIME selection.
 - `bun run test`: 51 files / 353 tests passed.
 - `bun run build` and `bun run release:check` passed.

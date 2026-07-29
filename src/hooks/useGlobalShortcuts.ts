@@ -11,6 +11,7 @@ export interface ShortcutHandlers {
     handleToggleSplit: () => void;
     handleToggleLive?: () => void;
     handleToggleTypewriter?: () => void;
+    handleToggleFocus?: () => void;
     /** Toggle OS fullscreen (F11). Cross-platform via the Tauri window API. */
     toggleFullscreen: () => void;
     handleToggleFileExplorer: () => void;
@@ -65,6 +66,11 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
             if (e.key === "F9") {
                 e.preventDefault();
                 s.handleToggleTypewriter?.();
+                return;
+            }
+            if (e.key === "F8") {
+                e.preventDefault();
+                if (s.hasFile) s.handleToggleFocus?.();
                 return;
             }
             // Cmd/Ctrl+Shift+L - explicit Live mode. Keep Ctrl+E's historical

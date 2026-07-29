@@ -6,6 +6,32 @@ All notable mdtxt changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-29
+
+### Added
+
+- A content-first desktop workspace with a shared Files/Outline navigation
+  rail, docked AI panel, persisted resizable panel widths, responsive overlays,
+  and a distraction-free Focus mode (`F8`).
+- Collapsible outline hierarchy with active-heading follow and keyboard
+  expand/collapse controls.
+
+### Changed
+
+- Live Beta complex blocks now project the rendered image, code, metadata,
+  table, math, Mermaid, footnote, or callout in place of inactive Markdown.
+  Clicking a projection (or pressing Enter/F2) restores its exact source for
+  editing; `EditorState.doc`, selection, undo, and Source fallback remain
+  authoritative.
+- Single-document chrome is quieter: the tab strip appears only when multiple
+  documents are open, and compact title-bar controls preserve document width.
+
+### Security
+
+- v0.3.0 is a public GA release with ad-hoc macOS bundle signing and unsigned
+  Windows packages. Automatic updates remain disabled until mdtxt owns signing
+  credentials and a verified update endpoint.
+
 ## [0.2.3] - 2026-07-28
 
 ### Fixed

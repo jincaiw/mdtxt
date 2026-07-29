@@ -4,6 +4,15 @@ mdtxt is a local-first Markdown editor. This roadmap is directional rather than
 a promise; the safety of local documents and a reliable native experience take
 priority over feature count.
 
+## Shipped in v0.3.0
+
+- The desktop workspace adapts between a resizable three-column layout and
+  narrow-window overlays, with shared Files/Outline navigation and docked AI.
+- Focus mode, collapsible outline hierarchy, and quieter single-document chrome
+  keep the document visually primary.
+- Inactive Live complex blocks render in place and restore their exact Markdown
+  source on click, Enter, or F2 without changing the CodeMirror document.
+
 ## Shipped in v0.2.3
 
 - A single command model powers native menus, keyboard shortcuts, the command
@@ -32,6 +41,6 @@ priority over feature count.
 ## Release policy
 
 Windows x64, Ubuntu LTS x64 and macOS Apple Silicon are the supported targets.
-v0.2.3 is a GA release by product-owner decision, but it remains unsigned and
+v0.3.0 is a GA release by product-owner decision, but it remains unsigned and
 the in-app updater stays disabled until mdtxt owns signing credentials and an
 update endpoint.

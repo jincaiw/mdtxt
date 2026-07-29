@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTheme, type Theme, type FontFamily, type FontSize } from "../context/ThemeContext";
 import {
     getTypewriterMode, setTypewriterMode,
+    getFocusMode, setFocusMode,
     getToolbarEnabled, setToolbarEnabled,
     getAIConfig, setAIConfig,
     getAIEnabled, setAIEnabled,
@@ -99,6 +100,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const { locale, setLocale, t } = useLocale();
 
     const [typewriter, setTypewriterLocal] = useState(getTypewriterMode);
+    const [focusMode, setFocusModeLocal] = useState(getFocusMode);
     const [toolbar, setToolbarLocal] = useState(getToolbarEnabled);
     const [wordWrap, setWordWrapLocal] = useState(getWordWrap);
     const [spellCheck, setSpellCheckLocal] = useState(getSpellCheck);
@@ -351,6 +353,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 {matches("typewriter") && (
                                     <ToggleRow label={t("Typewriter mode")} description={t("Keep caret vertically centered")} checked={typewriter}
                                         onChange={(v) => { setTypewriterLocal(v); setTypewriterMode(v); fire("mdtxt:typewriter-toggle", v); }} />
+                                )}
+                                {matches("focus") && (
+                                    <ToggleRow label={t("Focus mode")} description={t("Dim other paragraphs and collapse distractions")} checked={focusMode}
+                                        onChange={(v) => { setFocusModeLocal(v); setFocusMode(v); fire("mdtxt:focus-toggle", v); }} />
                                 )}
                                 {matches("toolbar") && (
                                     <ToggleRow label={t("Show formatting toolbar")} description={t("Toolbar above the editor")} checked={toolbar}

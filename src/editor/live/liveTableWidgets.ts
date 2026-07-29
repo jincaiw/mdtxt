@@ -1,14 +1,15 @@
 import { syntaxTree } from "@codemirror/language";
-import type { Range } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import type { EditorState, Range } from "@codemirror/state";
+import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
 import { parseTable, type Align, type TableModel } from "../../utils/tableModel";
+import { makeLiveProjectionEditable } from "./liveBlockProjection";
 
 function alignCell(cell: HTMLTableCellElement, align: Align) {
     if (align !== "none") cell.style.textAlign = align;
 }
 
 class LiveTableWidget extends WidgetType {
-    constructor(private readonly source: string, private readonly model: TableModel) {
+    constructor(private readonly source: string, private readonly model: TableModel, private readonly from: number) {
         super();
     }
 
@@ -16,7 +17,7 @@ class LiveTableWidget extends WidgetType {
         return this.source === other.source;
     }
 
-    toDOM() {
+    toDOM(view: EditorView) {
         const wrapper = document.createElement("section");
         wrapper.className = "cm-live-block-widget cm-live-table-widget";
         const table = document.createElement("table");
@@ -37,6 +38,7 @@ class LiveTableWidget extends WidgetType {
             });
         }
         wrapper.append(table);
+        makeLiveProjectionEditable(wrapper, view, this.from);
         return wrapper;
     }
 
@@ -45,36 +47,20 @@ class LiveTableWidget extends WidgetType {
     }
 }
 
-function tableDecorations(view: EditorView): DecorationSet {
+function tableDecorations(state: EditorState): DecorationSet {
     const widgets: Range<Decoration>[] = [];
-    for (const visible of view.visibleRanges) {
-        syntaxTree(view.state).iterate({
-            from: visible.from,
-            to: visible.to,
+        syntaxTree(state).iterate({
             enter(node) {
                 if (node.name !== "Table") return;
-                if (view.compositionStarted || view.state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from)) return;
-                const source = view.state.doc.sliceString(node.from, node.to);
+                if (state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from)) return;
+                const source = state.doc.sliceString(node.from, node.to);
                 const model = parseTable(source.split("\n"));
-                widgets.push(Decoration.widget({
-                    widget: new LiveTableWidget(source, model), side: 1,
-                }).range(view.state.doc.lineAt(node.to).to));
+                widgets.push(Decoration.replace({
+                    widget: new LiveTableWidget(source, model, node.from),
+                }).range(node.from, node.to));
             },
         });
-    }
     return Decoration.set(widgets, true);
 }
 
-export const liveTableWidgets = ViewPlugin.fromClass(class {
-    decorations: DecorationSet;
-
-    constructor(view: EditorView) {
-        this.decorations = tableDecorations(view);
-    }
-
-    update(update: ViewUpdate) {
-        if (update.docChanged || update.selectionSet || update.viewportChanged || update.focusChanged) {
-            this.decorations = tableDecorations(update.view);
-        }
-    }
-}, { decorations: (plugin) => plugin.decorations });
+export const liveTableWidgets = EditorView.decorations.compute(["doc", "selection"], tableDecorations);

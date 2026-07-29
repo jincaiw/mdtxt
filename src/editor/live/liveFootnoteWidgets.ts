@@ -1,9 +1,10 @@
 import { syntaxTree } from "@codemirror/language";
 import type { Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { makeLiveProjectionEditable } from "./liveBlockProjection";
 
 class LiveFootnoteWidget extends WidgetType {
-    constructor(private readonly source: string, private readonly label: string, private readonly note: string) {
+    constructor(private readonly source: string, private readonly label: string, private readonly note: string, private readonly from: number) {
         super();
     }
 
@@ -11,7 +12,7 @@ class LiveFootnoteWidget extends WidgetType {
         return this.source === other.source;
     }
 
-    toDOM() {
+    toDOM(view: EditorView) {
         const aside = document.createElement("aside");
         aside.className = "cm-live-block-widget cm-live-footnote-widget";
         const marker = document.createElement("sup");
@@ -19,6 +20,7 @@ class LiveFootnoteWidget extends WidgetType {
         const text = document.createElement("span");
         text.textContent = this.note;
         aside.append(marker, text);
+        makeLiveProjectionEditable(aside, view, this.from);
         return aside;
     }
 
@@ -42,9 +44,9 @@ function footnoteDecorations(view: EditorView): DecorationSet {
                 if (view.compositionStarted || view.state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from)) return;
                 const label = source.slice(2, labelEnd);
                 const note = source.slice(labelEnd + 2).trim();
-                widgets.push(Decoration.widget({
-                    widget: new LiveFootnoteWidget(source, label, note), side: 1,
-                }).range(view.state.doc.lineAt(node.to).to));
+                widgets.push(Decoration.replace({
+                    widget: new LiveFootnoteWidget(source, label, note, node.from),
+                }).range(node.from, node.to));
             },
         });
     }
