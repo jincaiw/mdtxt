@@ -17,6 +17,9 @@ using System.Runtime.InteropServices;
 
 public static class MdtxtNativePointer {
   [DllImport("user32.dll")]
+  public static extern bool ShowWindow(IntPtr hWnd, int command);
+
+  [DllImport("user32.dll")]
   public static extern bool SetForegroundWindow(IntPtr hWnd);
 
   [DllImport("user32.dll")]
@@ -27,6 +30,7 @@ public static class MdtxtNativePointer {
 
   public const uint LeftDown = 0x0002;
   public const uint LeftUp = 0x0004;
+  public const int Restore = 9;
 }
 '@
 
@@ -50,8 +54,11 @@ while ([DateTime]::UtcNow -lt $deadline) {
         $rect = $tab.Current.BoundingRectangle
         $x = [int]($rect.Left + ($rect.Width / 2))
         $y = [int]($rect.Top + ($rect.Height / 2))
-        [void][MdtxtNativePointer]::SetForegroundWindow($process.MainWindowHandle)
-        Start-Sleep -Milliseconds 100
+        [void][MdtxtNativePointer]::ShowWindow($process.MainWindowHandle, [MdtxtNativePointer]::Restore)
+        if (-not [MdtxtNativePointer]::SetForegroundWindow($process.MainWindowHandle)) {
+          throw "Could not foreground mdtxt before selecting tab index $Index."
+        }
+        Start-Sleep -Milliseconds 250
         if (-not [MdtxtNativePointer]::SetCursorPos($x, $y)) {
           throw "Could not move the native pointer to tab index $Index."
         }
