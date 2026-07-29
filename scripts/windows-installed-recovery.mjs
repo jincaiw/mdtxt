@@ -65,6 +65,17 @@ function invokeUi(pattern, timeoutSeconds = 30) {
     console.log(output);
 }
 
+function invokeUiIfPresent(pattern, timeoutSeconds = 2) {
+    const result = spawnSync(powershell, [
+        "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+        "-File", uiaInvokeScript,
+        "-TargetProcessId", String(application.pid),
+        "-Pattern", pattern,
+        "-TimeoutSeconds", String(timeoutSeconds),
+    ], { cwd: root, encoding: "utf8" });
+    if (result.status === 0) console.log(result.stdout.trim());
+}
+
 function focusUiTab(index, timeoutSeconds = 30) {
     const output = runPowerShell(uiaFocusTabScript, [
         "-TargetProcessId", String(application.pid),
@@ -187,6 +198,10 @@ async function run() {
     // drafts instead of depending on platform button focus order.
     invokeUi("Restore all|全部恢复");
     await wait(1_000);
+    // A force-kill can happen before WebView2 flushes the first-run tour flag.
+    // Dismiss the modal when it reappears so it cannot intercept tab clicks;
+    // an already-persisted profile takes the no-op path.
+    invokeUiIfPresent("Just start writing|直接开始写作");
     send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
     // Locate the first recovered TabItem through native accessibility and
