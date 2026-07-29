@@ -446,6 +446,8 @@ const zhCN = {
     "Copy code": "复制代码",
     "Copied!": "已复制！",
     "Copy": "复制",
+    "Copy formatted selection": "复制带格式的选区",
+    "Could not copy formatted selection": "无法复制带格式的选区",
     "+ add": "+ 添加",
     "Close image": "关闭图片",
     "mdtxt encountered an unexpected error. Your file data should be safe.": "mdtxt 遇到了意外错误，你的文件数据应该仍然安全。",
