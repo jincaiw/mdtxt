@@ -42,4 +42,12 @@ describe("TitleBar native window controls", () => {
         expect(container.querySelector("header")).not.toHaveClass("drag-region");
         expect(screen.queryByText("notes.md")).toBeNull();
     });
+
+    it("does not duplicate the product name above the welcome screen", () => {
+        Object.defineProperty(window, "__TAURI_INTERNALS__", { configurable: true, value: {} });
+        Object.defineProperty(window.navigator, "platform", { configurable: true, value: "MacIntel" });
+        render(<TitleBar />);
+        expect(screen.queryByText("mdtxt")).toBeNull();
+        expect(screen.getByLabelText("Settings")).toBeInTheDocument();
+    });
 });

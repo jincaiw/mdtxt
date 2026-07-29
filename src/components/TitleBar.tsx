@@ -149,7 +149,6 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                 </div>
 
                 <div className="flex items-center justify-center px-3">
-                    {!hasFile && showDocumentIdentity && <span className="text-[12px] font-medium tracking-tight text-[var(--text-primary)]">mdtxt</span>}
                     {hasFile && mode && onSetMode && (
                         <ModeToggle mode={mode} onSetMode={onSetMode} liveEnabled={liveEnabled} />
                     )}

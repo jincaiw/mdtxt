@@ -52,9 +52,8 @@ while ([DateTime]::UtcNow -lt $deadline) {
         # Use the accessible element's native screen rectangle for a real
         # pointer activation of the same standard click path users exercise.
         $rect = $tab.Current.BoundingRectangle
-        $point = $tab.GetClickablePoint()
-        $x = [int]$point.X
-        $y = [int]$point.Y
+        $x = [int]($rect.Left + ($rect.Width / 2))
+        $y = [int]($rect.Top + ($rect.Height / 2))
         [void][MdtxtNativePointer]::ShowWindow($process.MainWindowHandle, [MdtxtNativePointer]::Restore)
         if (-not [MdtxtNativePointer]::SetForegroundWindow($process.MainWindowHandle)) {
           throw "Could not foreground mdtxt before selecting tab index $Index."

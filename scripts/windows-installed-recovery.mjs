@@ -189,13 +189,13 @@ async function run() {
     await wait(1_000);
     send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), secondText);
-    // Select the first recovered TabItem through its native accessibility
-    // pattern. TabBar's Enter/arrow keyboard behavior is covered separately;
-    // keeping this selection in one UIA process avoids losing child focus when
-    // a second SendInput process foregrounds the top-level window.
+    // Locate the first recovered TabItem through native accessibility and
+    // click its screen bounds. Refocus the editor before clipboard inspection:
+    // selecting a tab intentionally leaves keyboard focus on the tab itself.
     focusUiTab(0);
     await wait(500);
     capture(recoveryScreenshot);
+    send({ keys: ["ClickEditor"] });
     assert.equal(readEditorThroughClipboard(), firstText);
     console.log(`MDTXT_INSTALLED_RECOVERY platform=windows binary=${binary} signal=taskkill-F drafts=2 order=passed activeTab=second cursorLine=5 content=passed accessibleTabSelection=passed originalOverwrite=impossible deniedShareUx=passed recoveryScreenshot=${recoveryScreenshot} deniedScreenshot=${deniedScreenshot}`);
 }

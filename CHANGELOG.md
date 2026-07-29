@@ -14,6 +14,9 @@ All notable mdtxt changes are documented here. The format follows
   UI Automation and other assistive technologies, with package-level coverage
   for every restored tab; previous/next tab commands are also available from
   the native Window menu without WebView2-reserved shortcut paths.
+- The welcome screen now reads the current package version instead of showing
+  a stale 0.1.0 label, and no longer duplicates the product name in the title
+  bar when no document is open.
 
 ## [0.2.2] - 2026-07-28
 

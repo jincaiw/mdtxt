@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { clearRecentFiles, getRecentFiles, removeRecentFile, type RecentFile } from "../utils/persistence";
 import { useLocale } from "../context/LocaleContext";
+import appPackage from "../../package.json";
 
 interface WelcomeScreenProps {
     onOpenFile: () => void;
@@ -143,7 +144,7 @@ export function WelcomeScreen({ onOpenFile, onNewFile, onFileDrop, onOpenRecent 
                     <h1 className="font-serif text-[42px] font-normal leading-none tracking-[-0.03em] text-[var(--accent)]">
                         mdtxt
                     </h1>
-                    <span className="mt-2 text-[11px] tabular-nums text-[var(--text-muted)]">0.1.0</span>
+                    <span className="mt-2 text-[11px] tabular-nums text-[var(--text-muted)]">v{appPackage.version}</span>
                     <p className="mt-2 text-[13px] text-[var(--text-secondary)]">
                         {t("Focused Markdown writing")}
                     </p>
@@ -180,7 +181,7 @@ export function WelcomeScreen({ onOpenFile, onNewFile, onFileDrop, onOpenRecent 
                                 title={t("Clear all recents")}
                                 className="rounded px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] transition-colors hover:text-[var(--danger)]"
                             >
-                                {t("More")} ›
+                                {t("Clear all")}
                             </button>
                         </div>
                         <ul className="flex flex-col overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--bg-primary)]">
