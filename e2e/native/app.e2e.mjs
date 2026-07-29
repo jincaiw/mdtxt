@@ -254,6 +254,11 @@ describe("mdtxt native Tauri smoke", () => {
         await activate(restore);
         await dialog.waitForDisplayed({ reverse: true });
 
+        // Live deliberately hides Markdown markers away from the caret. The
+        // recovery contract is byte-for-byte source preservation, so switch
+        // to Source before reading the editor DOM instead of comparing the
+        // visual projection to Markdown source.
+        await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
         const recovered = await $(".cm-content");
         await recovered.waitForDisplayed();
         const recoveredText = await browser.execute(
