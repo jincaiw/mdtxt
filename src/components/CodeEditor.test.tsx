@@ -82,6 +82,20 @@ describe("editor selection theming", () => {
         expect(view.state.selection.main.from).toBe(source.indexOf("```ts") + 1);
     });
 
+    it("edits a Live code block without rewriting its fence or language", async () => {
+        const source = "# code\n\n```ts\nconst answer = 42;\n```";
+        const { container } = render(<CodeEditor documentId="code-edit" content={source} onChange={() => {}} liveMode />);
+        const code = await waitFor(() => {
+            const element = container.querySelector<HTMLElement>(".cm-live-code-widget code");
+            expect(element).toBeTruthy();
+            return element!;
+        });
+        code.textContent = "const answer = 43;";
+        fireEvent.blur(code);
+        const editor = container.querySelector<HTMLElement>(".cm-editor");
+        await waitFor(() => expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe("# code\n\n```ts\nconst answer = 43;\n```"));
+    });
+
     it("mounts bounded frontmatter metadata without replacing the YAML source", async () => {
         const source = "---\ntitle: 安全说明\ntags: docs, beta\n---\n\n# Body";
         const { container } = render(<CodeEditor documentId="frontmatter" content={source} onChange={() => {}} liveMode />);
