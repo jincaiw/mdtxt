@@ -10,7 +10,7 @@ import { useAIAssistShortcut } from "../interactions/useAIAssistShortcut";
 import { useEditorReview } from "../interactions/useEditorReview";
 import { useEditorPreferences } from "../extensions/useEditorPreferences";
 import { useEditorOverlays } from "../interactions/EditorOverlays";
-import { createEditorPasteHandler } from "../interactions/editorPaste";
+import { createEditorDropHandler, createEditorPasteHandler } from "../interactions/editorPaste";
 import { useLiveMarkdownPresentation } from "../live/liveMarkdownPresentation";
 import type { DocumentTextChange } from "../../utils/documentSessionController";
 import type { LiveLocale } from "../live/liveLocale";
@@ -97,13 +97,14 @@ export function useEditorController({
     });
     openAIBubbleRef.current = openAIBubble;
     const handlePaste = createEditorPasteHandler({ filePathRef, onImagePasteRef, onErrorRef });
+    const handleDrop = createEditorDropHandler({ filePathRef, onImagePasteRef, onErrorRef });
 
     useCodeMirrorHost({
         containerRef, viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef,
         wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
         onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
         typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-        content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste,
+        content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste, handleDrop,
     });
     useEditorDocumentSession({
         viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef, contentRef,

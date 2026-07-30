@@ -1,6 +1,6 @@
 import type { RefObject } from "react";
 import type { EditorView } from "@codemirror/view";
-import { getImageFromClipboard, saveImageToFile, createMarkdownImage } from "../../utils/imageUtils";
+import { getImageFromClipboard, getImageFromDrop, saveImageToFile, createMarkdownImage } from "../../utils/imageUtils";
 import { pasteUrlOnSelection, pasteUrlAutolink, pasteTsvAsTable, htmlToMarkdown } from "../../utils/smartPaste";
 import { applyEditorResult, toEditorActionState } from "../core/editorPresentation";
 
@@ -72,5 +72,35 @@ export function createEditorPasteHandler({
             return true;
         }
         return false;
+    };
+}
+
+/** Keeps image drops on the same bounded local-asset path as image paste. */
+export function createEditorDropHandler({
+    filePathRef,
+    onImagePasteRef,
+    onErrorRef,
+}: EditorPasteOptions) {
+    return (event: DragEvent, view: EditorView): boolean => {
+        const imageFile = getImageFromDrop(event);
+        if (!imageFile) return false;
+        event.preventDefault();
+        if (!filePathRef.current) {
+            onErrorRef.current?.("Please save your file first before adding images.");
+            return true;
+        }
+        void (async () => {
+            try {
+                const imagePath = await saveImageToFile(imageFile, filePathRef.current!);
+                const markdown = createMarkdownImage(imagePath, imageFile.name.replace(/\.[^.]+$/, "") || `image-${Date.now()}`);
+                const selection = view.state.selection.main;
+                view.dispatch({ changes: { from: selection.from, to: selection.to, insert: markdown }, selection: { anchor: selection.from + markdown.length } });
+                onImagePasteRef.current?.();
+            } catch (error) {
+                const message = typeof error === "string" ? error : (error as { message?: string })?.message;
+                onErrorRef.current?.(message || "Failed to save image. Please try again.");
+            }
+        })();
+        return true;
     };
 }

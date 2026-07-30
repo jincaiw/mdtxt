@@ -56,6 +56,7 @@ interface UseCodeMirrorHostOptions {
     detectTable: (view: EditorView) => void;
     openFind: (mode: "find" | "replace", selectionStart: number) => void;
     handlePaste: (event: ClipboardEvent, view: EditorView) => boolean;
+    handleDrop: (event: DragEvent, view: EditorView) => boolean;
 }
 
 /** Owns the one-time CodeMirror view and its stable extension protocol. */
@@ -64,7 +65,7 @@ export function useCodeMirrorHost({
     wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
     onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
     typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-    content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste,
+    content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste, handleDrop,
 }: UseCodeMirrorHostOptions) {
     useEffect(() => {
         if (!containerRef.current) return;
@@ -167,7 +168,7 @@ export function useCodeMirrorHost({
                     liveCompRef.current.of(liveMode && !liveRestricted ? createLiveMarkdownPresentation(filePath ?? null, liveLocale) : []),
                     keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
                     updateListener,
-                    EditorView.domEventHandlers({ paste: handlePaste }),
+                    EditorView.domEventHandlers({ paste: handlePaste, drop: handleDrop }),
                     EditorView.theme({ "&": { outline: "none" } }),
                 ],
             });
