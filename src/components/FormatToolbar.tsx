@@ -11,6 +11,7 @@ interface FormatToolbarProps {
      *  when provided — the primary visible affordance for the AI feature
      *  (it was keyboard-only before). */
     onAIAssist?: () => void;
+    onCopyFormatted?: () => void;
 }
 
 interface ToolButtonProps {
@@ -36,7 +37,7 @@ function ToolButton({ icon, title, onClick }: ToolButtonProps) {
 
 const Sep = () => <div className="w-px h-5 bg-[var(--border)] mx-0.5" />;
 
-export function FormatToolbar({ getState, apply, onAIAssist }: FormatToolbarProps) {
+export function FormatToolbar({ getState, apply, onAIAssist, onCopyFormatted }: FormatToolbarProps) {
     const { t } = useLocale();
     const command = (id: EditorCommandId) => () => {
         const st = getState();
@@ -64,6 +65,7 @@ export function FormatToolbar({ getState, apply, onAIAssist }: FormatToolbarProp
             <ToolButton icon="data_object" title={t("Code block")} onClick={command("insert.codeBlock")} />
             <ToolButton icon="table_chart" title={t("Insert table")} onClick={command("insert.table")} />
             <ToolButton icon="horizontal_rule" title={t("Horizontal rule")} onClick={command("insert.rule")} />
+            {onCopyFormatted && <ToolButton icon="content_copy" title={t("Copy formatted selection")} onClick={onCopyFormatted} />}
             {onAIAssist && (
                 <>
                     <Sep />

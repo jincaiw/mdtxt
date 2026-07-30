@@ -9,6 +9,7 @@ import { SlashMenu, type SlashCommand } from "../../components/SlashMenu";
 import { AIBubble } from "../../components/AIBubble";
 import { TableToolbar } from "../../components/TableToolbar";
 import { EDITOR_COMMAND_EVENT, runEditorCommand, type EditorCommandId } from "../commands/editorCommands";
+import { copySelectedMarkdownAsRichText } from "./editorCopy";
 
 type AIBubbleState = { x: number; y: number; selStart: number; selEnd: number; text: string };
 type SlashState = { from: number; pos: { x: number; y: number } };
@@ -183,8 +184,12 @@ export function useEditorOverlays({
         if (view) applyEditorResult(view, { text: newContent, selStart: newCursor, selEnd: newCursor });
     }, [viewRef]);
 
+    const copyFormatted = useCallback(() => {
+        const view = viewRef.current;
+        if (view) void copySelectedMarkdownAsRichText(view).catch(() => onNoticeRef.current?.("Could not copy formatted selection"));
+    }, [onNoticeRef, viewRef]);
     const toolbar = showToolbar
-        ? <FormatToolbar getState={getState} apply={applyResult} onAIAssist={aiEnabled ? openAIBubble : undefined} />
+        ? <FormatToolbar getState={getState} apply={applyResult} onAIAssist={aiEnabled ? openAIBubble : undefined} onCopyFormatted={copyFormatted} />
         : null;
     const floatingOverlays = (
         <>
