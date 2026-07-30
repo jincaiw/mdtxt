@@ -105,6 +105,20 @@ describe("editor selection theming", () => {
         expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
     });
 
+    it("moves through Live table cells and appends a row from the final cell", async () => {
+        const source = "# table\n\n| Name | Value |\n| --- | --- |\n| alpha | 42 |";
+        const { container } = render(<CodeEditor documentId="table-nav" content={source} onChange={() => {}} liveMode />);
+        const finalCell = await waitFor(() => {
+            const cell = container.querySelector<HTMLElement>('[data-live-table-cell="0:1"]');
+            expect(cell).toBeTruthy();
+            return cell!;
+        });
+        fireEvent.keyDown(finalCell, { key: "Tab" });
+        const editor = container.querySelector<HTMLElement>(".cm-editor");
+        await waitFor(() => expect(EditorView.findFromDOM(editor!).state.doc.lines).toBe(6));
+        await waitFor(() => expect(container.querySelector('[data-live-table-cell="1:0"]')).toHaveFocus());
+    });
+
     it("renders a visible display-math block through bounded KaTeX", async () => {
         const source = "# formula\n\n$$\nx^2 + y^2 = z^2\n$$";
         const { container } = render(<CodeEditor documentId="math" content={source} onChange={() => {}} liveMode />);

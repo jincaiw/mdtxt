@@ -23,8 +23,16 @@ class LiveTableWidget extends WidgetType {
         wrapper.title = "Double-click to edit Markdown source";
         const table = document.createElement("table");
         const head = table.createTHead().insertRow();
-        const updateCell = (row: number, column: number, element: HTMLElement) => {
-            const value = (element.textContent ?? "").replace(/[\r\n]+/g, " ").replace(/\|/g, "\\|");
+        type CellAddress = { row: number; column: number };
+        const valueOf = (element: HTMLElement) => (element.textContent ?? "").replace(/[\r\n]+/g, " ").replace(/\|/g, "\\|");
+        const focusCell = (target: CellAddress) => {
+            requestAnimationFrame(() => {
+                const selector = `[data-live-table-cell="${target.row}:${target.column}"]`;
+                view.dom.querySelector<HTMLElement>(selector)?.focus();
+            });
+        };
+        const updateCell = (row: number, column: number, element: HTMLElement, target?: CellAddress, appendRow = false) => {
+            const value = valueOf(element);
             const next: TableModel = {
                 headers: this.model.headers.slice(),
                 aligns: this.model.aligns.slice(),
@@ -32,23 +40,56 @@ class LiveTableWidget extends WidgetType {
             };
             if (row === -1) next.headers[column] = value;
             else next.rows[row][column] = value;
+            if (appendRow) next.rows.push(new Array(next.headers.length).fill(""));
             const replacement = serializeTable(next);
             view.dispatch({ changes: { from: this.from, to: this.from + this.source.length, insert: replacement } });
+            if (target) focusCell(target);
         };
         const editableCell = (cell: HTMLTableCellElement, value: string, row: number, column: number) => {
             cell.textContent = value;
             cell.contentEditable = "true";
+            cell.tabIndex = 0;
             cell.spellcheck = true;
+            cell.dataset.liveTableCell = `${row}:${column}`;
             cell.setAttribute("role", "textbox");
             cell.setAttribute("aria-label", row === -1 ? `Table header ${column + 1}` : `Table row ${row + 1}, column ${column + 1}`);
             // A cell edit is direct manipulation; don't let the projection's
             // source fallback steal the pointer event before editing starts.
             cell.addEventListener("mousedown", (event) => event.stopPropagation());
+            let cancelled = false;
+            let committed = false;
+            const nextCell = (backwards: boolean, keepColumn = false): { target?: CellAddress; appendRow?: boolean } => {
+                const columns = this.model.headers.length;
+                if (keepColumn) {
+                    if (row === -1) return this.model.rows.length > 0 ? { target: { row: 0, column } } : { target: { row: 0, column }, appendRow: true };
+                    return row + 1 < this.model.rows.length ? { target: { row: row + 1, column } } : { target: { row: row + 1, column }, appendRow: true };
+                }
+                if (backwards) {
+                    if (column > 0) return { target: { row, column: column - 1 } };
+                    if (row > 0) return { target: { row: row - 1, column: columns - 1 } };
+                    if (row === 0) return { target: { row: -1, column: columns - 1 } };
+                    return {};
+                }
+                if (column + 1 < columns) return { target: { row, column: column + 1 } };
+                if (row === -1) return this.model.rows.length > 0 ? { target: { row: 0, column: 0 } } : { target: { row: 0, column: 0 }, appendRow: true };
+                return row + 1 < this.model.rows.length ? { target: { row: row + 1, column: 0 } } : { target: { row: row + 1, column: 0 }, appendRow: true };
+            };
             cell.addEventListener("keydown", (event) => {
-                if (event.key === "Enter") { event.preventDefault(); cell.blur(); }
-                if (event.key === "Escape") { event.preventDefault(); cell.textContent = value; cell.blur(); }
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    cancelled = true;
+                    cell.textContent = value;
+                    cell.blur();
+                    return;
+                }
+                if (event.key === "Tab" || event.key === "Enter") {
+                    event.preventDefault();
+                    const next = nextCell(event.shiftKey, event.key === "Enter");
+                    committed = true;
+                    updateCell(row, column, cell, next.target, next.appendRow);
+                }
             });
-            cell.addEventListener("blur", () => updateCell(row, column, cell));
+            cell.addEventListener("blur", () => { if (!cancelled && !committed) updateCell(row, column, cell); });
         };
         this.model.headers.forEach((header, index) => {
             const cell = document.createElement("th");
