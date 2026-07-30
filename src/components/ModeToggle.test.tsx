@@ -18,20 +18,18 @@ describe("ModeToggle Live", () => {
         expect(screen.getByRole("button", { name: "Live mode" })).toHaveAttribute("aria-pressed", "true");
     });
 
-    it("keeps every exposed mode as a named pressed-state button in one accessible group", () => {
+    it("keeps Live and Source as the two primary title-bar modes", () => {
         const onSetMode = vi.fn();
         render(<ModeToggle mode="live" onSetMode={onSetMode} />);
 
         expect(screen.getByRole("group", { name: "View mode toggle" })).toBeInTheDocument();
-        const reader = screen.getByRole("button", { name: "Reader mode" });
         const live = screen.getByRole("button", { name: "Live mode" });
-        const split = screen.getByRole("button", { name: "Split view" });
         const source = screen.getByRole("button", { name: "Code editor" });
 
-        expect(reader).toHaveAttribute("aria-pressed", "false");
         expect(live).toHaveAttribute("aria-pressed", "true");
-        expect(split).toHaveAttribute("aria-pressed", "false");
         expect(source).toHaveAttribute("aria-pressed", "false");
+        expect(screen.queryByRole("button", { name: "Reader mode" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Split view" })).not.toBeInTheDocument();
 
         fireEvent.click(source);
         expect(onSetMode).toHaveBeenCalledWith("code");

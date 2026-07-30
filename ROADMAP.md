@@ -35,7 +35,9 @@ priority over feature count.
 
 ## Next
 
-- Gather broader Live Beta feedback before considering it as the default mode.
+- Keep Live as the default writing surface and Source as its immediate,
+  lossless fallback. Split and Reader remain available from View and the
+  command palette rather than competing with the two primary title-bar modes.
 - Add Developer ID signing/notarization for macOS and code signing for Windows
   before any trusted installer or updater channel.
 - Improve accessible keyboard navigation and native-package installation

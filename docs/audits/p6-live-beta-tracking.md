@@ -10,7 +10,12 @@ restores exact Markdown. This preserves the original P6 boundary: Markdown,
 selection and undo history remain authoritative, Live is explicit Beta, and
 Source is the default and fallback.
 
-Status: **accepted as an explicit, default-off Live Beta on macOS, Windows, and Ubuntu. This does not authorize making Live the default.**
+Historical status: this record accepted Live Beta on macOS, Windows, and
+Ubuntu. Since v0.4, Live is the default writing surface; Source remains the
+lossless fallback, and Split/Reader remain secondary views. The platform
+evidence below is retained as the original acceptance record and must be
+rerun after changes to CodeMirror ownership, block focus, IME helpers or
+large-document admission.
 
 ## Requirement traceability
 
@@ -18,7 +23,7 @@ Status: **accepted as an explicit, default-off Live Beta on macOS, Windows, and 
 | --- | --- | --- |
 | Source-preserving Live syntax | `src/editor/live/liveMarkdownPresentation.ts`, `src/test/fixtures/markdown/live-beta.md`, `src/test/liveBetaRoundTrip.test.ts` | Lezer/CodeMirror decorations preserve the exact Markdown source and undo history |
 | Focus, selection, and composition | `src/editor/live/editFocusResolver.ts`, native Pinyin/Fcitx5 jobs | Composition, multi-selection, clipboard, undo/redo, mode changes, and tab changes retain Source fallback |
-| Explicit Beta gate | persistence, settings, `ModeToggle`, session tests | Live is hidden and disabled by default; disabling it returns every session to Source |
+| Primary Live mode | persistence, settings, `ModeToggle`, session tests | Live is the default for new and migrated sessions; Source is always a direct fallback |
 | Restricted Live | `src/editor/live/liveEligibility.ts`, `CodeEditor` disclosure | Large/complex documents retain editable Source geometry and show the downgrade reason |
 | Native performance | mdtxt-owned CI run `29946140453`, commit `6ac73e0` | Windows and Ubuntu meet the 1 MiB input and 10 MiB Source/restricted-Live budgets |
 | Native Chinese IME | macOS manual record plus CI artifacts `8540422494` and `8540348396` | Apple Simplified Pinyin, Microsoft Pinyin, and Fcitx5 Pinyin passed; Japanese IME is outside 0.1.0 scope |
