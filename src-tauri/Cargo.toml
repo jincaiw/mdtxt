@@ -45,6 +45,7 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 # Claude Code's Tauri MCP server. Registered only in debug builds (lib.rs),
 # so release binaries never start its WebSocket server.
 tauri-plugin-mcp-bridge = "0.11"
+tauri-plugin-clipboard-manager = "2"
 
 # Silent "Save as PDF" export: render the document in a hidden WebView2 and call
 # its native PrintToPdf (no OS print dialog). Versions track what wry/tauri

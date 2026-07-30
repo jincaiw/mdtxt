@@ -188,6 +188,11 @@ export function useEditorOverlays({
         const view = viewRef.current;
         if (view) void copySelectedMarkdownAsRichText(view).catch(() => onNoticeRef.current?.("Could not copy formatted selection"));
     }, [onNoticeRef, viewRef]);
+    useEffect(() => {
+        const listener = () => copyFormatted();
+        window.addEventListener("mdtxt:copy-formatted-selection", listener);
+        return () => window.removeEventListener("mdtxt:copy-formatted-selection", listener);
+    }, [copyFormatted]);
     const toolbar = showToolbar
         ? <FormatToolbar getState={getState} apply={applyResult} onAIAssist={aiEnabled ? openAIBubble : undefined} onCopyFormatted={copyFormatted} />
         : null;

@@ -151,6 +151,13 @@ interface FileData {
   hash: string;
 }
 
+interface WorkspaceQuickOpenEntry {
+  name: string;
+  path: string;
+  relativePath: string;
+  modified: number;
+}
+
 interface ProposedDocument {
   documentId: string;
   version: number;
@@ -201,6 +208,10 @@ function AppContent() {
   const [mode, setModeState] = usePersistedState<ViewMode>(getSafeSavedViewMode, setSavedViewMode);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
+  // Metadata-only workspace index, requested only while the palette is open.
+  // This avoids parsing a whole folder on launch while still making Typora-like
+  // quick open available from the primary keyboard workflow.
+  const [workspaceQuickOpen, setWorkspaceQuickOpen] = useState<WorkspaceQuickOpenEntry[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -253,6 +264,22 @@ function AppContent() {
   const navigationTab: NavigationTab = showTOC ? "outline" : "files";
   const navigationOpen = (showFileExplorer || showTOC) && !focusModeEnabled;
   const aiPanelOpen = showAIPanel && !focusModeEnabled;
+
+  useEffect(() => {
+    if (!showPalette) return;
+    const root = getWorkspaceState().root;
+    if (!root) {
+      setWorkspaceQuickOpen([]);
+      return;
+    }
+    let cancelled = false;
+    void invoke<WorkspaceQuickOpenEntry[]>("list_workspace_markdown_files", { root })
+      .then((entries) => { if (!cancelled) setWorkspaceQuickOpen(entries); })
+      // Quick open is supplementary: an unreadable or recently moved workspace
+      // must not make the command palette unusable.
+      .catch(() => { if (!cancelled) setWorkspaceQuickOpen([]); });
+    return () => { cancelled = true; };
+  }, [showPalette]);
   // Proposed document from Agent mode, shown as an inline diff for accept/reject.
   const [proposedDoc, setProposedDoc] = useState<ProposedDocument | null>(null);
 
@@ -2010,6 +2037,14 @@ function AppContent() {
         run: () => setShowStats(true),
       });
       items.push({
+        id: "edit.copyFormatted",
+        label: "Copy formatted selection",
+        section: "Edit",
+        icon: "content_copy",
+        keywords: "clipboard rich text html markdown paste word pages",
+        run: () => window.dispatchEvent(new Event("mdtxt:copy-formatted-selection")),
+      });
+      items.push({
         id: "tab.close",
         label: "Close tab",
         hint: "Ctrl+W",
@@ -2211,6 +2246,23 @@ function AppContent() {
     theme, setTheme, tr,
   ]);
 
+  // Typora-style quick open: the palette searches a bounded, metadata-only
+  // workspace index. Keep the full relative path as both a hint and a keyword
+  // so duplicate note names remain easy to distinguish and find.
+  const workspaceQuickOpenItems = useMemo<PaletteCommand[]>(() => (
+    workspaceQuickOpen
+      .filter((entry) => entry.path !== filePath)
+      .map((entry) => ({
+        id: `workspace.${entry.path}`,
+        label: entry.name,
+        hint: entry.relativePath,
+        section: "Quick open",
+        icon: "description",
+        keywords: `workspace file ${entry.relativePath}`,
+        run: () => void loadFile(entry.path),
+      }))
+  ), [workspaceQuickOpen, filePath, loadFile]);
+
   // Heading items are recomputed only while the palette is actually open.
   // Scanning every line of the document for `#`-prefixed headings on every
   // typing pause used to be cheap on small docs and noticeable on large
@@ -2269,12 +2321,12 @@ function AppContent() {
   // before so the CommandPalette component sees no API change. Reference
   // changes only when one of the sources changes — typically rare.
   const fullPaletteItems = useMemo<PaletteCommand[]>(
-    () => [...paletteItems, ...tabPaletteItems, ...headingPaletteItems].map((item) => ({
+    () => [...workspaceQuickOpenItems, ...paletteItems, ...tabPaletteItems, ...headingPaletteItems].map((item) => ({
       ...item,
       label: tr(item.label),
       section: tr(item.section),
     })),
-    [paletteItems, tabPaletteItems, headingPaletteItems, tr]
+    [workspaceQuickOpenItems, paletteItems, tabPaletteItems, headingPaletteItems, tr]
   );
 
   // Tab-bar items. The active tab's name/dirty come from live state (its stored
