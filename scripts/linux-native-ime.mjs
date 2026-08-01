@@ -221,7 +221,14 @@ async function focusEditorWindow() {
         .sort((left, right) => right.area - left.area)[0]?.id;
     assert.ok(windowId, "xdotool returned no mdtxt X11 window");
     runCommand("xdotool", ["windowmap", "--sync", windowId], "mapping the mdtxt X11 window");
-    runCommand("xdotool", ["windowactivate", windowId], "activating the mdtxt X11 window");
+    // GitHub's bare Xvfb display has no EWMH-capable window manager, so
+    // windowactivate (_NET_ACTIVE_WINDOW) legitimately fails there. Prefer it
+    // when available, then use the direct X11 focus primitive that XTEST IME
+    // verification actually needs in headless CI.
+    const activate = spawnSync("xdotool", ["windowactivate", windowId], { encoding: "utf8" });
+    if (activate.status !== 0) {
+        runCommand("xdotool", ["windowfocus", "--sync", windowId], "focusing the mdtxt X11 window without EWMH");
+    }
     await wait(150);
     runCommand("xdotool", ["mousemove", "--window", windowId, "80", "115", "click", "1"], "clicking the editor");
     const actualFocus = runCommand("xdotool", ["getwindowfocus"], "reading X11 keyboard focus");
