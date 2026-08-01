@@ -108,15 +108,16 @@ function processWindowIds() {
 
 async function verifySystemPrintDialog() {
     const existing = new Set(processWindowIds());
-    assert.equal(await execute(`
-        const reader = document.querySelector("button[aria-label='阅读模式'], button[aria-label='Reader mode']");
-        if (!(reader instanceof HTMLButtonElement)) throw new Error("Reader mode is unavailable");
-        reader.click();
-        return true;
-    `), true);
+    // Reader is intentionally a secondary mode. Exercise its native shortcut
+    // here rather than depending on a title-bar button that is no longer part
+    // of the focused Source/Live workspace surface.
+    await focusEditorWindow();
+    sendKey("ctrl+e");
+    await wait(150);
+    sendKey("ctrl+e");
     await waitForScript(`
-        return document.querySelector("button[aria-label='阅读模式'][aria-pressed='true'], button[aria-label='Reader mode'][aria-pressed='true']")
-            && Boolean(document.querySelector(".markdown-body"));
+        return Boolean(document.querySelector(".markdown-body"))
+            && !document.querySelector(".cm-editor[data-mdtxt-live='true']");
     `, "Reader preview before PDF export");
     assert.equal(await execute(`
         const exportButton = document.querySelector("button[aria-label='导出文档'], button[aria-label='Export document']");

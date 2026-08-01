@@ -175,7 +175,7 @@ describe("mdtxt native Tauri smoke", () => {
         assert.deepEqual(chrome.simulatedControls, []);
     });
 
-    it("exposes Live as the default workspace mode", async () => {
+    it("keeps Live and Source primary while Split and Reader remain reachable", async () => {
         const newFile = await $("//button[contains(., '新建文件') or contains(., 'New File')]");
         await newFile.click();
 
@@ -191,8 +191,9 @@ describe("mdtxt native Tauri smoke", () => {
 
         await $("[role='group'][aria-label='切换视图模式'], [role='group'][aria-label='View mode toggle']").waitForDisplayed();
         assert.equal(await $("button[aria-label='Live 模式'], button[aria-label='Live mode']").getAttribute("aria-pressed"), "true");
-        assert.equal(await $("button[aria-label='分栏视图'], button[aria-label='Split view']").isDisplayed(), true);
-        assert.equal(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']").isDisplayed(), true);
+        assert.equal(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']").isDisplayed(), true);
+        assert.equal(await $("button[aria-label='分栏视图'], button[aria-label='Split view']").isExisting(), false);
+        assert.equal(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']").isExisting(), false);
         const liveMode = await $("button[aria-label='Live 模式'], button[aria-label='Live mode']");
         await liveMode.waitForDisplayed();
         const editor = await $(".cm-content");
@@ -202,9 +203,12 @@ describe("mdtxt native Tauri smoke", () => {
         await $(".cm-editor[data-mdtxt-live='true']").waitForExist();
         assert.equal(await $(".cm-editor[data-mdtxt-live='true'] .cm-gutters").getCSSProperty("display").then((v) => v.value), "none");
 
-        await activate(await $("button[aria-label='分栏视图'], button[aria-label='Split view']"));
+        // Secondary keyboard routes preserve Typora-compatible Reader and
+        // Split access without expanding the two-button primary toggle.
+        await browser.keys(["Control", "\\"]);
         await $(".markdown-body").waitForDisplayed();
-        await activate(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']"));
+        await browser.keys(["Control", "e"]);
+        await browser.keys(["Control", "e"]);
         assert.equal(await $(".markdown-body").isDisplayed(), true);
     });
 
