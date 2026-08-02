@@ -55,7 +55,7 @@ function StatusBarImpl({
                 <button
                     data-tour="file-explorer"
                     onClick={onToggleFileExplorer}
-                    title={t("Files (Ctrl+Shift+E)")}
+                    title={t("Files (Ctrl/Cmd+Shift+L)")}
                     aria-label={t(showFileExplorer ? "Close file explorer" : "Open file explorer")}
                     aria-pressed={showFileExplorer}
                     className={`btn-press flex items-center justify-center w-8 h-6 rounded transition-colors ${showFileExplorer
@@ -72,7 +72,7 @@ function StatusBarImpl({
                 <button
                     data-tour="toc"
                     onClick={onToggleTOC}
-                    title={t("Table of Contents (Ctrl+Shift+O)")}
+                    title={t("Table of Contents (Ctrl/Cmd+Shift+1)")}
                     aria-label={t(showTOC ? "Close table of contents" : "Open table of contents")}
                     aria-pressed={showTOC}
                     className={`btn-press flex items-center justify-center w-8 h-6 rounded transition-colors ${showTOC

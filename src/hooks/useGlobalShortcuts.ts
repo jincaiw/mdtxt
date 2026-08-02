@@ -8,15 +8,18 @@ export interface ShortcutHandlers {
     handleSaveAs: () => void;
     handleNewFile: () => void;
     handleToggleMode: () => void;
-    handleToggleSplit: () => void;
     handleToggleLive?: () => void;
     handleToggleTypewriter?: () => void;
     handleToggleFocus?: () => void;
     /** Toggle OS fullscreen (F11). Cross-platform via the Tauri window API. */
     toggleFullscreen: () => void;
     handleToggleFileExplorer: () => void;
+    showFileTree?: () => void;
+    showArticles?: () => void;
     handleToggleTOC: () => void;
     openCheatsheet: () => void;
+    /** Typora file-name fuzzy search (Ctrl+P / Cmd+Shift+O). */
+    openQuickOpen: () => void;
     openPalette: () => void;
     openSettings: () => void;
     /** Open the reader-mode find bar. Only invoked when mode === "preview". */
@@ -25,12 +28,12 @@ export interface ShortcutHandlers {
     openSearch?: () => void;
     /** Close the active tab (Ctrl+W). */
     closeActiveTab?: () => void;
-    /** Switch to the previous/next tab (Alt+Left/Right, Ctrl+Shift+Tab / Ctrl+Tab). */
+    /** Switch tabs (Typora: Cmd+` on macOS, Ctrl+Tab on Windows/Linux). */
     prevTab?: () => void;
     nextTab?: () => void;
     /** Reopen the most recently closed tab (Ctrl+Shift+T). */
     reopenClosedTab?: () => void;
-    /** Jump to a tab by index; -1 means the last tab (Ctrl+1..9). */
+    /** Jump to a tab by index; -1 means the last tab (Alt+1..9). */
     gotoTab?: (index: number) => void;
     hasFile: boolean;
     content: string;
@@ -51,12 +54,19 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const s = ref.current;
+            const mod = e.ctrlKey || e.metaKey;
+            const isMac = /mac/i.test(navigator.platform || navigator.userAgent || "");
             // F11 - Toggle fullscreen. The universal fullscreen key on Windows
             // and Linux. macOS reserves F11 for Show Desktop, where users
             // fullscreen via the green title-bar button; the underlying Tauri
             // setFullscreen drives the same window state either way. No file
             // needed — works on the welcome screen too. FULLSCREEN-01.
             if (e.key === "F11") {
+                e.preventDefault();
+                s.toggleFullscreen();
+                return;
+            }
+            if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && (e.key === "f" || e.key === "F")) {
                 e.preventDefault();
                 s.toggleFullscreen();
                 return;
@@ -73,75 +83,91 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
                 if (s.hasFile) s.handleToggleFocus?.();
                 return;
             }
-            // Cmd/Ctrl+Shift+L - switch to/from the primary Live editor. Keep
-            // Ctrl+E's Reader/Source toggle intact rather than overloading it.
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (e.key === "l" || e.key === "L")) {
-                e.preventDefault();
-                if (s.hasFile) s.handleToggleLive?.();
-                return;
-            }
-            // Ctrl+Shift+E - Toggle file explorer (check before Ctrl+E)
-            if (e.ctrlKey && e.shiftKey && e.key === "E") {
+            // Typora: Cmd/Ctrl+Shift+L toggles the sidebar. Live Preview is
+            // the normal writing surface, not a second top-level mode.
+            if (mod && e.shiftKey && !e.altKey && (e.key === "l" || e.key === "L")) {
                 e.preventDefault();
                 if (s.hasFile) s.handleToggleFileExplorer();
                 return;
             }
-            // Ctrl+Shift+O - Toggle TOC (check before Ctrl+O)
-            if (e.ctrlKey && e.shiftKey && e.key === "O") {
+            // Typora: outline/file tree use Ctrl+Shift+1/3 on Windows/Linux
+            // and Cmd+Ctrl+1/3 on macOS. Keep these at the app level because
+            // they operate on the desktop shell rather than editor text.
+            const outlineShortcut = (!isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.key === "1")
+                || (isMac && e.metaKey && e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "1");
+            if (outlineShortcut) {
                 e.preventDefault();
                 if (s.hasFile) s.handleToggleTOC();
                 return;
             }
+            const fileTreeShortcut = (!isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.key === "3")
+                || (isMac && e.metaKey && e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "3");
+            if (fileTreeShortcut) {
+                e.preventDefault();
+                if (s.hasFile) (s.showFileTree ?? s.handleToggleFileExplorer)();
+                return;
+            }
+            const articlesShortcut = (!isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.key === "2")
+                || (isMac && e.metaKey && e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "2");
+            if (articlesShortcut) {
+                e.preventDefault();
+                if (s.hasFile) s.showArticles?.();
+                return;
+            }
             // Ctrl+O - Open file (without Shift). Match both cases so CapsLock
             // (where an unshifted key reports uppercase) doesn't dead-zone it.
-            if (e.ctrlKey && !e.shiftKey && (e.key === "o" || e.key === "O")) {
+            if (mod && !e.shiftKey && !e.altKey && (e.key === "o" || e.key === "O")) {
                 e.preventDefault();
                 s.handleOpenFile();
             }
             // Ctrl+S - Save file. Match "s" AND "S": with CapsLock on, an unshifted
             // Ctrl+S reports e.key === "S", which previously fell through and made
             // the keypress silently do nothing (while Ctrl+Shift+S still worked).
-            if (e.ctrlKey && !e.shiftKey && (e.key === "s" || e.key === "S")) {
+            if (mod && !e.shiftKey && !e.altKey && (e.key === "s" || e.key === "S")) {
                 e.preventDefault();
                 if (s.hasFile || s.content) s.handleSaveFile();
             }
             // Ctrl+Shift+S - Save As
-            if (e.ctrlKey && e.shiftKey && (e.key === "s" || e.key === "S")) {
+            if (mod && e.shiftKey && !e.altKey && (e.key === "s" || e.key === "S")) {
                 e.preventDefault();
                 if (s.hasFile || s.content) s.handleSaveAs();
             }
             // Ctrl+N - New file (case-insensitive for the CapsLock case)
-            if (e.ctrlKey && !e.shiftKey && (e.key === "n" || e.key === "N")) {
+            if (mod && !e.shiftKey && !e.altKey && (e.key === "n" || e.key === "N")) {
                 e.preventDefault();
                 s.handleNewFile();
             }
-            // Ctrl+E - Toggle preview/code mode (without Shift, case-insensitive)
-            if (e.ctrlKey && !e.shiftKey && (e.key === "e" || e.key === "E")) {
+            // Typora exposes a dedicated New Tab binding on macOS.
+            if (e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "t" || e.key === "T")) {
+                e.preventDefault();
+                s.handleNewFile();
+                return;
+            }
+            // Typora: Ctrl/Cmd+/ toggles Source Code Mode. Do this at capture
+            // phase before CodeMirror sees the key, where it would otherwise
+            // be free to bind document formatting.
+            if (mod && !e.shiftKey && !e.altKey && e.key === "/") {
                 e.preventDefault();
                 if (s.hasFile) s.handleToggleMode();
-            }
-            // Ctrl+\ - Toggle split view
-            if (e.ctrlKey && !e.shiftKey && e.key === "\\") {
-                e.preventDefault();
-                if (s.hasFile) s.handleToggleSplit();
+                return;
             }
             // Ctrl+W - close the active tab (falls back to the welcome screen
             // when it's the last one). The webview doesn't reserve Ctrl+W.
-            if (e.ctrlKey && !e.shiftKey && (e.key === "w" || e.key === "W")) {
+            if (mod && !e.shiftKey && !e.altKey && (e.key === "w" || e.key === "W")) {
                 e.preventDefault();
                 if (s.hasFile) s.closeActiveTab?.();
                 return;
             }
             // Ctrl+Shift+F - search across all files in the folder (checked
             // before the unshifted Ctrl+F find-in-document below).
-            if (e.ctrlKey && e.shiftKey && (e.key === "f" || e.key === "F")) {
+            if (mod && e.shiftKey && !e.altKey && (e.key === "f" || e.key === "F")) {
                 e.preventDefault();
                 if (s.hasFile) s.openSearch?.();
                 return;
             }
             // Ctrl+F in reader mode - find in preview. In code/split mode the
             // focused editor's own keymap handles Mod-f, so this never races it.
-            if (e.ctrlKey && !e.shiftKey && (e.key === "f" || e.key === "F")) {
+            if (mod && !e.shiftKey && !e.altKey && (e.key === "f" || e.key === "F")) {
                 if (s.hasFile && s.mode === "preview" && s.openPreviewFind) {
                     e.preventDefault();
                     s.openPreviewFind();
@@ -160,8 +186,15 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
                 s.nextTab?.();
                 return;
             }
-            // Ctrl+Tab / Ctrl+Shift+Tab - cycle tabs (the browser/VS Code pair),
-            // and Ctrl+PageDown / Ctrl+PageUp as the other common alias. TABS-16.
+            // Typora cycles opened documents with Cmd+` on macOS. Do not bind
+            // Cmd+Shift+` here: Typora reserves it for inline code.
+            if (e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && e.key === "`") {
+                e.preventDefault();
+                s.nextTab?.();
+                return;
+            }
+            // Ctrl+Tab / Ctrl+Shift+Tab cycles tabs on Windows/Linux and stays
+            // as a useful previous-tab extension on macOS. TABS-16.
             if (e.ctrlKey && !e.altKey && !e.metaKey && e.key === "Tab") {
                 e.preventDefault();
                 (e.shiftKey ? s.prevTab : s.nextTab)?.();
@@ -178,13 +211,14 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
                 return;
             }
             // Ctrl+Shift+T - reopen the most recently closed tab. TABS-15.
-            if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && (e.key === "t" || e.key === "T")) {
+            if (mod && e.shiftKey && !e.altKey && (e.key === "t" || e.key === "T")) {
                 e.preventDefault();
                 s.reopenClosedTab?.();
                 return;
             }
-            // Ctrl+1..9 - jump to tab N (Ctrl+9 = last tab, like browsers). TABS-16.
-            if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && e.key >= "1" && e.key <= "9") {
+            // Alt+1..9 keeps tab navigation available without stealing
+            // Typora's Ctrl/Cmd+1..6 heading shortcuts from CodeMirror.
+            if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key >= "1" && e.key <= "9") {
                 e.preventDefault();
                 s.gotoTab?.(e.key === "9" ? -1 : Number(e.key) - 1);
                 return;
@@ -198,23 +232,29 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
                     s.openCheatsheet();
                 }
             }
-            // Ctrl+P / Ctrl+Shift+P - command palette
-            if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
+            // Typora Quick Open: Ctrl+P on Windows/Linux, Cmd+Shift+O on macOS.
+            if ((!isMac && e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (e.key === "p" || e.key === "P"))
+                || (isMac && e.metaKey && !e.ctrlKey && e.shiftKey && !e.altKey && (e.key === "o" || e.key === "O"))) {
+                e.preventDefault();
+                s.openQuickOpen();
+                return;
+            }
+            // Command Palette stays available as an mdtxt extension without
+            // shadowing Typora's Quick Open binding.
+            if (mod && e.shiftKey && !e.altKey && (e.key === "p" || e.key === "P")) {
                 e.preventDefault();
                 s.openPalette();
+                return;
             }
             // Ctrl+, - Settings
-            if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+            if (mod && !e.altKey && e.key === ",") {
                 e.preventDefault();
                 s.openSettings();
             }
-            // AI assist - Alt+J everywhere, Cmd+J on macOS. Handled here (window
-            // level) rather than only in the editor so it fires regardless of
-            // focus; the editor opens the bubble via the mdtxt:ai-assist
-            // listener. (Ctrl+J is reserved by WebView2 on Windows, hence Alt+J.)
-            const isAltJ = e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === "j" || e.key === "J" || e.code === "KeyJ");
-            const isCmdJ = e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && (e.key === "j" || e.key === "J");
-            if (isAltJ || isCmdJ) {
+            // Reserve Ctrl/Cmd+J for Typora's Jump to Selection. AI stays an
+            // mdtxt extension behind an explicit, non-conflicting chord.
+            const isAiChord = e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && (e.key === "j" || e.key === "J" || e.code === "KeyJ");
+            if (isAiChord) {
                 e.preventDefault();
                 window.dispatchEvent(new CustomEvent("mdtxt:ai-assist"));
             }
@@ -226,23 +266,8 @@ export function useGlobalShortcuts(handlers: ShortcutHandlers) {
         // editor focus from making those shortcuts silently unavailable.
         window.addEventListener("keydown", handleKeyDown, { capture: true });
 
-        // Defense-in-depth for Ctrl+J: Edge/Chrome/WebView2 treat Ctrl+J as a
-        // "browser accelerator" for Downloads. On WebView2 (Windows) the page
-        // never sees this keydown, so JS can't help — users have Alt+J as the
-        // working alias there. On WebKitGTK (Linux) and WKWebView (macOS) the
-        // event DOES reach the page; we capture-phase preventDefault here so the
-        // host webview's default action is suppressed regardless of which
-        // element is focused (textarea, palette input, settings, etc.).
-        const blockCtrlJ = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === "j" || e.key === "J")) {
-                e.preventDefault();
-            }
-        };
-        window.addEventListener("keydown", blockCtrlJ, { capture: true });
-
         return () => {
             window.removeEventListener("keydown", handleKeyDown, { capture: true } as EventListenerOptions);
-            window.removeEventListener("keydown", blockCtrlJ, { capture: true } as EventListenerOptions);
         };
     }, []);
 }

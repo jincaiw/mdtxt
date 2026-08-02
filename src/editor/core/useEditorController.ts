@@ -93,7 +93,7 @@ export function useEditorController({
     });
     const aiEnabled = useAIAssistShortcut(viewRef, triggerAIBubble);
     const { detectSlash, detectTable, openAIBubble, openFind, toolbar, floatingOverlays } = useEditorOverlays({
-        viewRef, aiConfig, onNoticeRef, reviewingRef, showToolbar, aiEnabled, content,
+        viewRef, aiConfig, onNoticeRef, reviewingRef, showToolbar, aiEnabled, content, liveMode,
     });
     openAIBubbleRef.current = openAIBubble;
     const handlePaste = createEditorPasteHandler({ filePathRef, onImagePasteRef, onErrorRef });

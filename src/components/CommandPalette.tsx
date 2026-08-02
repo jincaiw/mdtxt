@@ -20,6 +20,11 @@ interface CommandPaletteProps {
     isOpen: boolean;
     items: PaletteCommand[];
     onClose: () => void;
+    /** Allows the file-focused Quick Open surface to reuse the accessible
+     * palette mechanics without presenting itself as a command launcher. */
+    title?: string;
+    searchPlaceholder?: string;
+    searchLabel?: string;
 }
 
 /** Indices in `haystack` that `needle` matches, mirroring fuzzyScore's logic
@@ -97,7 +102,14 @@ function fuzzyScore(needle: string, haystack: string): number {
     return 1000 + score; // worse than substring matches
 }
 
-export function CommandPalette({ isOpen, items, onClose }: CommandPaletteProps) {
+export function CommandPalette({
+    isOpen,
+    items,
+    onClose,
+    title = "Command palette",
+    searchPlaceholder = "Type a command, file, or heading…",
+    searchLabel = "Search commands",
+}: CommandPaletteProps) {
     const { t } = useLocale();
     const [query, setQuery] = useState("");
     const [activeIdx, setActiveIdx] = useState(0);
@@ -208,7 +220,7 @@ export function CommandPalette({ isOpen, items, onClose }: CommandPaletteProps) 
     let runningIdx = -1;
 
     return (
-        <div className="fixed inset-0 z-[110] flex items-start justify-center pt-[12vh]" role="dialog" aria-modal="true" aria-label={t("Command palette")}>
+        <div className="fixed inset-0 z-[110] flex items-start justify-center pt-[12vh]" role="dialog" aria-modal="true" aria-label={t(title)}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
             <div
@@ -222,8 +234,8 @@ export function CommandPalette({ isOpen, items, onClose }: CommandPaletteProps) 
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder={t("Type a command, file, or heading…")}
-                        aria-label={t("Search commands")}
+                        placeholder={t(searchPlaceholder)}
+                        aria-label={t(searchLabel)}
                         className="flex-1 bg-transparent text-[var(--text-primary)] outline-none text-sm placeholder:text-[var(--text-muted)]"
                     />
                     <kbd className="px-1.5 py-0.5 text-[11px] font-mono rounded border border-[var(--border)] bg-[var(--bg-input)] text-[var(--text-muted)]">Esc</kbd>

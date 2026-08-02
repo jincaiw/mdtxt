@@ -4,7 +4,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
-import { writeHtml } from "@tauri-apps/plugin-clipboard-manager";
+import { writeHtml, writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 export interface EditorClipboardPayload {
     plainText: string;
@@ -56,6 +56,18 @@ export async function copySelectedMarkdownAsRichText(view: EditorView): Promise<
         } else {
             await navigator.clipboard.writeText(payload.plainText);
         }
+    }
+    return true;
+}
+
+/** Copy the exact source selection, matching Typora's Copy as Markdown. */
+export async function copySelectedMarkdownPlain(view: EditorView): Promise<boolean> {
+    const markdown = selectedMarkdown(view.state);
+    if (markdown === null) return false;
+    try {
+        await writeText(markdown);
+    } catch {
+        await navigator.clipboard.writeText(markdown);
     }
     return true;
 }

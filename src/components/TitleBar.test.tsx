@@ -4,8 +4,6 @@ import { TitleBar } from "./TitleBar";
 
 vi.mock("@tauri-apps/api/window", () => ({ Window: { getCurrent: vi.fn() } }));
 vi.mock("./SettingsMenu", () => ({ SettingsMenu: () => <button aria-label="Settings">Settings</button> }));
-vi.mock("./ExportMenu", () => ({ ExportMenu: () => <button aria-label="Export">Export</button> }));
-vi.mock("./ModeToggle", () => ({ ModeToggle: () => <div aria-label="Mode toggle" /> }));
 vi.mock("../context/LocaleContext", () => ({ useLocale: () => ({ t: (text: string) => text }) }));
 
 afterEach(() => {
@@ -16,7 +14,7 @@ afterEach(() => {
 });
 
 function renderTitleBar() {
-    return render(<TitleBar fileName="notes.md" filePath="/tmp/notes.md" onOpenFile={() => {}} onNewFile={() => {}} />);
+    return render(<TitleBar fileName="notes.md" filePath="/tmp/notes.md" />);
 }
 
 describe("TitleBar native window controls", () => {
@@ -26,6 +24,12 @@ describe("TitleBar native window controls", () => {
         expect(screen.queryByLabelText("Maximize")).toBeNull();
         expect(screen.queryByLabelText("Close")).toBeNull();
         expect(screen.getByLabelText("Settings")).toBeInTheDocument();
+    });
+
+    it("keeps document tools out of the title bar", () => {
+        renderTitleBar();
+        expect(screen.queryByLabelText("Mode toggle")).toBeNull();
+        expect(screen.queryByLabelText("Export")).toBeNull();
     });
 
     it("reserves the macOS traffic-light safe area and drag region", () => {

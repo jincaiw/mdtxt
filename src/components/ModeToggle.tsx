@@ -24,7 +24,7 @@ export function ModeToggle({ mode, onSetMode }: ModeToggleProps) {
                     onClick={() => onSetMode("code")}
                     aria-label={t("Code editor")}
                     aria-pressed={mode === "code"}
-                    title={t("Source (Ctrl+E)")}
+                    title={t("Source (Ctrl/Cmd+/)")}
                     className={`${buttonBase} ${modeClass(mode === "code")}`}
                 >
                     <span className="material-symbols-outlined text-[15px]">code</span>

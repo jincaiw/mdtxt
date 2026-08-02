@@ -119,6 +119,19 @@ describe("editor selection theming", () => {
         expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(source);
     });
 
+    it("keeps a completed table projected when the caret is at its end", async () => {
+        const source = "| Name | Value |\n| --- | --- |\n| alpha | 42 |";
+        const { container } = render(<CodeEditor documentId="table-end" content={source} onChange={() => {}} liveMode />);
+        const editor = await waitFor(() => {
+            const element = container.querySelector<HTMLElement>(".cm-editor");
+            expect(element).toBeTruthy();
+            return element!;
+        });
+        const view = EditorView.findFromDOM(editor);
+        view.dispatch({ selection: { anchor: source.length } });
+        await waitFor(() => expect(container.querySelector(".cm-live-table-widget table")).toHaveTextContent("alpha"));
+    });
+
     it("moves through Live table cells and appends a row from the final cell", async () => {
         const source = "# table\n\n| Name | Value |\n| --- | --- |\n| alpha | 42 |";
         const { container } = render(<CodeEditor documentId="table-nav" content={source} onChange={() => {}} liveMode />);
@@ -131,6 +144,22 @@ describe("editor selection theming", () => {
         const editor = container.querySelector<HTMLElement>(".cm-editor");
         await waitFor(() => expect(EditorView.findFromDOM(editor!).state.doc.lines).toBe(6));
         await waitFor(() => expect(container.querySelector('[data-live-table-cell="1:0"]')).toHaveFocus());
+    });
+
+    it("commits a direct Live table cell edit back to exact Markdown", async () => {
+        const source = "| Name | Value |\n| --- | --- |\n| alpha | 42 |";
+        const { container } = render(<CodeEditor documentId="table-edit" content={source} onChange={() => {}} liveMode />);
+        const valueCell = await waitFor(() => {
+            const cell = container.querySelector<HTMLElement>('[data-live-table-cell="0:1"]');
+            expect(cell).toBeTruthy();
+            return cell!;
+        });
+        valueCell.textContent = "43";
+        fireEvent.blur(valueCell);
+        const editor = container.querySelector<HTMLElement>(".cm-editor");
+        await waitFor(() => expect(EditorView.findFromDOM(editor!).state.doc.toString()).toBe(
+            "| Name  | Value |\n| ----- | ----- |\n| alpha | 43    |",
+        ));
     });
 
     it("renders a visible display-math block through bounded KaTeX", async () => {

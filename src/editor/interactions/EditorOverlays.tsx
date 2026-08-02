@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import type { EditorView } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
 import { applyEditorResult, toEditorActionState } from "../core/editorPresentation";
 import type { EditorResult, EditorState } from "../../utils/editorActions";
 import { applyTableOp, findTableAt, locateCell, type Align } from "../../utils/tableModel";
@@ -9,7 +9,8 @@ import { SlashMenu, type SlashCommand } from "../../components/SlashMenu";
 import { AIBubble } from "../../components/AIBubble";
 import { TableToolbar } from "../../components/TableToolbar";
 import { EDITOR_COMMAND_EVENT, runEditorCommand, type EditorCommandId } from "../commands/editorCommands";
-import { copySelectedMarkdownAsRichText } from "./editorCopy";
+import { copySelectedMarkdownAsRichText, copySelectedMarkdownPlain } from "./editorCopy";
+import { readText } from "@tauri-apps/plugin-clipboard-manager";
 
 type AIBubbleState = { x: number; y: number; selStart: number; selEnd: number; text: string };
 type SlashState = { from: number; pos: { x: number; y: number } };
@@ -32,6 +33,7 @@ interface UseEditorOverlaysOptions {
     showToolbar?: boolean;
     aiEnabled: boolean;
     content: string;
+    liveMode: boolean;
 }
 
 /**
@@ -47,6 +49,7 @@ export function useEditorOverlays({
     showToolbar,
     aiEnabled,
     content,
+    liveMode,
 }: UseEditorOverlaysOptions): EditorOverlayControls {
     const [findOpen, setFindOpen] = useState(false);
     const [findMode, setFindMode] = useState<"find" | "replace">("find");
@@ -109,7 +112,7 @@ export function useEditorOverlays({
     }, []);
 
     const detectTable = useCallback((view: EditorView) => {
-        if (reviewingRef.current) { if (tableUIRef.current) setTableUI(null); return; }
+        if (liveMode || reviewingRef.current) { if (tableUIRef.current) setTableUI(null); return; }
         const head = view.state.selection.main.head;
         const doc = view.state.doc;
         const currentLine = doc.lineAt(head);
@@ -128,7 +131,13 @@ export function useEditorOverlays({
         const coords = view.coordsAtPos(region.from + sliceFrom);
         if (!coords) { if (tableUIRef.current) setTableUI(null); return; }
         setTableUI({ x: coords.left, y: coords.top, align: region.model.aligns[colIndex] ?? "none" });
-    }, [reviewingRef]);
+    }, [liveMode, reviewingRef]);
+
+    // A mode switch does not necessarily produce a cursor transaction. Clear
+    // source-only table controls eagerly so they cannot float over Live view.
+    useEffect(() => {
+        if (liveMode && tableUIRef.current) setTableUI(null);
+    }, [liveMode]);
 
     const getState = useCallback((): EditorState | null => {
         const view = viewRef.current;
@@ -165,6 +174,17 @@ export function useEditorOverlays({
         window.addEventListener("mdtxt:editor-find", listener);
         return () => window.removeEventListener("mdtxt:editor-find", listener);
     }, [openFind, viewRef]);
+    useEffect(() => {
+        const listener = () => {
+            const view = viewRef.current;
+            if (!view) return;
+            const selection = view.state.selection.main;
+            view.dispatch({ effects: EditorView.scrollIntoView(selection.head, { y: "center" }) });
+            view.focus();
+        };
+        window.addEventListener("mdtxt:editor-jump-selection", listener);
+        return () => window.removeEventListener("mdtxt:editor-jump-selection", listener);
+    }, [viewRef]);
     const handleSlashSelect = useCallback((command: SlashCommand) => {
         const view = viewRef.current;
         const current = slashStateRef.current;
@@ -193,6 +213,27 @@ export function useEditorOverlays({
         window.addEventListener("mdtxt:copy-formatted-selection", listener);
         return () => window.removeEventListener("mdtxt:copy-formatted-selection", listener);
     }, [copyFormatted]);
+    useEffect(() => {
+        const copyMarkdown = () => {
+            const view = viewRef.current;
+            if (view) void copySelectedMarkdownPlain(view).catch(() => onNoticeRef.current?.("Could not copy Markdown selection"));
+        };
+        const pastePlain = () => {
+            const view = viewRef.current;
+            if (!view) return;
+            void readText().catch(() => navigator.clipboard.readText()).then((text) => {
+                const selection = view.state.selection.main;
+                view.dispatch({ changes: { from: selection.from, to: selection.to, insert: text }, selection: { anchor: selection.from + text.length } });
+                view.focus();
+            }).catch(() => onNoticeRef.current?.("Could not read plain text from clipboard"));
+        };
+        window.addEventListener("mdtxt:copy-markdown", copyMarkdown);
+        window.addEventListener("mdtxt:paste-plain", pastePlain);
+        return () => {
+            window.removeEventListener("mdtxt:copy-markdown", copyMarkdown);
+            window.removeEventListener("mdtxt:paste-plain", pastePlain);
+        };
+    }, [onNoticeRef, viewRef]);
     const toolbar = showToolbar
         ? <FormatToolbar getState={getState} apply={applyResult} onAIAssist={aiEnabled ? openAIBubble : undefined} onCopyFormatted={copyFormatted} />
         : null;
@@ -233,7 +274,7 @@ export function useEditorOverlays({
                 }}
                 onClose={() => setAIBubble(null)}
             />}
-            {tableUI && <TableToolbar
+            {!liveMode && tableUI && <TableToolbar
                 anchor={{ x: tableUI.x, y: tableUI.y }}
                 activeAlign={tableUI.align}
                 onOp={(operation) => {

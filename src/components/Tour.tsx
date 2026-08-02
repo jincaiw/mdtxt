@@ -33,7 +33,7 @@ const STEPS: Step[] = [
         placement: "above",
         icon: "folder_open",
         title: "Your folder, one click away",
-        body: "This opens the file explorer. It lists every markdown file next to the one you're editing, so you can jump between notes without leaving mdtxt. (Ctrl+Shift+E)",
+        body: "This opens the file explorer. It lists every markdown file next to the one you're editing, so you can jump between notes without leaving mdtxt. (Ctrl/Cmd+Shift+L)",
     },
     {
         id: "toc",
@@ -41,14 +41,14 @@ const STEPS: Step[] = [
         placement: "above",
         icon: "menu_book",
         title: "Outline of your doc",
-        body: "This is the table of contents. Every heading you write shows up here, and it tracks where you are as you scroll. Click any heading to jump straight to it. (Ctrl+Shift+O)",
+        body: "This is the table of contents. Every heading you write shows up here, and it tracks where you are as you scroll. Click any heading to jump straight to it. (Ctrl+Shift+1 on Windows/Linux; Cmd+Ctrl+1 on macOS)",
     },
     {
         id: "palette",
         placement: "center",
         icon: "search",
         title: "One box for everything",
-        body: "Press Ctrl+P after the tour to open the command palette. Files, views, themes, AI: it's all in there.",
+        body: "Use Ctrl+P on Windows/Linux or Cmd+Shift+O on macOS to open files quickly. The command palette is available with Ctrl/Cmd+Shift+P.",
     },
     {
         id: "done",
@@ -157,7 +157,7 @@ export function Tour({ onClose, onOpenTutorial }: TourProps) {
         setStepIndex((i) => Math.max(0, i - 1));
     }, []);
 
-    // Modal keyboard handling: capture phase so app shortcuts (Ctrl+P, Ctrl+E…)
+    // Modal keyboard handling: capture phase so app shortcuts (Ctrl+P, Ctrl+/…)
     // don't fire underneath the overlay while the tour is up.
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {

@@ -118,10 +118,17 @@ class LiveTableWidget extends WidgetType {
 
 function tableDecorations(state: EditorState): DecorationSet {
     const widgets: Range<Decoration>[] = [];
+    const selectionTouchesTableInterior = (from: number, to: number) => state.selection.ranges.some((range) => {
+        // A collapsed cursor exactly on either block boundary is outside the
+        // table for presentation purposes. Treating `to` as inclusive made a
+        // freshly completed table stay as raw Markdown after Source → Live.
+        if (range.empty) return range.from > from && range.from < to;
+        return range.from < to && range.to > from;
+    });
         syntaxTree(state).iterate({
             enter(node) {
                 if (node.name !== "Table") return;
-                if (state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from)) return;
+                if (selectionTouchesTableInterior(node.from, node.to)) return;
                 const source = state.doc.sliceString(node.from, node.to);
                 const model = parseTable(source.split("\n"));
                 widgets.push(Decoration.replace({
