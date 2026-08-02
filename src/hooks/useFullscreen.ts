@@ -13,17 +13,17 @@ export interface FullscreenControls {
   isFullscreen: boolean;
   /** True while the masking cover is faded in over a resize transition. */
   fsTransition: boolean;
-  /** Toggle OS fullscreen (F11), masking the resize behind a fade. */
+  /** Toggle OS fullscreen, masking the resize behind a fade. */
   toggleFullscreen: () => Promise<void>;
 }
 
 /**
- * Toggle OS fullscreen (F11). With native window decorations, fullscreen can
+ * Toggle OS fullscreen. With native window decorations, fullscreen can
  * also change through the macOS green button and native Window menu. Keep the
- * React state subscribed to the OS instead of treating F11 as its own source of
+ * React state subscribed to the OS instead of treating one shortcut as its own source of
  * truth. FULLSCREEN-01.
  *
- * @param notify shows the "press F11 to exit" hint when entering fullscreen.
+ * @param notify shows the platform shortcut used to exit fullscreen.
  */
 export function useFullscreen(notify: (message: string) => void): FullscreenControls {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -100,7 +100,8 @@ export function useFullscreen(notify: (message: string) => void): FullscreenCont
       isFullscreenRef.current = actual;
       setIsFullscreen(actual);
       if (actual) {
-        notify("Fullscreen on — press F11 to exit");
+        const isMac = /mac/i.test(navigator.platform || navigator.userAgent || "");
+        notify(isMac ? "Fullscreen on — press Cmd+Option+F to exit" : "Fullscreen on — press F11 to exit");
       }
     } catch {
       /* browser dev mode — no Tauri window */

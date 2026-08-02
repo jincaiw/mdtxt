@@ -2,10 +2,10 @@ import type { EditorResult, EditorState } from "../../utils/editorActions";
 import { insertLink, wrapSelection } from "../../utils/editorActions";
 
 export type EditorCommandId =
-    | "format.bold" | "format.italic" | "format.strike" | "format.inlineCode" | "format.link"
+    | "format.bold" | "format.italic" | "format.underline" | "format.strike" | "format.inlineCode" | "format.link" | "format.clear"
     | "format.heading1" | "format.heading2" | "format.heading3" | "format.heading4" | "format.heading5" | "format.heading6" | "format.paragraph"
     | "format.bulletList" | "format.orderedList" | "format.taskList" | "format.blockquote"
-    | "insert.codeBlock" | "insert.table" | "insert.rule";
+    | "insert.codeBlock" | "insert.mathBlock" | "insert.table" | "insert.image" | "insert.rule";
 
 export const EDITOR_COMMAND_EVENT = "mdtxt:editor-command";
 
@@ -45,6 +45,16 @@ export function insertCodeBlock(state: EditorState): EditorResult {
     };
 }
 
+export function insertMathBlock(state: EditorState): EditorResult {
+    const selected = state.text.slice(state.selStart, state.selEnd) || "x^2";
+    const inserted = `\n$$\n${selected}\n$$\n`;
+    return {
+        text: state.text.slice(0, state.selStart) + inserted + state.text.slice(state.selEnd),
+        selStart: state.selStart + 4,
+        selEnd: state.selStart + 4 + selected.length,
+    };
+}
+
 export function insertText(state: EditorState, text: string): EditorResult {
     return {
         text: state.text.slice(0, state.selStart) + text + state.text.slice(state.selEnd),
@@ -53,13 +63,34 @@ export function insertText(state: EditorState, text: string): EditorResult {
     };
 }
 
+export function clearFormatting(state: EditorState): EditorResult {
+    if (state.selStart === state.selEnd) return state;
+    const selected = state.text.slice(state.selStart, state.selEnd);
+    const cleared = selected
+        .replace(/\*\*([^\n]+?)\*\*/g, "$1")
+        .replace(/__([^\n]+?)__/g, "$1")
+        .replace(/~~([^\n]+?)~~/g, "$1")
+        .replace(/<u>([^\n]+?)<\/u>/gi, "$1")
+        .replace(/`([^`\n]+?)`/g, "$1")
+        .replace(/\[([^\]\n]+)\]\([^\n)]+\)/g, "$1")
+        .replace(/\*([^*\n]+?)\*/g, "$1")
+        .replace(/_([^_\n]+?)_/g, "$1");
+    return {
+        text: state.text.slice(0, state.selStart) + cleared + state.text.slice(state.selEnd),
+        selStart: state.selStart,
+        selEnd: state.selStart + cleared.length,
+    };
+}
+
 export function runEditorCommand(state: EditorState, command: EditorCommandId): EditorResult {
     switch (command) {
         case "format.bold": return wrapSelection(state, "**", "**", "bold");
         case "format.italic": return wrapSelection(state, "*", "*", "italic");
+        case "format.underline": return wrapSelection(state, "<u>", "</u>", "text");
         case "format.strike": return wrapSelection(state, "~~", "~~", "text");
         case "format.inlineCode": return wrapSelection(state, "`", "`", "code");
         case "format.link": return insertLink(state);
+        case "format.clear": return clearFormatting(state);
         case "format.heading1": return setHeading(state, 1);
         case "format.heading2": return setHeading(state, 2);
         case "format.heading3": return setHeading(state, 3);
@@ -72,7 +103,9 @@ export function runEditorCommand(state: EditorState, command: EditorCommandId): 
         case "format.taskList": return toggleLinePrefix(state, "- [ ] ");
         case "format.blockquote": return toggleLinePrefix(state, "> ");
         case "insert.codeBlock": return insertCodeBlock(state);
+        case "insert.mathBlock": return insertMathBlock(state);
         case "insert.table": return insertText(state, "\n| Header 1 | Header 2 |\n| --- | --- |\n| Cell | Cell |\n");
+        case "insert.image": return insertText(state, "![Alt text](image.png)");
         case "insert.rule": return insertText(state, "\n\n---\n\n");
     }
 }

@@ -22,6 +22,8 @@ import { createLiveMarkdownPresentation } from "../live/liveMarkdownPresentation
 import type { DocumentTextChange } from "../../utils/documentSessionController";
 import type { LiveLocale } from "../live/liveLocale";
 import { runEditorCommand } from "../commands/editorCommands";
+import { copySelectedMarkdownPlain } from "../interactions/editorCopy";
+import { readText } from "@tauri-apps/plugin-clipboard-manager";
 
 interface UseCodeMirrorHostOptions {
     containerRef: RefObject<HTMLDivElement | null>;
@@ -56,6 +58,7 @@ interface UseCodeMirrorHostOptions {
     detectTable: (view: EditorView) => void;
     openFind: (mode: "find" | "replace", selectionStart: number) => void;
     handlePaste: (event: ClipboardEvent, view: EditorView) => boolean;
+    handleDrop: (event: DragEvent, view: EditorView) => boolean;
 }
 
 /** Owns the one-time CodeMirror view and its stable extension protocol. */
@@ -64,7 +67,7 @@ export function useCodeMirrorHost({
     wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
     onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
     typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-    content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste,
+    content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste, handleDrop,
 }: UseCodeMirrorHostOptions) {
     useEffect(() => {
         if (!containerRef.current) return;
@@ -75,29 +78,53 @@ export function useCodeMirrorHost({
             { key: "Enter", run: (view) => runAction(view, handleEnter) },
             { key: "Mod-b", run: (view) => applyCommand(view, "format.bold") },
             { key: "Mod-i", run: (view) => applyCommand(view, "format.italic") },
+            { key: "Mod-u", run: (view) => applyCommand(view, "format.underline") },
             { key: "Mod-k", run: (view) => applyCommand(view, "format.link") },
-            { key: "Mod-/", run: (view) => applyCommand(view, "format.blockquote") },
-            { key: "Mod-Shift-x", run: (view) => applyCommand(view, "format.strike") },
+            { key: "Mod-\\", run: (view) => applyCommand(view, "format.clear") },
+            // Ctrl/Cmd+/ is globally reserved for Typora-compatible Source
+            // mode. Paragraph shortcuts intentionally use the documented,
+            // platform-specific bindings instead of editor-centric defaults.
+            { key: "Ctrl-Shift-q", run: (view) => applyCommand(view, "format.blockquote") },
+            { key: "Meta-Alt-q", run: (view) => applyCommand(view, "format.blockquote") },
+            { key: "Alt-Shift-5", run: (view) => applyCommand(view, "format.strike") },
+            { key: "Ctrl-Shift-`", run: (view) => applyCommand(view, "format.strike") },
             { key: "Mod-Shift-`", run: (view) => applyCommand(view, "format.inlineCode") },
-            { key: "Mod-Shift-1", run: (view) => applyCommand(view, "format.heading1") },
-            { key: "Mod-Shift-2", run: (view) => applyCommand(view, "format.heading2") },
-            { key: "Mod-Shift-3", run: (view) => applyCommand(view, "format.heading3") },
-            { key: "Mod-Shift-4", run: (view) => applyCommand(view, "format.heading4") },
-            { key: "Mod-Shift-5", run: (view) => applyCommand(view, "format.heading5") },
-            { key: "Mod-Shift-6", run: (view) => applyCommand(view, "format.heading6") },
-            { key: "Mod-Shift-0", run: (view) => applyCommand(view, "format.paragraph") },
-            { key: "Mod-Shift-7", run: (view) => applyCommand(view, "format.orderedList") },
-            { key: "Mod-Shift-8", run: (view) => applyCommand(view, "format.bulletList") },
-            { key: "Mod-Shift-9", run: (view) => applyCommand(view, "format.taskList") },
-            { key: "Mod-Shift-c", run: (view) => applyCommand(view, "insert.codeBlock") },
+            { key: "Mod-1", run: (view) => applyCommand(view, "format.heading1") },
+            { key: "Mod-2", run: (view) => applyCommand(view, "format.heading2") },
+            { key: "Mod-3", run: (view) => applyCommand(view, "format.heading3") },
+            { key: "Mod-4", run: (view) => applyCommand(view, "format.heading4") },
+            { key: "Mod-5", run: (view) => applyCommand(view, "format.heading5") },
+            { key: "Mod-6", run: (view) => applyCommand(view, "format.heading6") },
+            { key: "Mod-0", run: (view) => applyCommand(view, "format.paragraph") },
+            { key: "Ctrl-Shift-[", run: (view) => applyCommand(view, "format.orderedList") },
+            { key: "Meta-Alt-o", run: (view) => applyCommand(view, "format.orderedList") },
+            { key: "Ctrl-Shift-]", run: (view) => applyCommand(view, "format.bulletList") },
+            { key: "Meta-Alt-u", run: (view) => applyCommand(view, "format.bulletList") },
+            { key: "Ctrl-t", run: (view) => applyCommand(view, "insert.table") },
+            { key: "Meta-Alt-t", run: (view) => applyCommand(view, "insert.table") },
+            { key: "Ctrl-Shift-k", run: (view) => applyCommand(view, "insert.codeBlock") },
+            { key: "Meta-Alt-c", run: (view) => applyCommand(view, "insert.codeBlock") },
+            { key: "Ctrl-Shift-m", run: (view) => applyCommand(view, "insert.mathBlock") },
+            { key: "Meta-Alt-b", run: (view) => applyCommand(view, "insert.mathBlock") },
+            { key: "Ctrl-Shift-i", run: (view) => applyCommand(view, "insert.image") },
+            { key: "Meta-Ctrl-i", run: (view) => applyCommand(view, "insert.image") },
             // Browser rich-paste handlers vary by WebView. This explicit
             // shortcut always inserts clipboard plain text and keeps the
             // resulting transaction in CodeMirror's undo history.
             { key: "Mod-Shift-v", run: (view) => {
-                void navigator.clipboard.readText().then((text) => {
+                void readText().catch(() => navigator.clipboard.readText()).then((text) => {
                     const selection = view.state.selection.main;
                     view.dispatch({ changes: { from: selection.from, to: selection.to, insert: text }, selection: { anchor: selection.from + text.length } });
                 });
+                return true;
+            } },
+            { key: "Mod-Shift-c", run: (view) => {
+                void copySelectedMarkdownPlain(view);
+                return true;
+            } },
+            { key: "Mod-j", run: (view) => {
+                const selection = view.state.selection.main;
+                view.dispatch({ effects: EditorView.scrollIntoView(selection.head, { y: "center" }) });
                 return true;
             } },
             { key: "Mod-f", run: (view) => { openFind("find", view.state.selection.main.from); return true; } },
@@ -167,7 +194,7 @@ export function useCodeMirrorHost({
                     liveCompRef.current.of(liveMode && !liveRestricted ? createLiveMarkdownPresentation(filePath ?? null, liveLocale) : []),
                     keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
                     updateListener,
-                    EditorView.domEventHandlers({ paste: handlePaste }),
+                    EditorView.domEventHandlers({ paste: handlePaste, drop: handleDrop }),
                     EditorView.theme({ "&": { outline: "none" } }),
                 ],
             });

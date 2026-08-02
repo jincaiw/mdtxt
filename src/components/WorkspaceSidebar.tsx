@@ -15,13 +15,15 @@ interface WorkspaceSidebarProps {
     onTabChange: (tab: NavigationTab) => void;
     onFileSelect: (path: string) => void;
     onWorkspaceMutation?: (mutation: WorkspaceMutation) => void;
+    fileViewMode: "tree" | "articles";
+    onFileViewModeChange: (mode: "tree" | "articles") => void;
     onClose: () => void;
     onWidthChange: (width: number) => void;
 }
 
 export function WorkspaceSidebar({
     isOpen, tab, width, currentFilePath, content, activeLine,
-    onTabChange, onFileSelect, onWorkspaceMutation, onClose, onWidthChange,
+    onTabChange, onFileSelect, onWorkspaceMutation, fileViewMode, onFileViewModeChange, onClose, onWidthChange,
 }: WorkspaceSidebarProps) {
     const { t } = useLocale();
     if (!isOpen) return null;
@@ -51,7 +53,7 @@ export function WorkspaceSidebar({
             </div>
             <div className="workspace-navigation-content">
                 {tab === "files" ? (
-                    <FileExplorer isOpen currentFilePath={currentFilePath} onFileSelect={onFileSelect} onWorkspaceMutation={onWorkspaceMutation} onClose={onClose} embedded />
+                    <FileExplorer isOpen currentFilePath={currentFilePath} onFileSelect={onFileSelect} onWorkspaceMutation={onWorkspaceMutation} viewMode={fileViewMode} onViewModeChange={onFileViewModeChange} onClose={onClose} embedded />
                 ) : (
                     <TableOfContents isOpen content={content} activeLine={activeLine} onClose={onClose} embedded />
                 )}

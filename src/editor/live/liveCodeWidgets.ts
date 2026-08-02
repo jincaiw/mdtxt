@@ -9,6 +9,8 @@ class LiveCodeWidget extends WidgetType {
         private readonly source: string,
         private readonly language: string,
         private readonly code: string,
+        private readonly codeFrom: number,
+        private readonly codeTo: number,
         private readonly locale: LiveLocale,
         private readonly from: number,
     ) {
@@ -28,6 +30,27 @@ class LiveCodeWidget extends WidgetType {
         const pre = document.createElement("pre");
         const code = document.createElement("code");
         code.textContent = this.code;
+        code.contentEditable = "true";
+        code.tabIndex = 0;
+        code.spellcheck = false;
+        code.setAttribute("role", "textbox");
+        code.setAttribute("aria-label", liveText(this.locale, "编辑代码块", "Edit code block"));
+        // Keep direct code editing inside the widget. The section itself still
+        // exposes the deliberate Source fallback on its label/background.
+        code.addEventListener("mousedown", (event) => event.stopPropagation());
+        let cancelled = false;
+        code.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            cancelled = true;
+            code.textContent = this.code;
+            code.blur();
+        });
+        code.addEventListener("blur", () => {
+            if (cancelled) return;
+            const next = code.textContent ?? "";
+            if (next !== this.code) view.dispatch({ changes: { from: this.codeFrom, to: this.codeTo, insert: next } });
+        });
         pre.append(code);
         wrapper.append(label, pre);
         makeLiveProjectionEditable(wrapper, view, this.from);
@@ -52,7 +75,7 @@ function codeDecorations(state: EditorState, locale: LiveLocale): DecorationSet 
                 const code = text ? state.doc.sliceString(text.from, text.to) : "";
                 const source = state.doc.sliceString(node.from, node.to);
                 widgets.push(Decoration.replace({
-                    widget: new LiveCodeWidget(source, language, code, locale, node.from),
+                    widget: new LiveCodeWidget(source, language, code, text?.from ?? node.from, text?.to ?? node.from, locale, node.from),
                 }).range(node.from, node.to));
             },
         });

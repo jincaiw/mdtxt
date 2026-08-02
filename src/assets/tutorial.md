@@ -10,12 +10,12 @@ This is a **real, editable document**. Nothing here is a screenshot: everything
 you see rendered on the right is produced from the markdown on the left. Poke at
 it, change things, and watch the preview update live.
 
-> Tip: press **Ctrl/⌘+E** to flip between Reader, Split and Code views. Enable
-> **Live** is the default source-preserving document view; it
-> is optional and Source is always one shortcut away. In Split view you can edit
-> and preview side by side, which is the best way to explore this guide.
+> Tip: **Live Preview** is the normal writing view. Press **Ctrl/⌘+/** to switch
+> to Source Code Mode and press it again to come back. Split view is an optional
+> extra (**Ctrl/⌘+\\**) when you specifically want side-by-side source and reading.
 
-Open the outline (the list icon in the bottom bar, **Ctrl+Shift+O**) to see every
+Open the outline (the list icon in the bottom bar, **Ctrl+Shift+1** on Windows/Linux
+or **Cmd+Ctrl+1** on macOS) to see every
 heading below turn into a clickable table of contents.
 
 ---
@@ -50,11 +50,14 @@ preview:
 
 | Feature        | Shortcut       | Notes                          |
 | -------------- | -------------- | ------------------------------ |
-| Command palette| `Ctrl+P`       | Search every action and file   |
-| File explorer  | `Ctrl+Shift+E` | Browse the current folder      |
-| Outline        | `Ctrl+Shift+O` | Jump between headings          |
+| Quick open     | `Ctrl+P` / `Cmd+Shift+O` | Find a file by name |
+| Command palette| `Ctrl/⌘+Shift+P` | Search commands              |
+| File explorer  | `Ctrl/⌘+Shift+L` | Browse the current folder    |
+| Outline        | `Ctrl+Shift+1` / `Cmd+Ctrl+1` | Jump between headings |
+| Articles       | `Ctrl+Shift+2` / `Cmd+Ctrl+2` | Browse Markdown files as a flat list |
+| File tree      | `Ctrl+Shift+3` / `Cmd+Ctrl+3` | Browse the workspace hierarchy |
 | Global search  | `Ctrl+Shift+F` | Find text across your folder   |
-| Live           | `Ctrl/⌘+Shift+L` | Toggle the live editor |
+| Source mode    | `Ctrl/⌘+/` | Toggle Source Code Mode |
 
 ## 4. Code with syntax highlighting
 

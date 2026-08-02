@@ -9,6 +9,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
 import { ThemeProvider, useTheme, type Theme } from "./context/ThemeContext";
 import { TitleBar } from "./components/TitleBar";
+import { ExportMenu } from "./components/ExportMenu";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { CodeEditor } from "./components/CodeEditor";
 import { StatusBar } from "./components/StatusBar";
@@ -151,16 +152,31 @@ interface FileData {
   hash: string;
 }
 
+interface WorkspaceQuickOpenEntry {
+  name: string;
+  path: string;
+  relativePath: string;
+  modified: number;
+}
+
 interface ProposedDocument {
   documentId: string;
   version: number;
   content: string;
 }
 
-// Platform-aware AI shortcut hint. Windows uses Alt+J because WebView2 reserves
-// Ctrl+J for its Downloads UI before the page sees it; macOS shows ⌘J. (AI-02.)
+// AI is an optional mdtxt extension. Keep its hint aligned with the global
+// handler and away from Typora's Cmd/Ctrl+J "jump to selection" binding.
 const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platform || navigator.userAgent || "");
-const AI_SHORTCUT = IS_MAC ? "⌘J" : "Alt+J";
+const AI_SHORTCUT = "Alt+Shift+J";
+const SOURCE_SHORTCUT = IS_MAC ? "⌘+/" : "Ctrl+/";
+const OUTLINE_SHORTCUT = IS_MAC ? "⌘+Ctrl+1" : "Ctrl+Shift+1";
+const ARTICLES_SHORTCUT = IS_MAC ? "⌘+Ctrl+2" : "Ctrl+Shift+2";
+const QUICK_OPEN_COPY = {
+  title: "Open Quickly",
+  placeholder: "Search files…",
+  label: "Search files",
+} as const;
 
 // Width of the right-side AI panel; the editor/preview area reserves this much
 // padding-right when it's open so content reflows beside it (not under it).
@@ -201,6 +217,11 @@ function AppContent() {
   const [mode, setModeState] = usePersistedState<ViewMode>(getSafeSavedViewMode, setSavedViewMode);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
+  const [showQuickOpen, setShowQuickOpen] = useState(false);
+  // Metadata-only workspace index, requested only while the palette is open.
+  // This avoids parsing a whole folder on launch while still making Typora-like
+  // quick open available from the primary keyboard workflow.
+  const [workspaceQuickOpen, setWorkspaceQuickOpen] = useState<WorkspaceQuickOpenEntry[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -248,11 +269,28 @@ function AppContent() {
 
   // Sidebar panel state
   const [showFileExplorer, setShowFileExplorer] = useState(false);
+  const [workspaceFileView, setWorkspaceFileView] = useState<"tree" | "articles">("tree");
   const [showTOC, setShowTOC] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const navigationTab: NavigationTab = showTOC ? "outline" : "files";
   const navigationOpen = (showFileExplorer || showTOC) && !focusModeEnabled;
   const aiPanelOpen = showAIPanel && !focusModeEnabled;
+
+  useEffect(() => {
+    if (!showPalette && !showQuickOpen) return;
+    const root = getWorkspaceState().root;
+    if (!root) {
+      setWorkspaceQuickOpen([]);
+      return;
+    }
+    let cancelled = false;
+    void invoke<WorkspaceQuickOpenEntry[]>("list_workspace_markdown_files", { root })
+      .then((entries) => { if (!cancelled) setWorkspaceQuickOpen(entries); })
+      // Quick open is supplementary: an unreadable or recently moved workspace
+      // must not make the command palette unusable.
+      .catch(() => { if (!cancelled) setWorkspaceQuickOpen([]); });
+    return () => { cancelled = true; };
+  }, [showPalette, showQuickOpen]);
   // Proposed document from Agent mode, shown as an inline diff for accept/reject.
   const [proposedDoc, setProposedDoc] = useState<ProposedDocument | null>(null);
 
@@ -1707,9 +1745,11 @@ function AppContent() {
     };
   }, [loadFile]);
 
-  // Toggle between preview and code (skips split — split has its own shortcut)
+  // Typora's Source Code Mode is a two-way switch around its normal Live
+  // Preview writing surface. Reader and split remain optional mdtxt views,
+  // but must not become the destination of Cmd/Ctrl+/.
   const handleToggleMode = useCallback(() => {
-    setMode((prev) => (prev === "code" ? "preview" : "code"));
+    setMode((prev) => (prev === "code" ? "live" : "code"));
   }, []);
 
   const handleToggleSplit = useCallback(() => {
@@ -1726,14 +1766,24 @@ function AppContent() {
     setShowTOC(false);
   }, []);
 
+  const handleShowFileTree = useCallback(() => {
+    setWorkspaceFileView("tree");
+    setShowFileExplorer(true);
+    setShowTOC(false);
+  }, []);
+
+  const handleShowArticles = useCallback(() => {
+    setWorkspaceFileView("articles");
+    setShowFileExplorer(true);
+    setShowTOC(false);
+  }, []);
+
   // Toggle table of contents (mutually exclusive with file explorer)
   const handleToggleTOC = useCallback(() => {
     setShowTOC((prev) => !prev);
     setShowFileExplorer(false);
   }, []);
 
-  // Toggle the right-side AI assistant panel.
-  const handleToggleAI = useCallback(() => setShowAIPanel((v) => !v), []);
   const handleToggleFocus = useCallback(() => setFocusModeEnabled((value) => !value), [setFocusModeEnabled]);
 
   const handleNavigationTabChange = useCallback((tab: NavigationTab) => {
@@ -1832,8 +1882,8 @@ function AppContent() {
   // Neutral info toast (distinct from error). Used e.g. when AI assist is
   // invoked before it's configured, so the action isn't a silent no-op.
   const handleNotice = useCallback((message: string) => {
-    showToast(message, 'info');
-  }, [showToast]);
+    showToast(tr(message), 'info');
+  }, [showToast, tr]);
 
   // Fullscreen (F11). Native title-bar controls, the Window menu, and F11 all
   // converge on the same OS state; the hook keeps React in sync with it.
@@ -1855,12 +1905,15 @@ function AppContent() {
   // App-wide keyboard shortcuts (window-level, mounted once). See the hook.
   useGlobalShortcuts({
     handleOpenFile, handleSaveFile, handleSaveAs, handleNewFile,
-    handleToggleMode, handleToggleSplit, handleToggleLive, handleToggleFileExplorer, handleToggleTOC,
+    handleToggleMode, handleToggleLive, handleToggleFileExplorer, handleToggleTOC,
+    showFileTree: handleShowFileTree,
+    showArticles: handleShowArticles,
     handleToggleTypewriter: () => setTypewriterModeEnabled((value) => !value),
     handleToggleFocus,
     toggleFullscreen,
     openCheatsheet: () => setShowCheatsheet(true),
-    openPalette: () => setShowPalette(true),
+    openQuickOpen: () => { setShowPalette(false); setShowQuickOpen(true); },
+    openPalette: () => { setShowQuickOpen(false); setShowPalette(true); },
     openSettings: () => setShowSettings(true),
     // Ctrl+F in reader mode opens the preview find bar (the editor keymap
     // handles find in code/split mode, where the editor has focus). FIND-01.
@@ -1879,7 +1932,9 @@ function AppContent() {
     const exportDocument = (format: "html" | "pdf" | "docx") => () => window.dispatchEvent(new CustomEvent("mdtxt:export", { detail: format }));
     return {
       "file.new": handleNewFile,
+      "file.newTab": handleNewFile,
       "file.open": handleOpenFile,
+      "file.quickOpen": () => { setShowPalette(false); setShowQuickOpen(true); },
       "file.save": handleSaveFile,
       "file.saveAs": handleSaveAs,
       "file.reveal": () => { if (filePath) void revealItemInDir(filePath).catch(() => showToast(tr("Could not reveal file"), "error")); },
@@ -1889,37 +1944,42 @@ function AppContent() {
       "tab.previous": () => cycleTab(-1),
       "tab.next": () => cycleTab(1),
       "export.html": exportDocument("html"), "export.pdf": exportDocument("pdf"), "export.docx": exportDocument("docx"),
+      "editor.jumpSelection": () => window.dispatchEvent(new Event("mdtxt:editor-jump-selection")),
+      "editor.copyMarkdown": () => window.dispatchEvent(new Event("mdtxt:copy-markdown")),
+      "editor.pastePlain": () => window.dispatchEvent(new Event("mdtxt:paste-plain")),
       "editor.find": () => window.dispatchEvent(new CustomEvent("mdtxt:editor-find", { detail: "find" })),
       "editor.replace": () => window.dispatchEvent(new CustomEvent("mdtxt:editor-find", { detail: "replace" })),
-      "view.code": () => setMode("code"), "view.live": () => setMode("live"), "view.split": () => setMode("split"), "view.preview": () => setMode("preview"),
-      "view.explorer": handleToggleFileExplorer, "view.outline": handleToggleTOC,
+      "view.source": handleToggleMode, "view.code": () => setMode("code"), "view.live": () => setMode("live"), "view.split": () => setMode("split"), "view.preview": () => setMode("preview"),
+      "view.sidebar": handleToggleFileExplorer, "view.explorer": handleShowFileTree, "view.articles": handleShowArticles, "view.outline": handleToggleTOC,
       "view.toolbar": () => setToolbarVisible((value) => !value), "view.typewriter": () => setTypewriterModeEnabled((value) => !value),
       "view.focus": handleToggleFocus,
+      "view.search": () => setShowSearch(true),
       "view.fullscreen": toggleFullscreen,
       "ai.assist": () => window.dispatchEvent(new CustomEvent("mdtxt:ai-assist")),
       "settings.open": () => setShowSettings(true), "help.shortcuts": () => setShowCheatsheet(true),
       "help.guide": handleOpenTutorial, "help.tour": () => { if (!hasFile) handleNewFile(); setShowTour(true); },
-      "format.bold": editor("format.bold"), "format.italic": editor("format.italic"), "format.strike": editor("format.strike"),
-      "format.inlineCode": editor("format.inlineCode"), "format.link": editor("format.link"),
+      "format.bold": editor("format.bold"), "format.italic": editor("format.italic"), "format.underline": editor("format.underline"), "format.strike": editor("format.strike"),
+      "format.inlineCode": editor("format.inlineCode"), "format.link": editor("format.link"), "format.clear": editor("format.clear"),
       "format.heading1": editor("format.heading1"), "format.heading2": editor("format.heading2"), "format.heading3": editor("format.heading3"),
       "format.heading4": editor("format.heading4"), "format.heading5": editor("format.heading5"), "format.heading6": editor("format.heading6"),
       "format.paragraph": editor("format.paragraph"), "format.bulletList": editor("format.bulletList"),
       "format.orderedList": editor("format.orderedList"), "format.taskList": editor("format.taskList"), "format.blockquote": editor("format.blockquote"),
-      "insert.codeBlock": editor("insert.codeBlock"), "insert.table": editor("insert.table"), "insert.rule": editor("insert.rule"),
+      "insert.codeBlock": editor("insert.codeBlock"), "insert.mathBlock": editor("insert.mathBlock"), "insert.table": editor("insert.table"), "insert.image": editor("insert.image"), "insert.rule": editor("insert.rule"),
     };
-  }, [closeTab, cycleTab, filePath, handleNewFile, handleOpenFile, handleOpenTutorial, handleSaveAs, handleSaveFile, handleToggleFileExplorer, handleToggleFocus, handleToggleTOC, hasFile, setMode, showToast, toggleFullscreen, tr]);
+  }, [closeTab, cycleTab, filePath, handleNewFile, handleOpenFile, handleOpenTutorial, handleSaveAs, handleSaveFile, handleShowArticles, handleShowFileTree, handleToggleFileExplorer, handleToggleFocus, handleToggleTOC, hasFile, setMode, showToast, toggleFullscreen, tr]);
 
   const nativeMenuState = useMemo(() => ({
     hasDocument: hasFile,
     canReveal: !!filePath,
     mode,
     fileExplorerOpen: showFileExplorer,
+    articlesOpen: showFileExplorer && workspaceFileView === "articles",
     outlineOpen: showTOC,
     toolbarOpen: toolbarVisible,
     typewriterOpen: typewriterModeEnabled,
     focusModeOpen: focusModeEnabled,
     aiEnabled,
-  }), [aiEnabled, filePath, focusModeEnabled, hasFile, mode, showFileExplorer, showTOC, toolbarVisible, typewriterModeEnabled]);
+  }), [aiEnabled, filePath, focusModeEnabled, hasFile, mode, showFileExplorer, showTOC, toolbarVisible, typewriterModeEnabled, workspaceFileView]);
 
   useNativeMenu({ state: nativeMenuState, commands: nativeMenuCommands, translate: tr });
 
@@ -2010,6 +2070,32 @@ function AppContent() {
         run: () => setShowStats(true),
       });
       items.push({
+        id: "edit.copyFormatted",
+        label: "Copy formatted selection",
+        section: "Edit",
+        icon: "content_copy",
+        keywords: "clipboard rich text html markdown paste word pages",
+        run: () => window.dispatchEvent(new Event("mdtxt:copy-formatted-selection")),
+      });
+      items.push({
+        id: "insert.image",
+        label: "Insert image",
+        hint: IS_MAC ? "⌘+Ctrl+I" : "Ctrl+Shift+I",
+        section: "Edit",
+        icon: "image",
+        keywords: "markdown image picture asset",
+        run: () => window.dispatchEvent(new CustomEvent(EDITOR_COMMAND_EVENT, { detail: "insert.image" })),
+      });
+      items.push({
+        id: "format.clear",
+        label: "Clear format",
+        hint: `${IS_MAC ? "⌘" : "Ctrl"}+\\`,
+        section: "Edit",
+        icon: "format_clear",
+        keywords: "remove markdown styling plain",
+        run: () => window.dispatchEvent(new CustomEvent(EDITOR_COMMAND_EVENT, { detail: "format.clear" })),
+      });
+      items.push({
         id: "tab.close",
         label: "Close tab",
         hint: "Ctrl+W",
@@ -2023,35 +2109,43 @@ function AppContent() {
     // === View === only when a buffer exists
     if (hasFile) {
       items.push({
-        id: "view.preview",
-        label: "Switch to Reader mode",
-        hint: "Ctrl+E",
+        id: "view.live",
+        label: "Switch to Live Preview",
         section: "View",
-        icon: "visibility",
-        run: () => setMode("preview"),
+        icon: "auto_fix_high",
+        run: () => setMode("live"),
       });
       items.push({
-        id: "view.code",
-        label: "Switch to Code editor",
+        id: "view.source",
+        label: "Toggle Source Code mode",
+        hint: SOURCE_SHORTCUT,
         section: "View",
         icon: "code",
-        run: () => setMode("code"),
+        run: handleToggleMode,
       });
       items.push({
         id: "view.split",
         label: "Toggle Split view",
-        hint: "Ctrl+\\",
         section: "View",
         icon: "vertical_split",
         run: handleToggleSplit,
       });
       items.push({
         id: "view.explorer",
-        label: "Toggle file explorer",
-        hint: "Ctrl+Shift+E",
+        label: "Show file tree",
+        hint: IS_MAC ? "⌘+Ctrl+3" : "Ctrl+Shift+3",
         section: "View",
         icon: "folder",
-        run: handleToggleFileExplorer,
+        run: handleShowFileTree,
+      });
+      items.push({
+        id: "view.articles",
+        label: "Show articles",
+        hint: ARTICLES_SHORTCUT,
+        section: "View",
+        icon: "view_list",
+        keywords: "articles files list sidebar",
+        run: handleShowArticles,
       });
       items.push({
         id: "search.files",
@@ -2065,7 +2159,7 @@ function AppContent() {
       items.push({
         id: "view.toc",
         label: "Toggle outline",
-        hint: "Ctrl+Shift+O",
+        hint: OUTLINE_SHORTCUT,
         section: "View",
         icon: "format_list_bulleted",
         run: handleToggleTOC,
@@ -2074,10 +2168,10 @@ function AppContent() {
 
     // Fullscreen works anywhere (including the welcome screen), so unlike the
     // other View entries it isn't gated on a file being open.
-    items.push({
-      id: "view.fullscreen",
-      label: "Toggle fullscreen",
-      hint: "F11",
+      items.push({
+        id: "view.fullscreen",
+        label: "Toggle fullscreen",
+        hint: IS_MAC ? "⌘+⌥+F" : "F11",
       section: "View",
       icon: "fullscreen",
       keywords: "full screen distraction free f11 immersive",
@@ -2205,11 +2299,47 @@ function AppContent() {
     // (post-debounce) for no reason. Headings are computed below in a
     // separate hook that's gated on the palette actually being open.
     handleNewFile, handleOpenFile, handleSaveFile, handleSaveAs, handleOpenTutorial,
-    handleToggleSplit, handleToggleFileExplorer, handleToggleFocus, handleToggleTOC, toggleFullscreen,
+    handleToggleSplit, handleShowArticles, handleShowFileTree, handleToggleFileExplorer, handleToggleFocus, handleToggleTOC, toggleFullscreen,
     loadFile, filePath, hasFile, showToast, closeTab,
     typewriterModeEnabled, focusModeEnabled, toolbarVisible, aiEnabled,
     theme, setTheme, tr,
   ]);
+
+  // Typora-style quick open: the palette searches a bounded, metadata-only
+  // workspace index. Keep the full relative path as both a hint and a keyword
+  // so duplicate note names remain easy to distinguish and find.
+  const workspaceQuickOpenItems = useMemo<PaletteCommand[]>(() => (
+    workspaceQuickOpen
+      .filter((entry) => entry.path !== filePath)
+      .map((entry) => ({
+        id: `workspace.${entry.path}`,
+        label: entry.name,
+        hint: entry.relativePath,
+        section: "Quick open",
+        icon: "description",
+        keywords: `workspace file ${entry.relativePath}`,
+        run: () => void loadFile(entry.path),
+      }))
+  ), [workspaceQuickOpen, filePath, loadFile]);
+
+  const quickOpenItems = useMemo<PaletteCommand[]>(() => {
+    const recents = getRecentFiles()
+      .filter((entry) => entry.path !== filePath)
+      .map((entry) => ({
+        id: `quick-recent.${entry.path}`,
+        label: entry.name,
+        hint: entry.path,
+        section: "Recent files",
+        icon: "history",
+        keywords: entry.path,
+        run: () => void loadFile(entry.path),
+      }));
+    return [...workspaceQuickOpenItems, ...recents].map((item) => ({
+      ...item,
+      label: tr(item.label),
+      section: tr(item.section),
+    }));
+  }, [workspaceQuickOpenItems, filePath, loadFile, tr]);
 
   // Heading items are recomputed only while the palette is actually open.
   // Scanning every line of the document for `#`-prefixed headings on every
@@ -2265,9 +2395,9 @@ function AppContent() {
     }));
   }, [tabs, activeTabId, fileName, filePath, activateTab]);
 
-  // Concatenated list passed to the palette. Same `paletteItems` shape as
-  // before so the CommandPalette component sees no API change. Reference
-  // changes only when one of the sources changes — typically rare.
+  // Command palette intentionally excludes workspace files: Typora exposes
+  // command search and Quick Open as separate interactions with separate
+  // shortcuts and search intent.
   const fullPaletteItems = useMemo<PaletteCommand[]>(
     () => [...paletteItems, ...tabPaletteItems, ...headingPaletteItems].map((item) => ({
       ...item,
@@ -2390,19 +2520,22 @@ function AppContent() {
         fileName={fileName ?? undefined}
         isDirty={isDirty}
         filePath={filePath ?? undefined}
-        onOpenFile={handleOpenFile}
-        onNewFile={handleNewFile}
-        getExportHtml={getExportHtml}
-        onExportSuccess={handleExportSuccess}
-        onExportError={handleExportError}
-        onToggleAI={aiEnabled ? handleToggleAI : undefined}
-        aiActive={showAIPanel}
         isNativeFullscreen={isFullscreen}
-        mode={mode}
-        onSetMode={setMode}
         onToggleNavigation={handleToggleNavigation}
         navigationActive={navigationOpen}
       />
+
+      {/* Native File → Export commands dispatch to this non-visual export
+          controller. Keeping it mounted preserves lazy exporters and avoids
+          turning export into permanent title-bar chrome. */}
+      <div className="hidden" aria-hidden="true">
+        <ExportMenu
+          fileName={fileName || "document.md"}
+          getExportHtml={getExportHtml}
+          onSuccess={handleExportSuccess}
+          onError={handleExportError}
+        />
+      </div>
 
       {/* Keep single-document chrome quiet; tabs appear once there is something
           to switch between, and Focus mode hides them temporarily. */}
@@ -2450,6 +2583,8 @@ function AppContent() {
               onTabChange={handleNavigationTabChange}
               onFileSelect={loadFile}
               onWorkspaceMutation={handleWorkspaceMutation}
+              fileViewMode={workspaceFileView}
+              onFileViewModeChange={setWorkspaceFileView}
               onClose={closeAllPanels}
               onWidthChange={setNavigationWidthState}
             />
@@ -2674,6 +2809,18 @@ function AppContent() {
       {showPalette && (
         <Suspense fallback={null}>
           <CommandPalette isOpen={showPalette} items={fullPaletteItems} onClose={() => setShowPalette(false)} />
+        </Suspense>
+      )}
+      {showQuickOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            isOpen={showQuickOpen}
+            items={quickOpenItems}
+            title={tr(QUICK_OPEN_COPY.title)}
+            searchPlaceholder={tr(QUICK_OPEN_COPY.placeholder)}
+            searchLabel={tr(QUICK_OPEN_COPY.label)}
+            onClose={() => setShowQuickOpen(false)}
+          />
         </Suspense>
       )}
       {showSearch && (

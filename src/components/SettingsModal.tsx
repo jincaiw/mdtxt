@@ -19,10 +19,8 @@ import { useLocale } from "../context/LocaleContext";
 import { localizeAIError } from "../utils/aiErrors";
 import appPackage from "../../package.json";
 
-// Platform-aware AI shortcut hint (Windows/Linux: Alt+J; macOS: ⌘J). Windows
-// can't use Ctrl+J because WebView2 reserves it for its Downloads UI.
-const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platform || navigator.userAgent || "");
-const AI_SHORTCUT = IS_MAC ? "⌘J" : "Alt+J";
+// Optional mdtxt AI must not claim Typora's Cmd/Ctrl+J jump binding.
+const AI_SHORTCUT = "Alt+Shift+J";
 
 interface SettingsModalProps {
     isOpen: boolean;

@@ -607,6 +607,23 @@ pub struct WorkspaceEntry {
     pub modified: u64,
 }
 
+/// A Markdown document exposed to the command palette's workspace quick-open
+/// list. Paths are absolute so opening one follows the same safe read path as
+/// every other file action; `relative_path` only exists to disambiguate names.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceQuickOpenEntry {
+    pub name: String,
+    pub path: String,
+    pub relative_path: String,
+    pub modified: u64,
+}
+
+// Quick open should be instant even in a repository-sized workspace. The
+// bounded index deliberately skips hidden/build directories and symlinks,
+// rather than following a link outside the user-selected workspace.
+const WORKSPACE_QUICK_OPEN_MAX_FILES: usize = 5000;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceMutation {
@@ -762,6 +779,91 @@ pub async fn list_workspace_entries(
         .await
         .map_err(|e| CommandError::ReadError(e.to_string()))??;
     Ok(entries)
+}
+
+/// Returns a bounded, metadata-only index of Markdown files for quick open.
+/// Unlike content search this never reads document bytes, so opening the
+/// palette remains cheap for large notes collections.
+#[tauri::command]
+pub async fn list_workspace_markdown_files(
+    root: String,
+) -> Result<Vec<WorkspaceQuickOpenEntry>, CommandError> {
+    let root = workspace_root(&root)?;
+    tokio::task::spawn_blocking(move || Ok(workspace_markdown_files(root)))
+        .await
+        .map_err(|e| CommandError::ReadError(e.to_string()))?
+}
+
+fn workspace_markdown_files(root: PathBuf) -> Vec<WorkspaceQuickOpenEntry> {
+    let mut results = Vec::new();
+    let mut stack = vec![root.clone()];
+
+    while let Some(directory) = stack.pop() {
+        if results.len() >= WORKSPACE_QUICK_OPEN_MAX_FILES {
+            break;
+        }
+        let read_dir = match std::fs::read_dir(&directory) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        for entry in read_dir.flatten() {
+            if results.len() >= WORKSPACE_QUICK_OPEN_MAX_FILES {
+                break;
+            }
+            let path = entry.path();
+            let name = match path.file_name().and_then(|value| value.to_str()) {
+                Some(value) if !value.starts_with('.') => value,
+                _ => continue,
+            };
+            let file_type = match entry.file_type() {
+                Ok(value) => value,
+                Err(_) => continue,
+            };
+            // A symlink can leave the selected root, so keep it out of both
+            // the tree walk and the quick-open results.
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_dir() {
+                if name != "node_modules" && name != "target" {
+                    stack.push(path);
+                }
+                continue;
+            }
+            if !file_type.is_file()
+                || !path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|ext| {
+                        ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")
+                    })
+            {
+                continue;
+            }
+            let metadata = match entry.metadata() {
+                Ok(value) => value,
+                Err(_) => continue,
+            };
+            let relative_path = path
+                .strip_prefix(&root)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            results.push(WorkspaceQuickOpenEntry {
+                name: name.to_string(),
+                path: path.to_string_lossy().to_string(),
+                relative_path,
+                modified: mtime_ms(&metadata),
+            });
+        }
+    }
+    results.sort_by(|left, right| {
+        left.name
+            .to_lowercase()
+            .cmp(&right.name.to_lowercase())
+            .then_with(|| left.relative_path.cmp(&right.relative_path))
+    });
+    results
 }
 
 #[tauri::command]
@@ -1392,8 +1494,8 @@ pub fn set_ai_key(key: String) -> Result<(), String> {
 mod tests {
     use super::{
         apply_eol, content_hash, read_file, sanitize_image_name, save_file, save_file_impl,
-        save_temp_path, search_markdown_tree, validate_rel_path, write_export_binary,
-        write_export_text, CommandError, Eol, SaveFault,
+        save_temp_path, search_markdown_tree, validate_rel_path, workspace_markdown_files,
+        write_export_binary, write_export_text, CommandError, Eol, SaveFault,
     };
     use std::path::{Path, PathBuf};
 
@@ -1474,6 +1576,26 @@ mod tests {
         let results = search_markdown_tree(dir.clone(), "needle", false);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "keep.md");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn workspace_quick_open_indexes_markdown_without_following_hidden_or_build_dirs() {
+        let dir = std::env::temp_dir().join(format!("mdtxt-quick-open-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("notes")).unwrap();
+        std::fs::create_dir_all(dir.join(".git")).unwrap();
+        std::fs::create_dir_all(dir.join("target")).unwrap();
+        std::fs::write(dir.join("README.md"), "root").unwrap();
+        std::fs::write(dir.join("notes").join("plan.markdown"), "nested").unwrap();
+        std::fs::write(dir.join(".git").join("hidden.md"), "hidden").unwrap();
+        std::fs::write(dir.join("target").join("build.md"), "build").unwrap();
+
+        let results = workspace_markdown_files(dir.clone());
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].name, "plan.markdown");
+        assert_eq!(results[0].relative_path, "notes/plan.markdown");
+        assert_eq!(results[1].name, "README.md");
 
         std::fs::remove_dir_all(&dir).ok();
     }

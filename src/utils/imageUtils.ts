@@ -23,6 +23,16 @@ export function getImageFromClipboard(event: ClipboardEvent): File | null {
     return null;
 }
 
+/** Return the first image supplied by an OS/browser drag operation. */
+export function getImageFromDrop(event: DragEvent): File | null {
+    const files = event.dataTransfer?.files;
+    if (!files) return null;
+    for (const file of Array.from(files)) {
+        if (file.type.startsWith("image/")) return file;
+    }
+    return null;
+}
+
 /**
  * Convert a File/Blob to Uint8Array for sending to Rust
  */

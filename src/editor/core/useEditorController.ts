@@ -10,7 +10,7 @@ import { useAIAssistShortcut } from "../interactions/useAIAssistShortcut";
 import { useEditorReview } from "../interactions/useEditorReview";
 import { useEditorPreferences } from "../extensions/useEditorPreferences";
 import { useEditorOverlays } from "../interactions/EditorOverlays";
-import { createEditorPasteHandler } from "../interactions/editorPaste";
+import { createEditorDropHandler, createEditorPasteHandler } from "../interactions/editorPaste";
 import { useLiveMarkdownPresentation } from "../live/liveMarkdownPresentation";
 import type { DocumentTextChange } from "../../utils/documentSessionController";
 import type { LiveLocale } from "../live/liveLocale";
@@ -93,17 +93,18 @@ export function useEditorController({
     });
     const aiEnabled = useAIAssistShortcut(viewRef, triggerAIBubble);
     const { detectSlash, detectTable, openAIBubble, openFind, toolbar, floatingOverlays } = useEditorOverlays({
-        viewRef, aiConfig, onNoticeRef, reviewingRef, showToolbar, aiEnabled, content,
+        viewRef, aiConfig, onNoticeRef, reviewingRef, showToolbar, aiEnabled, content, liveMode,
     });
     openAIBubbleRef.current = openAIBubble;
     const handlePaste = createEditorPasteHandler({ filePathRef, onImagePasteRef, onErrorRef });
+    const handleDrop = createEditorDropHandler({ filePathRef, onImagePasteRef, onErrorRef });
 
     useCodeMirrorHost({
         containerRef, viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef,
         wrapCompRef, spellCompRef, historyCompRef, mergeCompRef, liveCompRef, sourceSyntaxCompRef,
         onChangeRef, onTextChangesRef, onStateChangeRef, onCursorChangeRef, onSelectionChangeRef,
         typewriterRef, reviewingRef, wikiCompletionSource, documentId, sessionState,
-        content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste,
+        content, wordWrap, spellCheck, liveMode, liveRestricted, liveLocale, filePath, detectSlash, detectTable, openFind, handlePaste, handleDrop,
     });
     useEditorDocumentSession({
         viewRef, createStateRef, loadedDocumentIdRef, lastEmittedRef, contentRef,

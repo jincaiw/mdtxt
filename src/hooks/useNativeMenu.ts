@@ -8,6 +8,7 @@ export interface NativeMenuState {
     canReveal: boolean;
     mode: "preview" | "code" | "split" | "live";
     fileExplorerOpen: boolean;
+    articlesOpen: boolean;
     outlineOpen: boolean;
     toolbarOpen: boolean;
     typewriterOpen: boolean;
@@ -52,14 +53,15 @@ export function useNativeMenu({ state, commands, translate }: NativeMenuOptions)
             try {
                 const file = await Submenu.new({ text: translate("File"), items: [
                     await item("file.new", "New file", "CmdOrCtrl+N"),
+                    ...(isMac ? [await item("file.newTab", "New tab", "Cmd+T")] : []),
                     await item("file.open", "Open file…", "CmdOrCtrl+O"),
+                    await item("file.quickOpen", "Open quickly", isMac ? "Cmd+Shift+O" : "Ctrl+P", state.hasDocument),
                     await separator(),
                     await item("file.save", "Save", "CmdOrCtrl+S", state.hasDocument),
                     await item("file.saveAs", "Save As…", "CmdOrCtrl+Shift+S", state.hasDocument),
                     await separator(),
                     await item("file.reveal", "Reveal in folder", undefined, state.canReveal),
                     await item("file.copyPath", "Copy file path", undefined, state.canReveal),
-                    await item("file.stats", "Document statistics", undefined, state.hasDocument),
                     await separator(),
                     await Submenu.new({ text: translate("Export"), items: [
                         await item("export.html", "HTML", undefined, state.hasDocument),
@@ -73,55 +75,73 @@ export function useNativeMenu({ state, commands, translate }: NativeMenuOptions)
                 const edit = await Submenu.new({ text: translate("Edit"), items: [
                     await PredefinedMenuItem.new({ item: "Undo" }), await PredefinedMenuItem.new({ item: "Redo" }), await separator(),
                     await PredefinedMenuItem.new({ item: "Cut" }), await PredefinedMenuItem.new({ item: "Copy" }), await PredefinedMenuItem.new({ item: "Paste" }), await PredefinedMenuItem.new({ item: "SelectAll" }), await separator(),
+                    // AppKit may suppress custom Edit items whose key
+                    // equivalents collide with the hosted WKWebView. The
+                    // editor owns these shortcuts; keep the menu entries
+                    // visible and dispatch them through the same command path.
+                    await item("editor.copyMarkdown", "Copy as Markdown", undefined, state.hasDocument),
+                    await item("editor.pastePlain", "Paste as plain text", undefined, state.hasDocument),
+                    await item("editor.jumpSelection", "Jump to selection", undefined, state.hasDocument),
                     await item("editor.find", "Find", "CmdOrCtrl+F", state.hasDocument),
                     await item("editor.replace", "Find and replace", "CmdOrCtrl+H", state.hasDocument),
                 ] });
 
-                const format = await Submenu.new({ text: translate("Format"), items: [
-                    await item("format.heading1", "Heading 1", "CmdOrCtrl+Shift+1", state.hasDocument),
-                    await item("format.heading2", "Heading 2", "CmdOrCtrl+Shift+2", state.hasDocument),
-                    await item("format.heading3", "Heading 3", "CmdOrCtrl+Shift+3", state.hasDocument),
-                    await item("format.heading4", "Heading 4", "CmdOrCtrl+Shift+4", state.hasDocument),
-                    await item("format.heading5", "Heading 5", "CmdOrCtrl+Shift+5", state.hasDocument),
-                    await item("format.heading6", "Heading 6", "CmdOrCtrl+Shift+6", state.hasDocument),
-                    await item("format.paragraph", "Paragraph", "CmdOrCtrl+Shift+0", state.hasDocument), await separator(),
-                    await item("format.bold", "Bold", "CmdOrCtrl+B", state.hasDocument),
-                    await item("format.italic", "Italic", "CmdOrCtrl+I", state.hasDocument),
-                    await item("format.strike", "Strikethrough", "CmdOrCtrl+Shift+X", state.hasDocument),
-                    await item("format.inlineCode", "Inline code", "CmdOrCtrl+Shift+`", state.hasDocument),
-                    await item("format.link", "Link", "CmdOrCtrl+K", state.hasDocument), await separator(),
-                    await item("format.bulletList", "Bullet list", "CmdOrCtrl+Shift+8", state.hasDocument),
-                    await item("format.orderedList", "Numbered list", "CmdOrCtrl+Shift+7", state.hasDocument),
-                    await item("format.taskList", "Task list", "CmdOrCtrl+Shift+9", state.hasDocument),
-                    await item("format.blockquote", "Blockquote", "CmdOrCtrl+/", state.hasDocument),
-                    await item("insert.codeBlock", "Code block", "CmdOrCtrl+Shift+C", state.hasDocument),
-                    await item("insert.table", "Insert table", undefined, state.hasDocument),
+                const paragraph = await Submenu.new({ text: translate("Paragraph"), items: [
+                    await item("format.heading1", "Heading 1", "CmdOrCtrl+1", state.hasDocument),
+                    await item("format.heading2", "Heading 2", "CmdOrCtrl+2", state.hasDocument),
+                    await item("format.heading3", "Heading 3", "CmdOrCtrl+3", state.hasDocument),
+                    await item("format.heading4", "Heading 4", "CmdOrCtrl+4", state.hasDocument),
+                    await item("format.heading5", "Heading 5", "CmdOrCtrl+5", state.hasDocument),
+                    await item("format.heading6", "Heading 6", "CmdOrCtrl+6", state.hasDocument),
+                    await item("format.paragraph", "Paragraph", "CmdOrCtrl+0", state.hasDocument), await separator(),
+                    await item("insert.table", "Table", isMac ? "Cmd+Alt+T" : "Ctrl+T", state.hasDocument),
+                    await item("insert.codeBlock", "Code fences", isMac ? "Cmd+Alt+C" : "Ctrl+Shift+K", state.hasDocument),
+                    await item("insert.mathBlock", "Math block", isMac ? "Cmd+Alt+B" : "Ctrl+Shift+M", state.hasDocument),
+                    await item("format.blockquote", "Quote", isMac ? "Cmd+Alt+Q" : "Ctrl+Shift+Q", state.hasDocument),
+                    await item("format.orderedList", "Ordered list", isMac ? "Cmd+Alt+O" : "Ctrl+Shift+[", state.hasDocument),
+                    await item("format.bulletList", "Unordered list", isMac ? "Cmd+Alt+U" : "Ctrl+Shift+]", state.hasDocument),
+                    await item("format.taskList", "Task list", undefined, state.hasDocument),
                     await item("insert.rule", "Horizontal rule", undefined, state.hasDocument),
                 ] });
 
+                const format = await Submenu.new({ text: translate("Format"), items: [
+                    await item("format.bold", "Bold", "CmdOrCtrl+B", state.hasDocument),
+                    await item("format.italic", "Italic", "CmdOrCtrl+I", state.hasDocument),
+                    await item("format.underline", "Underline", "CmdOrCtrl+U", state.hasDocument),
+                    await item("format.strike", "Strikethrough", isMac ? "Ctrl+Shift+`" : "Alt+Shift+5", state.hasDocument),
+                    await item("format.inlineCode", "Inline code", "CmdOrCtrl+Shift+`", state.hasDocument),
+                    await item("format.link", "Link", "CmdOrCtrl+K", state.hasDocument),
+                    await item("insert.image", "Image", isMac ? "Cmd+Ctrl+I" : "Ctrl+Shift+I", state.hasDocument),
+                    await item("format.clear", "Clear format", "CmdOrCtrl+\\", state.hasDocument),
+                ] });
+
                 const view = await Submenu.new({ text: translate("View"), items: [
-                    await check("view.code", "Source", state.mode === "code", undefined, state.hasDocument),
-                    await check("view.live", "Live", state.mode === "live", "CmdOrCtrl+Shift+L", state.hasDocument),
-                    await check("view.split", "Split", state.mode === "split", "CmdOrCtrl+\\", state.hasDocument),
-                    await check("view.preview", "Reader", state.mode === "preview", "CmdOrCtrl+E", state.hasDocument), await separator(),
-                    await check("view.explorer", "File explorer", state.fileExplorerOpen, "CmdOrCtrl+Shift+E", state.hasDocument),
-                    await check("view.outline", "Outline", state.outlineOpen, "CmdOrCtrl+Shift+O", state.hasDocument),
+                    await check("view.source", "Source code mode", state.mode === "code", "CmdOrCtrl+/", state.hasDocument), await separator(),
+                    await check("view.sidebar", "Toggle sidebar", state.fileExplorerOpen || state.outlineOpen, "CmdOrCtrl+Shift+L", state.hasDocument),
+                    await check("view.outline", "Outline", state.outlineOpen, isMac ? "Cmd+Ctrl+1" : "Ctrl+Shift+1", state.hasDocument),
+                    await check("view.articles", "Articles", state.articlesOpen, undefined, state.hasDocument),
+                    await check("view.explorer", "File tree", state.fileExplorerOpen && !state.articlesOpen, isMac ? "Cmd+Ctrl+3" : "Ctrl+Shift+3", state.hasDocument),
                     await check("view.toolbar", "Formatting toolbar", state.toolbarOpen, undefined, state.hasDocument),
                     await check("view.typewriter", "Typewriter mode", state.typewriterOpen, "F9", state.hasDocument),
                     await check("view.focus", "Focus mode", state.focusModeOpen, "F8", state.hasDocument),
-                    await separator(), await item("view.fullscreen", "Toggle fullscreen", "F11"),
+                    await item("view.search", "Search across files", "CmdOrCtrl+Shift+F", state.hasDocument),
+                    await item("file.stats", "Document statistics", undefined, state.hasDocument),
+                    await separator(), await item("view.fullscreen", "Toggle fullscreen", isMac ? "Cmd+Alt+F" : "F11"),
                 ] });
 
                 const ai = await Submenu.new({ text: "AI", items: [
-                    await item("ai.assist", "AI assist on selection", isMac ? "Cmd+J" : "Alt+J", state.hasDocument && state.aiEnabled),
+                    // Keep Cmd/Ctrl+J available for Typora's native "Jump to
+                    // selection" command. AI is deliberately an optional
+                    // mdtxt extension and must not steal that muscle memory.
+                    await item("ai.assist", "AI assist on selection", "Alt+Shift+J", state.hasDocument && state.aiEnabled),
                 ] });
                 const windowMenu = await Submenu.new({ text: translate("Window"), items: [
                     // Keep tab-cycle accelerators registered even on the
                     // welcome screen. Their handlers safely no-op with no tabs,
                     // and this avoids a disabled-menu race while crash-recovery
                     // tabs are mounted and the native menu is rebuilt.
-                    await item("tab.previous", "Previous tab"),
-                    await item("tab.next", "Next tab"),
+                    await item("tab.previous", "Previous tab", "Ctrl+Shift+Tab"),
+                    await item("tab.next", "Next tab", isMac ? "Cmd+`" : "Ctrl+Tab"),
                     await separator(),
                     await PredefinedMenuItem.new({ item: "Minimize" }), await PredefinedMenuItem.new({ item: "Maximize" }),
                     await PredefinedMenuItem.new({ item: "Fullscreen" }), await PredefinedMenuItem.new({ item: "CloseWindow" }),
@@ -131,7 +151,7 @@ export function useNativeMenu({ state, commands, translate }: NativeMenuOptions)
                     await item("help.guide", "Open the interactive guide"),
                     await item("help.tour", "Replay the welcome tour"),
                 ] });
-                const topLevel = [file, edit, format, view, ai, windowMenu, help];
+                const topLevel = [file, edit, paragraph, format, view, ai, windowMenu, help];
                 if (isMac) {
                     const app = await Submenu.new({ text: "mdtxt", items: [
                         await PredefinedMenuItem.new({ item: { About: null } }), await separator(),

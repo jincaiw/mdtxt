@@ -6,6 +6,20 @@ All notable mdtxt changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-08-02
+
+- Aligned the Live-first desktop editor, native menus, command palette and
+  shortcut behavior with Typora's documented desktop interaction model while
+  retaining mdtxt's own identity and extensions.
+- Added direct Live table editing, lossless Markdown/source round trips,
+  formatted copy, workspace Articles/file-tree views, and Chinese-native menu
+  labels.
+- Completed current macOS Apple Pinyin preedit, candidate-placement and commit
+  evidence; Windows Microsoft Pinyin and Linux Fcitx5 evidence remains covered.
+- Hardened the cross-platform release lane as deliberately unsigned: every
+  Windows, macOS and Linux artifact carries the `-unsigned` suffix and the
+  workflow rejects signing tools and repository secrets.
+
 ## [0.4.3] - 2026-07-30
 
 - Fixed macOS unsigned packaging by omitting the empty signing-identity

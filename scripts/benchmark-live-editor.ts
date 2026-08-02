@@ -2,7 +2,8 @@ import { parser } from "@lezer/markdown";
 import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { createLargeMarkdown } from "../src/test/fixtures/largeMarkdown";
-import { liveMarkdownPresentation } from "../src/editor/live/liveMarkdownPresentation";
+import { liveMarkdownPresentation, restrictedLiveMarkdownPresentation } from "../src/editor/live/liveMarkdownPresentation";
+import { assessLiveEligibility } from "../src/editor/live/liveEligibility";
 
 const mib = 1024 * 1024;
 const samples = [1, 10].map((size) => ({ label: `${size} MiB`, bytes: size * mib }));
@@ -38,13 +39,15 @@ for (const sample of samples) {
     const sourceStart = performance.now();
     const sourceState = EditorState.create({ doc: document, extensions: [markdown({ base: markdownLanguage })] });
     const sourceCreateMs = milliseconds(sourceStart);
+    const eligibility = assessLiveEligibility(document);
+    const presentation = eligibility.restricted ? restrictedLiveMarkdownPresentation : liveMarkdownPresentation;
     const liveStart = performance.now();
-    const liveState = EditorState.create({ doc: document, extensions: [markdown({ base: markdownLanguage }), liveMarkdownPresentation] });
+    const liveState = EditorState.create({ doc: document, extensions: [markdown({ base: markdownLanguage }), presentation] });
     const liveCreateMs = milliseconds(liveStart);
     const liveEdits = measureLocalEdits(liveState);
     console.log(
         `${sample.label}: parse=${parseMs}ms tree=${tree.length} chars `
-        + `source-state=${sourceCreateMs}ms live-state=${liveCreateMs}ms `
+        + `source-state=${sourceCreateMs}ms ${eligibility.restricted ? "restricted-live" : "full-live"}-state=${liveCreateMs}ms `
         + `live-local-edit p50=${liveEdits.p50}ms p95=${liveEdits.p95}ms`,
     );
     // Keep sourceState alive through the measurement so JIT warmup cannot

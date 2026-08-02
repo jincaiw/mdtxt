@@ -5,9 +5,9 @@ mod recovery;
 
 use commands::{
     create_workspace_entry, get_ai_key, get_file_info, list_directory_files,
-    list_workspace_entries, move_workspace_entry, read_file, read_image_file,
-    rename_workspace_entry, save_file, save_image, save_image_bytes, search_files, set_ai_key,
-    trash_workspace_entry, write_export_binary, write_export_text,
+    list_workspace_entries, list_workspace_markdown_files, move_workspace_entry, read_file,
+    read_image_file, rename_workspace_entry, save_file, save_image, save_image_bytes, search_files,
+    set_ai_key, trash_workspace_entry, write_export_binary, write_export_text,
 };
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
@@ -56,6 +56,9 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        // Rich clipboard writes use the native OS clipboard so pasted HTML is
+        // preserved by desktop apps instead of depending on WebView support.
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             #[cfg(not(debug_assertions))]
             let _ = app;
@@ -80,6 +83,7 @@ pub fn run() {
             get_file_info,
             list_directory_files,
             list_workspace_entries,
+            list_workspace_markdown_files,
             create_workspace_entry,
             rename_workspace_entry,
             move_workspace_entry,

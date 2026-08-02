@@ -69,7 +69,7 @@ export function FormatToolbar({ getState, apply, onAIAssist, onCopyFormatted }: 
             {onAIAssist && (
                 <>
                     <Sep />
-                    <ToolButton icon="auto_awesome" title={t("AI assist (Alt+J)")} onClick={onAIAssist} />
+                    <ToolButton icon="auto_awesome" title={t("AI assist (Alt+Shift+J)")} onClick={onAIAssist} />
                 </>
             )}
         </div>

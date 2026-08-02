@@ -20,18 +20,18 @@ export function ModeToggle({ mode, onSetMode }: ModeToggleProps) {
             role="group"
             aria-label={t("View mode toggle")}
         >
-                <button
+            <button
                     onClick={() => onSetMode("code")}
                     aria-label={t("Code editor")}
                     aria-pressed={mode === "code"}
-                    title={t("Source (Ctrl+E)")}
+                    title={t("Source (Ctrl/Cmd+/)")}
                     className={`${buttonBase} ${modeClass(mode === "code")}`}
                 >
                     <span className="material-symbols-outlined text-[15px]">code</span>
                     <span className="hidden lg:inline">{t("Source")}</span>
-                </button>
+            </button>
 
-                <button
+            <button
                     onClick={() => onSetMode("live")}
                     aria-label={t("Live mode")}
                     aria-pressed={mode === "live"}
@@ -40,29 +40,7 @@ export function ModeToggle({ mode, onSetMode }: ModeToggleProps) {
                 >
                     <span className="material-symbols-outlined text-[15px]">auto_fix_high</span>
                     <span className="hidden lg:inline">{t("Live")}</span>
-                </button>
-
-                <button
-                    onClick={() => onSetMode("split")}
-                    aria-label={t("Split view")}
-                    aria-pressed={mode === "split"}
-                    title={t("Split view (Ctrl+\\)")}
-                    className={`${buttonBase} ${modeClass(mode === "split")}`}
-                >
-                    <span className="material-symbols-outlined text-[15px]">vertical_split</span>
-                    <span className="hidden lg:inline">{t("Split")}</span>
-                </button>
-
-                <button
-                    onClick={() => onSetMode("preview")}
-                    aria-label={t("Reader mode")}
-                    aria-pressed={mode === "preview"}
-                    title={t("Reader (Ctrl+E)")}
-                    className={`${buttonBase} ${modeClass(mode === "preview")}`}
-                >
-                    <span className="material-symbols-outlined text-[15px]">visibility</span>
-                    <span className="hidden lg:inline">{t("Reader")}</span>
-                </button>
+            </button>
         </div>
     );
 }

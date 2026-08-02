@@ -2,8 +2,6 @@ import { memo } from "react";
 import type { MouseEvent } from "react";
 import { Window } from "@tauri-apps/api/window";
 import { SettingsMenu } from "./SettingsMenu";
-import { ExportMenu } from "./ExportMenu";
-import { ModeToggle, type ViewMode } from "./ModeToggle";
 import { useLocale } from "../context/LocaleContext";
 import { getDesktopPlatform } from "../utils/desktopPlatform";
 
@@ -11,23 +9,14 @@ interface TitleBarProps {
     fileName?: string;
     isDirty?: boolean;
     filePath?: string;
-    onOpenFile?: () => void;
-    onNewFile?: () => void;
-    getExportHtml?: () => string;
-    onExportSuccess?: (format: string) => void;
-    onExportError?: (format: string) => void;
-    onToggleAI?: () => void;
-    aiActive?: boolean;
     /** macOS hides traffic lights while in native fullscreen, so release the
      * overlay safe area instead of leaving an empty gutter. */
     isNativeFullscreen?: boolean;
-    mode?: ViewMode;
-    onSetMode?: (mode: ViewMode) => void;
     onToggleNavigation?: () => void;
     navigationActive?: boolean;
 }
 
-function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getExportHtml, onExportSuccess, onExportError, onToggleAI, aiActive, isNativeFullscreen, mode, onSetMode, onToggleNavigation, navigationActive }: TitleBarProps) {
+function TitleBarImpl({ fileName, isDirty, filePath, isNativeFullscreen, onToggleNavigation, navigationActive }: TitleBarProps) {
     const { t } = useLocale();
     const desktopPlatform = getDesktopPlatform();
     const isMacOverlay = desktopPlatform === "macos";
@@ -108,58 +97,12 @@ function TitleBarImpl({ fileName, isDirty, filePath, onOpenFile, onNewFile, getE
                         )}
                     </div>}
 
-                    {/* Compact file actions. Their full labels remain in the
-                        native menu and command palette, keeping document chrome quiet. */}
-                    {hasFile && onOpenFile && (
-                        <div className="flex shrink-0 items-center gap-0.5">
-                            <div className="ml-1 h-4 w-px shrink-0 bg-[var(--border)]"></div>
-                            {onNewFile && (
-                                <button
-                                    onClick={onNewFile}
-                                    aria-label={t("New file")}
-                                    className="workspace-title-button hidden lg:flex"
-                                    title={t("New File (Ctrl+N)")}
-                                >
-                                    <span className="material-symbols-outlined text-[16px]">edit_note</span>
-                                </button>
-                            )}
-                            <button
-                                onClick={onOpenFile}
-                                aria-label={t("Open file")}
-                                className="workspace-title-button hidden lg:flex"
-                                title={t("Open File (Ctrl+O)")}
-                            >
-                                <span className="material-symbols-outlined text-[16px]">folder_open</span>
-                            </button>
-                            <ExportMenu
-                                fileName={fileName || 'document.md'}
-                                getExportHtml={getExportHtml}
-                                onSuccess={onExportSuccess}
-                                onError={onExportError}
-                            />
-                            {onToggleAI && (
-                                <button
-                                    onClick={onToggleAI}
-                                    aria-label={t("AI assistant")}
-                                    aria-pressed={aiActive}
-                                    title={t("AI assistant")}
-                                    className={`workspace-title-button ${aiActive
-                                        ? "bg-[var(--bg-hover)] text-[var(--accent)]"
-                                        : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                                    }`}
-                                >
-                                    <span className="material-symbols-outlined text-[15px] ai-shimmer" aria-hidden="true">auto_awesome</span>
-                                </button>
-                            )}
-                        </div>
-                    )}
                 </div>
 
-                <div className="flex items-center justify-center px-3">
-                    {hasFile && mode && onSetMode && (
-                        <ModeToggle mode={mode} onSetMode={onSetMode} />
-                    )}
-                </div>
+                {/* Typora keeps the document itself as the primary visual
+                    object. Source mode, export and auxiliary tools stay in
+                    native menus / commands instead of becoming title-bar modes. */}
+                <div aria-hidden="true" />
 
                 {/* Settings is an application command. Window controls belong
                     to the platform title bar instead of being reimplemented. */}

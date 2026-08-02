@@ -10,6 +10,13 @@ const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 const tauri = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
 const cargo = readFileSync("src-tauri/Cargo.toml", "utf8");
 const releaseWorkflow = readFileSync(".github/workflows/release.yml", "utf8");
+// Policy comments intentionally name prohibited signing tools. Inspect only
+// executable workflow lines so the guard can explain the boundary without
+// treating that explanation as a signing invocation.
+const executableReleaseWorkflow = releaseWorkflow
+  .split("\n")
+  .filter((line) => !/^\s*#/.test(line))
+  .join("\n");
 const testBuildWorkflow = readFileSync(".github/workflows/test-build.yml", "utf8");
 const issueConfig = readFileSync(".github/ISSUE_TEMPLATE/config.yml", "utf8");
 const bugTemplate = readFileSync(".github/ISSUE_TEMPLATE/bug_report.yml", "utf8");
@@ -60,6 +67,23 @@ if (tauri.bundle?.createUpdaterArtifacts !== false) {
 }
 if (!/unsigned/.test(releaseWorkflow) || /uses:\s*tauri-apps\/tauri-action/.test(releaseWorkflow)) {
   failures.push("release workflow must build and label unsigned artifacts without platform signing tools");
+}
+if (/\b(?:codesign|notarytool|signtool)\b/i.test(executableReleaseWorkflow)) {
+  failures.push("unsigned release workflow must not execute codesign, notarytool, or signtool");
+}
+if (/\$\{\{\s*secrets\./i.test(executableReleaseWorkflow)) {
+  failures.push("unsigned release workflow must not consume signing or other repository secrets");
+}
+const requiredUnsignedArtifacts = [
+  /windows_x64_portable-unsigned\.exe/,
+  /windows_x64-unsigned\.msi/,
+  /windows_x64_setup-unsigned\.exe/,
+  /macos-unsigned\.dmg/,
+  /linux_amd64-unsigned\.deb/,
+  /linux_amd64-unsigned\.AppImage/,
+];
+if (requiredUnsignedArtifacts.some((pattern) => !pattern.test(executableReleaseWorkflow))) {
+  failures.push("every Windows, macOS, and Linux release package must carry the -unsigned suffix");
 }
 
 if (failures.length) {

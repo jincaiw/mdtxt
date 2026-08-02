@@ -18,12 +18,20 @@ interface ShortcutGroup {
 }
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
-const isWindows = typeof navigator !== "undefined" && /Win/.test(navigator.platform);
 const cmd = isMac ? "⌘" : "Ctrl";
-// On Windows, WebView2 grabs Ctrl+J for the built-in Downloads UI before
-// the page can preventDefault, so we surface Alt+J as the primary AI
-// shortcut there. macOS / Linux see Ctrl+J fine.
-const aiShortcut = isWindows ? "Alt+J" : `${cmd}+J`;
+const aiShortcut = "Alt+Shift+J";
+const outlineShortcut = isMac ? "⌘+Ctrl+1" : "Ctrl+Shift+1";
+const articlesShortcut = isMac ? "⌘+Ctrl+2" : "Ctrl+Shift+2";
+const fileTreeShortcut = isMac ? "⌘+Ctrl+3" : "Ctrl+Shift+3";
+const quoteShortcut = isMac ? "⌘+⌥+Q" : "Ctrl+Shift+Q";
+const strikeShortcut = isMac ? "Ctrl+Shift+`" : "Alt+Shift+5";
+const inlineCodeShortcut = `${cmd}+Shift+\``;
+const orderedListShortcut = isMac ? "⌘+⌥+O" : "Ctrl+Shift+[";
+const bulletListShortcut = isMac ? "⌘+⌥+U" : "Ctrl+Shift+]";
+const tableShortcut = isMac ? "⌘+⌥+T" : "Ctrl+T";
+const codeBlockShortcut = isMac ? "⌘+⌥+C" : "Ctrl+Shift+K";
+const mathBlockShortcut = isMac ? "⌘+⌥+B" : "Ctrl+Shift+M";
+const imageShortcut = isMac ? "⌘+Ctrl+I" : "Ctrl+Shift+I";
 
 const groups: ShortcutGroup[] = [
     {
@@ -39,29 +47,30 @@ const groups: ShortcutGroup[] = [
     {
         title: "Tabs",
         items: [
-            { keys: `${cmd}+N`, description: "New tab" },
+            { keys: isMac ? "⌘+T" : "Ctrl+N", description: "New tab" },
             { keys: `${cmd}+W`, description: "Close tab" },
             { keys: `${cmd}+Shift+T`, description: "Reopen closed tab" },
-            { keys: `${cmd}+Tab`, description: "Next tab" },
-            { keys: `${cmd}+Shift+Tab`, description: "Previous tab" },
+            { keys: isMac ? "⌘+`" : "Ctrl+Tab", description: "Next tab" },
+            { keys: "Ctrl+Shift+Tab", description: "Previous tab" },
             { keys: "Alt+←/→", description: "Previous / next tab" },
-            { keys: `${cmd}+1-8`, description: "Jump to tab N" },
-            { keys: `${cmd}+9`, description: "Jump to last tab" },
+            { keys: "Alt+1-8", description: "Jump to tab N" },
+            { keys: "Alt+9", description: "Jump to last tab" },
         ],
     },
     {
         title: "View",
         items: [
-            { keys: `${cmd}+E`, description: "Toggle Reader / Code" },
-            { keys: `${cmd}+\\`, description: "Toggle split view" },
-            { keys: `${cmd}+Shift+L`, description: "Toggle Live editor" },
+            { keys: `${cmd}+/`, description: "Toggle Source Code mode" },
+            { keys: `${cmd}+Shift+L`, description: "Toggle sidebar" },
             { keys: "F9", description: "Toggle Typewriter mode" },
             { keys: "F8", description: "Toggle Focus mode" },
-            { keys: "F11", description: "Toggle fullscreen" },
-            { keys: `${cmd}+Shift+E`, description: "Toggle file explorer" },
+            { keys: isMac ? "⌘+⌥+F" : "F11", description: "Toggle fullscreen" },
+            { keys: articlesShortcut, description: "Show articles" },
+            { keys: fileTreeShortcut, description: "Show file tree" },
             { keys: `${cmd}+Shift+F`, description: "Search across files" },
-            { keys: `${cmd}+Shift+O`, description: "Toggle outline" },
-            { keys: `${cmd}+P`, description: "Command palette" },
+            { keys: outlineShortcut, description: "Toggle outline" },
+            { keys: isMac ? "⌘+Shift+O" : "Ctrl+P", description: "Quick open" },
+            { keys: `${cmd}+Shift+P`, description: "Command palette" },
             { keys: `${cmd}+,`, description: "Open settings" },
             { keys: "?", description: "Show this cheatsheet" },
         ],
@@ -78,13 +87,17 @@ const groups: ShortcutGroup[] = [
             { keys: `${cmd}+B`, description: "Bold (toggle)" },
             { keys: `${cmd}+I`, description: "Italic (toggle)" },
             { keys: `${cmd}+K`, description: "Insert link" },
-            { keys: `${cmd}+/`, description: "Toggle blockquote on line" },
-            { keys: `${cmd}+Shift+1-6`, description: "Set heading level 1–6" },
-            { keys: `${cmd}+Shift+0`, description: "Convert line to paragraph" },
-            { keys: `${cmd}+Shift+X`, description: "Toggle strikethrough" },
-            { keys: `${cmd}+Shift+\``, description: "Toggle inline code" },
-            { keys: `${cmd}+Shift+7/8/9`, description: "Ordered / bullet / task list" },
-            { keys: `${cmd}+Shift+C`, description: "Insert code block" },
+            { keys: imageShortcut, description: "Insert image" },
+            { keys: quoteShortcut, description: "Toggle blockquote on line" },
+            { keys: `${cmd}+1-6`, description: "Set heading level 1–6" },
+            { keys: `${cmd}+0`, description: "Convert line to paragraph" },
+            { keys: strikeShortcut, description: "Toggle strikethrough" },
+            { keys: inlineCodeShortcut, description: "Toggle inline code" },
+            { keys: `${cmd}+\\`, description: "Clear format" },
+            { keys: `${orderedListShortcut} / ${bulletListShortcut}`, description: "Ordered / bullet list" },
+            { keys: tableShortcut, description: "Insert table" },
+            { keys: codeBlockShortcut, description: "Insert code block" },
+            { keys: mathBlockShortcut, description: "Insert math block" },
         ],
     },
     {
@@ -95,6 +108,9 @@ const groups: ShortcutGroup[] = [
             { keys: "Enter", description: "Continue list, blockquote, or task item" },
             { keys: `${cmd}+F`, description: "Find" },
             { keys: `${cmd}+H`, description: "Find and replace" },
+            { keys: `${cmd}+Shift+C`, description: "Copy as Markdown" },
+            { keys: `${cmd}+Shift+V`, description: "Paste as plain text" },
+            { keys: `${cmd}+J`, description: "Jump to selection" },
         ],
     },
     {

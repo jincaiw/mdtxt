@@ -13,11 +13,11 @@ function makeHandlers(over: Partial<ShortcutHandlers> = {}): ShortcutHandlers {
         handleSaveAs: vi.fn(),
         handleNewFile: vi.fn(),
         handleToggleMode: vi.fn(),
-        handleToggleSplit: vi.fn(),
         toggleFullscreen: vi.fn(),
         handleToggleFileExplorer: vi.fn(),
         handleToggleTOC: vi.fn(),
         openCheatsheet: vi.fn(),
+        openQuickOpen: vi.fn(),
         openPalette: vi.fn(),
         openSettings: vi.fn(),
         hasFile: true,
@@ -68,29 +68,55 @@ describe("useGlobalShortcuts", () => {
         expect(h.handleNewFile).toHaveBeenCalledTimes(1);
     });
 
-    it("Ctrl+E toggles mode only when a file is open", () => {
-        press({ key: "e", ctrlKey: true });
+    it("Ctrl+/ toggles Typora-compatible source mode only when a file is open", () => {
+        press({ key: "/", ctrlKey: true });
         expect(h.handleToggleMode).toHaveBeenCalledTimes(1);
     });
 
-    it("Ctrl+P opens the palette and Ctrl+, opens settings", () => {
+    it("Cmd+/ also toggles source mode", () => {
+        press({ key: "/", metaKey: true });
+        expect(h.handleToggleMode).toHaveBeenCalledTimes(1);
+    });
+
+    it("Ctrl+P opens Quick Open while Ctrl+Shift+P opens the command palette", () => {
         press({ key: "p", ctrlKey: true });
+        press({ key: "p", ctrlKey: true, shiftKey: true });
         press({ key: ",", ctrlKey: true });
+        expect(h.openQuickOpen).toHaveBeenCalledTimes(1);
         expect(h.openPalette).toHaveBeenCalledTimes(1);
         expect(h.openSettings).toHaveBeenCalledTimes(1);
     });
 
     it("F11 toggles fullscreen", () => {
         press({ key: "F11" });
-        expect(h.toggleFullscreen).toHaveBeenCalledTimes(1);
+        press({ key: "f", metaKey: true, altKey: true });
+        expect(h.toggleFullscreen).toHaveBeenCalledTimes(2);
     });
 
-    it("Alt+J dispatches the AI-assist event", () => {
+    it("supports Typora's macOS new-tab and reopen bindings", () => {
+        h.reopenClosedTab = vi.fn();
+        press({ key: "t", metaKey: true });
+        press({ key: "t", metaKey: true, shiftKey: true });
+        expect(h.handleNewFile).toHaveBeenCalledTimes(1);
+        expect(h.reopenClosedTab).toHaveBeenCalledTimes(1);
+    });
+
+    it("Alt+Shift+J dispatches the non-conflicting AI-assist event", () => {
         const onAi = vi.fn();
         window.addEventListener("mdtxt:ai-assist", onAi);
-        press({ key: "j", altKey: true });
+        press({ key: "j", altKey: true, shiftKey: true });
         window.removeEventListener("mdtxt:ai-assist", onAi);
         expect(onAi).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses Typora's Cmd+backtick binding to cycle opened documents", () => {
+        const nextTab = vi.fn();
+        cleanup();
+        h = makeHandlers({ nextTab });
+        render(<Harness handlers={h} />);
+        press({ key: "`", metaKey: true });
+        press({ key: "`", metaKey: true, shiftKey: true });
+        expect(nextTab).toHaveBeenCalledTimes(1);
     });
 });
 
@@ -102,16 +128,28 @@ describe("useGlobalShortcuts gating", () => {
         expect(h.handleSaveFile).not.toHaveBeenCalled();
     });
 
-    it("switches recovered unsaved tabs without a file path", () => {
+    it("switches recovered unsaved tabs without shadowing Typora heading shortcuts", () => {
         const h = makeHandlers({ hasFile: false, content: "", gotoTab: vi.fn(), prevTab: vi.fn(), nextTab: vi.fn() });
         render(<Harness handlers={h} />);
         press({ key: "1", ctrlKey: true });
+        press({ key: "1", altKey: true });
         press({ key: "Tab", ctrlKey: true, shiftKey: true });
         press({ key: "PageUp", ctrlKey: true });
         press({ key: "PageDown", ctrlKey: true });
         expect(h.gotoTab).toHaveBeenCalledWith(0);
         expect(h.prevTab).toHaveBeenCalledTimes(2);
         expect(h.nextTab).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses Typora's Windows/Linux outline, articles, and file-tree bindings", () => {
+        const h = makeHandlers({ handleToggleTOC: vi.fn(), showArticles: vi.fn(), showFileTree: vi.fn() });
+        render(<Harness handlers={h} />);
+        press({ key: "1", ctrlKey: true, shiftKey: true });
+        press({ key: "2", ctrlKey: true, shiftKey: true });
+        press({ key: "3", ctrlKey: true, shiftKey: true });
+        expect(h.handleToggleTOC).toHaveBeenCalledTimes(1);
+        expect(h.showArticles).toHaveBeenCalledTimes(1);
+        expect(h.showFileTree).toHaveBeenCalledTimes(1);
     });
 
     it("Ctrl+F opens preview find only in reader mode", () => {

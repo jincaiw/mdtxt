@@ -5,6 +5,35 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.execute((target) => target.click(), element);
     };
 
+    const isLivePresentation = async () => browser.execute(() => {
+        const value = document.querySelector(".cm-editor")?.getAttribute("data-mdtxt-live");
+        return value === "true" || value === "restricted";
+    });
+
+    // Typora treats Source Code Mode as a shortcut around the normal Live
+    // writing surface. Exercise the real window-level binding instead of a
+    // removed title-bar control so native evidence matches shipped behavior.
+    const toggleSourceMode = async () => {
+        const modifier = await browser.execute(() => /mac/i.test(navigator.platform) ? "Meta" : "Control");
+        await browser.keys([modifier, "/"]);
+    };
+
+    const switchToSource = async () => {
+        if (!await isLivePresentation()) return;
+        await toggleSourceMode();
+        await browser.waitUntil(async () => !(await isLivePresentation()), {
+            timeoutMsg: "Source Code Mode did not activate",
+        });
+    };
+
+    const switchToLive = async () => {
+        if (await isLivePresentation()) return;
+        await toggleSourceMode();
+        await browser.waitUntil(isLivePresentation, {
+            timeoutMsg: "Live Preview did not activate",
+        });
+    };
+
     const dismissTourIfPresent = async () => {
         // The tour is mounted by a hasFile/booting effect after the editor
         // itself becomes visible. Let that effect settle before deciding the
@@ -133,11 +162,9 @@ describe("mdtxt native Tauri smoke", () => {
         console.log(`MDTXT_NATIVE_TRACE ${JSON.stringify(result.metrics ?? [])}`);
         assert.equal(result.error, undefined, result.error);
         // Live is the product default. Recovery/performance probes that type
-        // exact Markdown must opt into Source instead of treating the rendered
-        // Live projection as a contenteditable source surface.
-        const source = await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']");
-        await activate(source);
-        await browser.waitUntil(async () => (await source.getAttribute("aria-pressed")) === "true");
+        // exact Markdown opt into Source rather than treating a projection as
+        // a contenteditable source surface.
+        await switchToSource();
         return result.duration;
     };
 
@@ -159,7 +186,7 @@ describe("mdtxt native Tauri smoke", () => {
         await browser.waitUntil(async () => (await settings.getAttribute("aria-expanded")) !== "true");
     });
 
-    it("delegates window chrome to the native platform outside macOS", async () => {
+    it("delegates window chrome to the native platform without simulated controls", async () => {
         const chrome = await browser.execute(() => ({
             platform: navigator.platform,
             title: document.title,
@@ -169,13 +196,12 @@ describe("mdtxt native Tauri smoke", () => {
                 .filter((label) => /^(minimize|maximize|restore|close)$/i.test(label ?? "")),
         }));
 
-        assert.match(chrome.platform, /Linux/i);
         assert.equal(chrome.title, "mdtxt");
-        assert.equal(chrome.hasAppDragRegion, false);
+        assert.equal(chrome.hasAppDragRegion, /Mac/i.test(chrome.platform));
         assert.deepEqual(chrome.simulatedControls, []);
     });
 
-    it("exposes Live as the default workspace mode", async () => {
+    it("uses the Typora-style Source shortcut around Live while retaining Split as an extension", async () => {
         const newFile = await $("//button[contains(., '新建文件') or contains(., 'New File')]");
         await newFile.click();
 
@@ -189,22 +215,32 @@ describe("mdtxt native Tauri smoke", () => {
         }
         await browser.execute(() => localStorage.setItem("mdtxt:tourDone", "true"));
 
-        await $("[role='group'][aria-label='切换视图模式'], [role='group'][aria-label='View mode toggle']").waitForDisplayed();
-        assert.equal(await $("button[aria-label='Live 模式'], button[aria-label='Live mode']").getAttribute("aria-pressed"), "true");
-        assert.equal(await $("button[aria-label='分栏视图'], button[aria-label='Split view']").isDisplayed(), true);
-        assert.equal(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']").isDisplayed(), true);
-        const liveMode = await $("button[aria-label='Live 模式'], button[aria-label='Live mode']");
-        await liveMode.waitForDisplayed();
+        assert.equal(await $("[role='group'][aria-label='切换视图模式'], [role='group'][aria-label='View mode toggle']").isExisting(), false);
+        assert.equal(await $("button[aria-label='分栏视图'], button[aria-label='Split view']").isExisting(), false);
+        assert.equal(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']").isExisting(), false);
         const editor = await $(".cm-content");
         await editor.setValue("# Native smoke\n\n## Modes\n\n- Source\n- Live\n- Split\n- Reader");
 
-        await activate(liveMode);
+        await switchToLive();
         await $(".cm-editor[data-mdtxt-live='true']").waitForExist();
         assert.equal(await $(".cm-editor[data-mdtxt-live='true'] .cm-gutters").getCSSProperty("display").then((v) => v.value), "none");
 
-        await activate(await $("button[aria-label='分栏视图'], button[aria-label='Split view']"));
+        await switchToSource();
+        assert.equal(await $(".cm-editor").getAttribute("data-mdtxt-live"), null);
+        await switchToLive();
+
+        // Split remains an mdtxt extension without stealing Typora's
+        // Ctrl/Cmd+\\ Clear Format binding. Enter it through the command
+        // palette, which is the supported extension surface.
+        const paletteModifier = await browser.execute(() => /mac/i.test(navigator.platform) ? "Meta" : "Control");
+        await browser.keys([paletteModifier, "Shift", "P"]);
+        const palette = await $("[role='dialog'][aria-label='命令面板'], [role='dialog'][aria-label='Command palette']");
+        await palette.waitForDisplayed();
+        const paletteSearch = await palette.$("input");
+        const splitQuery = await browser.execute(() => document.documentElement.lang.startsWith("zh") ? "分栏" : "split view");
+        await paletteSearch.setValue(splitQuery);
+        await browser.keys("Enter");
         await $(".markdown-body").waitForDisplayed();
-        await activate(await $("button[aria-label='阅读模式'], button[aria-label='Reader mode']"));
         assert.equal(await $(".markdown-body").isDisplayed(), true);
     });
 
@@ -258,7 +294,7 @@ describe("mdtxt native Tauri smoke", () => {
         // recovery contract is byte-for-byte source preservation, so switch
         // to Source before reading the editor DOM instead of comparing the
         // visual projection to Markdown source.
-        await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
+        await switchToSource();
         const recovered = await $(".cm-content");
         await recovered.waitForDisplayed();
         const recoveredText = await browser.execute(
@@ -325,7 +361,7 @@ describe("mdtxt native Tauri smoke", () => {
         await (await $$(".cm-line"))[4].click();
 
         const started = await browser.execute(() => performance.now());
-        await activate(await $("button[aria-label='Live 模式'], button[aria-label='Live mode']"));
+        await switchToLive();
         const widgetSelectors = [
             ".cm-live-frontmatter-widget",
             ".cm-live-image-widget",
@@ -361,7 +397,7 @@ describe("mdtxt native Tauri smoke", () => {
         }
         const duration = await browser.execute((start) => performance.now() - start, started);
 
-        await activate(await $("button[aria-label='源码编辑器'], button[aria-label='Code editor']"));
+        await switchToSource();
         // CodeMirror virtualizes off-screen Source lines too. Validate the
         // controller-owned full document through the new recovery entry rather
         // than reconstructing only the currently mounted line DOM.
@@ -382,11 +418,6 @@ describe("mdtxt native Tauri smoke", () => {
 
         const sourceOpenMs = await restoreStagedRecovery();
         const restrictedLiveMs = await browser.executeAsync((done) => {
-            const button = document.querySelector("button[aria-label='Live 模式'], button[aria-label='Live mode']");
-            if (!(button instanceof HTMLButtonElement)) {
-                done({ error: "Live mode is unavailable" });
-                return;
-            }
             const started = performance.now();
             let timeoutId;
             const finish = () => {
@@ -403,7 +434,10 @@ describe("mdtxt native Tauri smoke", () => {
                 observer.disconnect();
                 done({ error: "Restricted Live did not activate within 20 seconds" });
             }, 20_000);
-            button.click();
+            const mac = /mac/i.test(navigator.platform);
+            window.dispatchEvent(new KeyboardEvent("keydown", {
+                key: "/", ctrlKey: !mac, metaKey: mac, bubbles: true, cancelable: true,
+            }));
             finish();
         });
         assert.equal(typeof restrictedLiveMs, "number", restrictedLiveMs.error);

@@ -4,6 +4,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+import { writeHtml, writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 export interface EditorClipboardPayload {
     plainText: string;
@@ -34,21 +35,39 @@ export function selectedMarkdown(state: EditorState): string | null {
 }
 
 /**
- * Runs after CodeMirror's native copy listener. CodeMirror owns text/plain,
- * including its line-wise-copy and platform fallbacks; this function only adds
- * the rich representation and must never cancel the browser event.
+ * Copies an explicit rich selection through Tauri's native clipboard. Normal
+ * Ctrl/Cmd+C remains CodeMirror-owned (including its line-wise-copy and IME
+ * fallbacks); this is intentionally a separate toolbar/menu action.
  */
 export async function copySelectedMarkdownAsRichText(view: EditorView): Promise<boolean> {
     const markdown = selectedMarkdown(view.state);
     if (markdown === null) return false;
     const payload = createEditorClipboardPayload(markdown);
-    if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-        await navigator.clipboard.write([new ClipboardItem({
-            "text/plain": new Blob([payload.plainText], { type: "text/plain" }),
-            "text/html": new Blob([payload.html], { type: "text/html" }),
-        })]);
-    } else {
-        await navigator.clipboard.writeText(payload.plainText);
+    try {
+        await writeHtml(payload.html, payload.plainText);
+    } catch {
+        // Browser preview/tests do not load Tauri's native plugin. Keep the
+        // same two MIME representations wherever the Web Clipboard API exists.
+        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+            await navigator.clipboard.write([new ClipboardItem({
+                "text/plain": new Blob([payload.plainText], { type: "text/plain" }),
+                "text/html": new Blob([payload.html], { type: "text/html" }),
+            })]);
+        } else {
+            await navigator.clipboard.writeText(payload.plainText);
+        }
+    }
+    return true;
+}
+
+/** Copy the exact source selection, matching Typora's Copy as Markdown. */
+export async function copySelectedMarkdownPlain(view: EditorView): Promise<boolean> {
+    const markdown = selectedMarkdown(view.state);
+    if (markdown === null) return false;
+    try {
+        await writeText(markdown);
+    } catch {
+        await navigator.clipboard.writeText(markdown);
     }
     return true;
 }
